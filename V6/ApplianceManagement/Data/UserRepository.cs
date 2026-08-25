@@ -10,6 +10,7 @@ namespace ApplianceManagement.Data
 {
     public class UserRepository
     {
+        // .NET Framework 4.7.2 Rfc2898DeriveBytes uses HMACSHA1; 100k iterations is still strong for desktop apps.
         private const int Pbkdf2Iterations = 100000;
 
         public User Authenticate(string userName, string password)
@@ -39,7 +40,6 @@ namespace ApplianceManagement.Data
                             CreatedDate = (DateTime)r["CreatedDate"]
                         };
 
-                        // Upgrade legacy SHA256 hashes to PBKDF2 on successful login
                         bool isLegacy = stored.IndexOf(':') < 0;
                         r.Close();
                         if (isLegacy)
@@ -121,14 +121,14 @@ namespace ApplianceManagement.Data
             }
         }
 
-        /// <summary>PBKDF2 format: iterations:saltBase64:hashBase64</summary>
+        /// <summary>Format: iterations:saltBase64:hashBase64 (HMACSHA1 via net472 Rfc2898DeriveBytes)</summary>
         public static string HashPassword(string password)
         {
             byte[] salt = new byte[16];
-            using (var rng = RandomNumberGenerator.Create())
+            using (var rng = new RNGCryptoServiceProvider())
                 rng.GetBytes(salt);
 
-            using (var pbkdf2 = new Rfc2898DeriveBytes(password, salt, Pbkdf2Iterations, HashAlgorithmName.SHA256))
+            using (var pbkdf2 = new Rfc2898DeriveBytes(password, salt, Pbkdf2Iterations))
             {
                 byte[] hash = pbkdf2.GetBytes(32);
                 return Pbkdf2Iterations + ":" +
@@ -141,28 +141,30 @@ namespace ApplianceManagement.Data
         {
             if (string.IsNullOrEmpty(stored)) return false;
 
-            // New format
             if (stored.Contains(":"))
             {
                 var parts = stored.Split(':');
                 if (parts.Length != 3) return false;
-                if (!int.TryParse(parts[0], out int iterations)) return false;
+                int iterations;
+                if (!int.TryParse(parts[0], out iterations)) return false;
                 byte[] salt = Convert.FromBase64String(parts[1]);
                 byte[] expected = Convert.FromBase64String(parts[2]);
 
-                using (var pbkdf2 = new Rfc2898DeriveBytes(password, salt, iterations, HashAlgorithmName.SHA256))
+                using (var pbkdf2 = new Rfc2898DeriveBytes(password, salt, iterations))
                 {
                     byte[] actual = pbkdf2.GetBytes(expected.Length);
                     return FixedTimeEquals(actual, expected);
                 }
             }
 
-            // Legacy SHA256 (uppercase hex) — still accepted, upgraded on login
             string legacy = ComputeSha256HashLegacy(password);
             return string.Equals(legacy, stored, StringComparison.OrdinalIgnoreCase);
         }
 
-        public static string ComputeSha256Hash(string raw) => HashPassword(raw);
+        public static string ComputeSha256Hash(string raw)
+        {
+            return HashPassword(raw);
+        }
 
         private static string ComputeSha256HashLegacy(string raw)
         {

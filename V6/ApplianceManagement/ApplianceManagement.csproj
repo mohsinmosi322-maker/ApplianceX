@@ -76,6 +76,7 @@
     <Compile Include="Data\PurchaseRepository.cs" />
     <Compile Include="Helpers\DbHelper.cs" />
     <Compile Include="Helpers\AppSettings.cs" />
+    <Compile Include="Helpers\AppLog.cs" />
     <Compile Include="Helpers\UiHelper.cs" />
     <Compile Include="Helpers\BillPrinter.cs" />
     <Compile Include="Helpers\LicenseReader.cs" />
