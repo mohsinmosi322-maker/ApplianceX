@@ -1,0 +1,30 @@
+# Build outputs
+**/bin/
+**/obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.pdb
+*.cache
+*.dll
+*.exe
+!**/packages/**
+
+# Secrets & local license
+license.dat
+auth_master.dat
+**/license.dat
+**/auth_master.dat
+*.log
+logs/
+
+# IDE
+.vs/
+.idea/
+*.DotSettings.user
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
