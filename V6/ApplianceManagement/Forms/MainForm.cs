@@ -135,7 +135,6 @@ namespace ApplianceManagement.Forms
             homeHost.BackColor = UiHelper.BgColor;
             homeHost.Controls.Add(homeScreen);
             homeHost.MdiParent = this;
-            homeHost.Dock = DockStyle.Fill;
             homeHost.FormClosing += (s, e) =>
             {
                 if (e.CloseReason == CloseReason.UserClosing) e.Cancel = true;
@@ -154,7 +153,7 @@ namespace ApplianceManagement.Forms
 
         private void SyncHome()
         {
-            if (homeHost == null || homeScreen == null || syncHome) return;
+            if (homeHost == null || homeScreen == null || syncingHome) return;
             syncingHome = true;
             try
             {
