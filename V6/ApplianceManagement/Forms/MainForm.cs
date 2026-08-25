@@ -18,18 +18,29 @@ namespace ApplianceManagement.Forms
         private ToolStripStatusLabel lblUser, lblShop, lblBrand, lblClock;
         private Timer clockTimer;
         private HomeScreen homeScreen;
-        private Timer welcomeTimer;
+        private Form homeHost;
         private MdiClient mdiClient;
+        private bool syncingHome;
 
         public MainForm(User user)
         {
             CurrentUser = user;
             Instance = this;
             UiHelper.InitializeTheme();
+            SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
             InitializeComponent();
             this.WindowState = FormWindowState.Maximized;
-            UiHelper.FadeIn(this);
             ApplyPermissions();
+        }
+
+        protected override CreateParams CreateParams
+        {
+            get
+            {
+                CreateParams cp = base.CreateParams;
+                cp.ExStyle |= 0x02000000; // WS_EX_COMPOSITED — stops child-control flicker
+                return cp;
+            }
         }
 
         private void InitializeComponent()
@@ -40,6 +51,7 @@ namespace ApplianceManagement.Forms
             this.MinimumSize = new Size(1024, 700);
             this.FormClosing += MainForm_FormClosing;
             this.KeyPreview = true;
+            this.MdiChildActivate += (s, e) => SyncHome();
 
             string shop = UiHelper.GetShopName();
             this.Text = UiHelper.AppName + "  —  " + shop;
@@ -54,6 +66,7 @@ namespace ApplianceManagement.Forms
         private void BuildMenu()
         {
             menuStrip = new MenuStrip();
+            menuStrip.Dock = DockStyle.Top;
             menuStrip.BackColor = UiHelper.ThemeColor;
             menuStrip.ForeColor = Color.White;
             menuStrip.Font = new Font(UiHelper.NormalFont.FontFamily, UiHelper.NormalFont.Size, FontStyle.Regular);
@@ -107,6 +120,7 @@ namespace ApplianceManagement.Forms
         private void BuildToolbar()
         {
             toolStrip = new ToolStrip();
+            toolStrip.Dock = DockStyle.Top;
             toolStrip.GripStyle = ToolStripGripStyle.Hidden;
             toolStrip.BackColor = Color.FromArgb(248, 250, 252);
             toolStrip.Padding = new Padding(10, 8, 10, 8);
@@ -119,7 +133,7 @@ namespace ApplianceManagement.Forms
             toolStrip.Items.Add(MakeToolButton("Purchase", "F3", (s, e) => OpenChild(new PurchaseForm(), "PURCHASE")));
             toolStrip.Items.Add(new ToolStripSeparator());
             toolStrip.Items.Add(MakeToolButton("New Item", "", (s, e) => OpenChild(new NewItemForm(), "NEWITEM")));
-            toolStrip.Items.Add(MakeToolButton("Stock", "", (s, e) => OpenChild(new InventoryForm(), "INVENTORY")));
+            toolStrip.Items.Add(MakeToolButton("Stock", "", (s, e) => OpenChild(new InventoryForm(), "INVENTORY", true)));
             toolStrip.Items.Add(MakeToolButton("Low Stock", "", (s, e) => OpenChild(new LowStockForm(), "INVENTORY")));
             toolStrip.Items.Add(new ToolStripSeparator());
             toolStrip.Items.Add(MakeToolButton("Reports", "", (s, e) => OpenChild(new ReportsForm("SALES"), "REPORTS")));
@@ -143,12 +157,12 @@ namespace ApplianceManagement.Forms
         private void BuildStatus()
         {
             statusStrip = new StatusStrip();
+            statusStrip.Dock = DockStyle.Bottom;
             statusStrip.BackColor = UiHelper.ThemeDark;
             statusStrip.ForeColor = Color.White;
             statusStrip.Font = UiHelper.SmallFont;
             statusStrip.SizingGrip = false;
             statusStrip.Padding = new Padding(8, 4, 12, 4);
-            statusStrip.Height = 28;
 
             string shop = UiHelper.GetShopName();
             string phone = UiHelper.GetShopPhone();
@@ -160,12 +174,11 @@ namespace ApplianceManagement.Forms
             };
             lblUser = new ToolStripStatusLabel("  " + CurrentUser.FullName + "  ·  " + CurrentUser.Role + "  ") { ForeColor = Color.White };
             lblClock = new ToolStripStatusLabel(DateTime.Now.ToString("dd MMM yyyy  HH:mm")) { ForeColor = Color.FromArgb(220, 230, 240) };
-            string brand = UiHelper.AppName + "  v" + UiHelper.AppVersion;
-            lblBrand = new ToolStripStatusLabel("  " + brand + "  ") { ForeColor = Color.FromArgb(200, 214, 229) };
+            lblBrand = new ToolStripStatusLabel("  " + UiHelper.AppName + "  v" + UiHelper.AppVersion + "  ") { ForeColor = Color.FromArgb(200, 214, 229) };
             statusStrip.Items.AddRange(new ToolStripItem[] { lblShop, lblUser, lblClock, lblBrand });
             this.Controls.Add(statusStrip);
 
-            clockTimer = new Timer { Interval = 15000 };
+            clockTimer = new Timer { Interval = 30000 };
             clockTimer.Tick += (s, e) => { if (lblClock != null) lblClock.Text = DateTime.Now.ToString("dd MMM yyyy  HH:mm"); };
             clockTimer.Start();
         }
@@ -178,47 +191,64 @@ namespace ApplianceManagement.Forms
                 {
                     mdiClient = (MdiClient)c;
                     mdiClient.BackColor = UiHelper.BgColor;
-                    SetupHome();
                     break;
                 }
             }
+            SetupHome();
         }
 
         /// <summary>
-        /// HomeScreen is a Panel. MdiClient.Controls only accepts Form instances.
-        /// Parent the dashboard to MainForm and toggle it when MDI children open/close.
+        /// Dashboard lives in a borderless MDI child (MdiClient only accepts Forms).
+        /// No overlay Panel vs MdiClient z-order war, and no polling timer.
         /// </summary>
         private void SetupHome()
         {
             homeScreen = new HomeScreen(CurrentUser);
             homeScreen.Dock = DockStyle.Fill;
-            this.Controls.Add(homeScreen);
-            RaiseChrome();
 
-            welcomeTimer = new Timer { Interval = 350 };
-            welcomeTimer.Tick += (s, ev) => UpdateHomeVisibility();
-            welcomeTimer.Start();
-        }
-
-        private void RaiseChrome()
-        {
-            if (homeScreen != null) homeScreen.BringToFront();
-            if (toolStrip != null) toolStrip.BringToFront();
-            if (menuStrip != null) menuStrip.BringToFront();
-            if (statusStrip != null) statusStrip.BringToFront();
-        }
-
-        private void UpdateHomeVisibility()
-        {
-            if (homeScreen == null) return;
-            bool show = this.MdiChildren.Length == 0;
-            if (show && !homeScreen.Visible)
+            homeHost = new Form();
+            homeHost.Text = "Dashboard";
+            homeHost.FormBorderStyle = FormBorderStyle.None;
+            homeHost.ControlBox = false;
+            homeHost.MaximizeBox = false;
+            homeHost.MinimizeBox = false;
+            homeHost.ShowInTaskbar = false;
+            homeHost.BackColor = UiHelper.BgColor;
+            homeHost.Controls.Add(homeScreen);
+            homeHost.MdiParent = this;
+            homeHost.FormClosing += (s, e) =>
             {
-                homeScreen.RefreshBranding();
-                homeScreen.RefreshData();
+                if (e.CloseReason == CloseReason.UserClosing)
+                    e.Cancel = true; // dashboard stays; other windows close around it
+            };
+            homeHost.Show();
+            homeHost.WindowState = FormWindowState.Maximized;
+        }
+
+        private int OtherChildCount()
+        {
+            int n = 0;
+            foreach (Form f in this.MdiChildren)
+                if (f != homeHost) n++;
+            return n;
+        }
+
+        private void SyncHome()
+        {
+            if (homeHost == null || homeScreen == null || syncingHome) return;
+            syncingHome = true;
+            try
+            {
+                bool showDash = OtherChildCount() == 0;
+                if (showDash)
+                {
+                    if (!homeHost.Visible) homeHost.Show();
+                    if (homeHost.WindowState != FormWindowState.Maximized)
+                        homeHost.WindowState = FormWindowState.Maximized;
+                    homeHost.Activate();
+                }
             }
-            homeScreen.Visible = show;
-            if (show) RaiseChrome();
+            finally { syncingHome = false; }
         }
 
         public void RefreshBranding()
@@ -281,36 +311,44 @@ namespace ApplianceManagement.Forms
         private void MnuWindows_DropDownOpening(object sender, EventArgs e)
         {
             mnuWindows.DropDownItems.Clear();
-            if (this.MdiChildren.Length == 0)
-            {
-                mnuWindows.DropDownItems.Add("(No open windows)");
-                return;
-            }
+            int listed = 0;
             foreach (Form child in this.MdiChildren)
             {
+                if (child == homeHost) continue;
+                listed++;
                 var item = new ToolStripMenuItem(string.IsNullOrEmpty(child.Text) ? child.GetType().Name : child.Text);
                 item.Tag = child;
                 item.Click += (s, ev) => ((Form)((ToolStripMenuItem)s).Tag).Activate();
                 if (child == this.ActiveMdiChild) item.Checked = true;
                 mnuWindows.DropDownItems.Add(item);
             }
-            mnuWindows.DropDownItems.Add(new ToolStripSeparator());
-            mnuWindows.DropDownItems.Add("Cascade", null, (s, ev) => this.LayoutMdi(MdiLayout.Cascade));
-            mnuWindows.DropDownItems.Add("Tile Horizontal", null, (s, ev) => this.LayoutMdi(MdiLayout.TileHorizontal));
-            mnuWindows.DropDownItems.Add("Close All", null, (s, ev) =>
+            if (listed == 0)
+                mnuWindows.DropDownItems.Add("(No open windows)");
+            else
             {
-                foreach (Form f in this.MdiChildren) f.Close();
-            });
+                mnuWindows.DropDownItems.Add(new ToolStripSeparator());
+                mnuWindows.DropDownItems.Add("Cascade", null, (s, ev) => this.LayoutMdi(MdiLayout.Cascade));
+                mnuWindows.DropDownItems.Add("Tile Horizontal", null, (s, ev) => this.LayoutMdi(MdiLayout.TileHorizontal));
+                mnuWindows.DropDownItems.Add("Close All", null, (s, ev) =>
+                {
+                    foreach (Form f in this.MdiChildren)
+                        if (f != homeHost) f.Close();
+                    SyncHome();
+                });
+            }
         }
 
         public void OpenChild(Form child, string permKey)
         {
-            if (homeScreen != null) homeScreen.Visible = false;
+            OpenChild(child, permKey, false);
+        }
+
+        public void OpenChild(Form child, string permKey, bool unused)
+        {
             if (!AppSettings.HasPermission(CurrentUser.UserName, CurrentUser.Role, permKey))
             {
                 MessageBox.Show("You do not have access to this form.", "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 child.Dispose();
-                if (homeScreen != null && this.MdiChildren.Length == 0) homeScreen.Visible = true;
                 return;
             }
 
@@ -319,7 +357,7 @@ namespace ApplianceManagement.Forms
             {
                 foreach (Form f in this.MdiChildren)
                 {
-                    if (f.GetType() == child.GetType())
+                    if (f != homeHost && f.GetType() == child.GetType())
                     {
                         f.Activate();
                         child.Dispose();
@@ -331,6 +369,7 @@ namespace ApplianceManagement.Forms
             child.MdiParent = this;
             UiHelper.ApplyFormSize(child);
             child.WindowState = FormWindowState.Normal;
+            child.FormClosed += (s, e) => SyncHome();
             child.Show();
         }
 
@@ -344,7 +383,8 @@ namespace ApplianceManagement.Forms
         private void DoLogout()
         {
             if (MessageBox.Show("Logout?", "Confirm", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
-            foreach (Form f in this.MdiChildren) f.Close();
+            foreach (Form f in this.MdiChildren)
+                if (f != homeHost) f.Close();
             this.Hide();
             var login = new LoginForm();
             login.FormClosed += (s, e) => this.Close();
@@ -358,7 +398,6 @@ namespace ApplianceManagement.Forms
                 if (!UiHelper.ConfirmExit()) e.Cancel = true;
             }
             if (e.Cancel) return;
-            if (welcomeTimer != null) { welcomeTimer.Stop(); welcomeTimer.Dispose(); welcomeTimer = null; }
             if (clockTimer != null) { clockTimer.Stop(); clockTimer.Dispose(); clockTimer = null; }
         }
     }
