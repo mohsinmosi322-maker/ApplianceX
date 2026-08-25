@@ -14,9 +14,7 @@ namespace ApplianceManagement.Forms
         private MenuStrip menuStrip;
         private ToolStripMenuItem mnuWindows;
         private HomeScreen homeScreen;
-        private Form homeHost;
         private MdiClient mdiClient;
-        private bool syncingHome;
 
         public MainForm(User user)
         {
@@ -121,50 +119,30 @@ namespace ApplianceManagement.Forms
             SetupHome();
         }
 
+        /// <summary>
+        /// HomeScreen is a Panel. Never add it to MdiClient (crash) and never host it
+        /// as an MDI child Form (that is what jammed the dashboard at the top).
+        /// Parent it to MainForm, Dock.Fill, sit it above MdiClient, below the menu.
+        /// </summary>
         private void SetupHome()
         {
             homeScreen = new HomeScreen(CurrentUser);
             homeScreen.Dock = DockStyle.Fill;
-            homeHost = new Form();
-            homeHost.Text = "Dashboard";
-            homeHost.FormBorderStyle = FormBorderStyle.None;
-            homeHost.ControlBox = false;
-            homeHost.MaximizeBox = false;
-            homeHost.MinimizeBox = false;
-            homeHost.ShowInTaskbar = false;
-            homeHost.BackColor = UiHelper.BgColor;
-            homeHost.Controls.Add(homeScreen);
-            homeHost.MdiParent = this;
-            homeHost.FormClosing += (s, e) =>
-            {
-                if (e.CloseReason == CloseReason.UserClosing) e.Cancel = true;
-            };
-            homeHost.Show();
-            homeHost.WindowState = FormWindowState.Maximized;
-        }
-
-        private int OtherChildCount()
-        {
-            int n = 0;
-            foreach (Form f in this.MdiChildren)
-                if (f != homeHost) n++;
-            return n;
+            this.Controls.Add(homeScreen);
+            homeScreen.BringToFront();
+            menuStrip.BringToFront();
         }
 
         private void SyncHome()
         {
-            if (homeHost == null || homeScreen == null || syncingHome) return;
-            syncingHome = true;
-            try
+            if (homeScreen == null) return;
+            bool showDash = this.MdiChildren.Length == 0;
+            homeScreen.Visible = showDash;
+            if (showDash)
             {
-                if (OtherChildCount() == 0)
-                {
-                    if (!homeHost.Visible) homeHost.Show();
-                    homeHost.WindowState = FormWindowState.Maximized;
-                    homeHost.Activate();
-                }
+                homeScreen.BringToFront();
+                menuStrip.BringToFront();
             }
-            finally { syncingHome = false; }
         }
 
         public void RefreshBranding()
@@ -212,31 +190,27 @@ namespace ApplianceManagement.Forms
         private void MnuWindows_DropDownOpening(object sender, EventArgs e)
         {
             mnuWindows.DropDownItems.Clear();
-            int listed = 0;
+            if (this.MdiChildren.Length == 0)
+            {
+                mnuWindows.DropDownItems.Add("(No open windows)");
+                return;
+            }
             foreach (Form child in this.MdiChildren)
             {
-                if (child == homeHost) continue;
-                listed++;
                 var item = new ToolStripMenuItem(string.IsNullOrEmpty(child.Text) ? child.GetType().Name : child.Text);
                 item.Tag = child;
                 item.Click += (s, ev) => ((Form)((ToolStripMenuItem)s).Tag).Activate();
                 if (child == this.ActiveMdiChild) item.Checked = true;
                 mnuWindows.DropDownItems.Add(item);
             }
-            if (listed == 0)
-                mnuWindows.DropDownItems.Add("(No open windows)");
-            else
+            mnuWindows.DropDownItems.Add(new ToolStripSeparator());
+            mnuWindows.DropDownItems.Add("Cascade", null, (s, ev) => this.LayoutMdi(MdiLayout.Cascade));
+            mnuWindows.DropDownItems.Add("Tile Horizontal", null, (s, ev) => this.LayoutMdi(MdiLayout.TileHorizontal));
+            mnuWindows.DropDownItems.Add("Close All", null, (s, ev) =>
             {
-                mnuWindows.DropDownItems.Add(new ToolStripSeparator());
-                mnuWindows.DropDownItems.Add("Cascade", null, (s, ev) => this.LayoutMdi(MdiLayout.Cascade));
-                mnuWindows.DropDownItems.Add("Tile Horizontal", null, (s, ev) => this.LayoutMdi(MdiLayout.TileHorizontal));
-                mnuWindows.DropDownItems.Add("Close All", null, (s, ev) =>
-                {
-                    foreach (Form f in this.MdiChildren)
-                        if (f != homeHost) f.Close();
-                    SyncHome();
-                });
-            }
+                foreach (Form f in this.MdiChildren) f.Close();
+                SyncHome();
+            });
         }
 
         public void OpenChild(Form child, string permKey)
@@ -252,7 +226,7 @@ namespace ApplianceManagement.Forms
             {
                 foreach (Form f in this.MdiChildren)
                 {
-                    if (f != homeHost && f.GetType() == child.GetType())
+                    if (f.GetType() == child.GetType())
                     {
                         f.Activate();
                         child.Dispose();
@@ -260,6 +234,7 @@ namespace ApplianceManagement.Forms
                     }
                 }
             }
+            if (homeScreen != null) homeScreen.Visible = false;
             child.MdiParent = this;
             UiHelper.ApplyFormSize(child);
             child.WindowState = FormWindowState.Normal;
@@ -277,8 +252,7 @@ namespace ApplianceManagement.Forms
         private void DoLogout()
         {
             if (MessageBox.Show("Logout?", "Confirm", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
-            foreach (Form f in this.MdiChildren)
-                if (f != homeHost) f.Close();
+            foreach (Form f in this.MdiChildren) f.Close();
             this.Hide();
             var login = new LoginForm();
             login.FormClosed += (s, e) => this.Close();
