@@ -8,11 +8,6 @@ namespace ApplianceManagement.Data
 {
     public class SaleRepository
     {
-        /// <summary>
-        /// Saves sale under a single transaction:
-        /// locked invoice number, stock check + decrement, ledger OUT, UnitCost snapshot.
-        /// Populates sale.SaleID and sale.InvoiceNo on success.
-        /// </summary>
         public int SaveSale(SaleHeader sale)
         {
             using (var conn = DbHelper.GetConnection())
@@ -47,19 +42,24 @@ namespace ApplianceManagement.Data
 
                         foreach (var d in sale.Details)
                         {
-                            // Lock product row and ensure stock
                             int available;
                             decimal unitCost;
-                            using (var cmd = DbHelper.CreateCommand(
-                                "SELECT CurrentStock, PurchasePrice FROM Products WITH (UPDLOCK, ROWLOCK) WHERE ProductID=@P AND IsActive=1", conn, trans))
+                            bool hasPhysicalStock = TryReadPhysicalStock(conn, trans, d.ProductID, out available, out unitCost);
+
+                            if (!hasPhysicalStock)
                             {
-                                cmd.Parameters.AddWithValue("@P", d.ProductID);
-                                using (var r = cmd.ExecuteReader())
+                                using (var cmd = DbHelper.CreateCommand(
+                                    "SELECT PurchasePrice, ISNULL((SELECT SUM(QuantityIn)-SUM(QuantityOut) FROM InventoryTransaction WITH (UPDLOCK) WHERE ProductID=@P),0) AS Stock " +
+                                    "FROM Products WITH (UPDLOCK, ROWLOCK) WHERE ProductID=@P AND IsActive=1", conn, trans))
                                 {
-                                    if (!r.Read())
-                                        throw new InvalidOperationException("Product not found or inactive (ID " + d.ProductID + ").");
-                                    available = Convert.ToInt32(r["CurrentStock"]);
-                                    unitCost = Convert.ToDecimal(r["PurchasePrice"]);
+                                    cmd.Parameters.AddWithValue("@P", d.ProductID);
+                                    using (var r = cmd.ExecuteReader())
+                                    {
+                                        if (!r.Read())
+                                            throw new InvalidOperationException("Product not found or inactive (ID " + d.ProductID + ").");
+                                        unitCost = Convert.ToDecimal(r["PurchasePrice"]);
+                                        available = Convert.ToInt32(r["Stock"]);
+                                    }
                                 }
                             }
 
@@ -68,44 +68,18 @@ namespace ApplianceManagement.Data
                                     "Insufficient stock for " + (d.ProductName ?? ("Product " + d.ProductID)) +
                                     ". Available: " + available + ", requested: " + d.Quantity);
 
-                            // Prefer UnitCost column if migration applied; otherwise omit
-                            try
-                            {
-                                using (var cmd = DbHelper.CreateCommand(
-                                    "INSERT INTO SaleDetail(SaleID,ProductID,Quantity,SalePrice,Discount,Amount,UnitCost) VALUES(@S,@P,@Q,@Pr,@Di,@Am,@Uc)", conn, trans))
-                                {
-                                    cmd.Parameters.AddWithValue("@S", saleId);
-                                    cmd.Parameters.AddWithValue("@P", d.ProductID);
-                                    cmd.Parameters.AddWithValue("@Q", d.Quantity);
-                                    cmd.Parameters.AddWithValue("@Pr", d.SalePrice);
-                                    cmd.Parameters.AddWithValue("@Di", d.Discount);
-                                    cmd.Parameters.AddWithValue("@Am", d.Amount);
-                                    cmd.Parameters.AddWithValue("@Uc", unitCost);
-                                    cmd.ExecuteNonQuery();
-                                }
-                            }
-                            catch (SqlException)
-                            {
-                                using (var cmd = DbHelper.CreateCommand(
-                                    "INSERT INTO SaleDetail(SaleID,ProductID,Quantity,SalePrice,Discount,Amount) VALUES(@S,@P,@Q,@Pr,@Di,@Am)", conn, trans))
-                                {
-                                    cmd.Parameters.AddWithValue("@S", saleId);
-                                    cmd.Parameters.AddWithValue("@P", d.ProductID);
-                                    cmd.Parameters.AddWithValue("@Q", d.Quantity);
-                                    cmd.Parameters.AddWithValue("@Pr", d.SalePrice);
-                                    cmd.Parameters.AddWithValue("@Di", d.Discount);
-                                    cmd.Parameters.AddWithValue("@Am", d.Amount);
-                                    cmd.ExecuteNonQuery();
-                                }
-                            }
+                            InsertSaleDetail(conn, trans, saleId, d, unitCost);
 
-                            using (var cmd = DbHelper.CreateCommand(
-                                "UPDATE Products SET CurrentStock = CurrentStock - @Q WHERE ProductID=@P AND CurrentStock >= @Q", conn, trans))
+                            if (hasPhysicalStock)
                             {
-                                cmd.Parameters.AddWithValue("@Q", d.Quantity);
-                                cmd.Parameters.AddWithValue("@P", d.ProductID);
-                                if (cmd.ExecuteNonQuery() == 0)
-                                    throw new InvalidOperationException("Stock changed concurrently for product " + d.ProductID);
+                                using (var cmd = DbHelper.CreateCommand(
+                                    "UPDATE Products SET CurrentStock = CurrentStock - @Q WHERE ProductID=@P AND CurrentStock >= @Q", conn, trans))
+                                {
+                                    cmd.Parameters.AddWithValue("@Q", d.Quantity);
+                                    cmd.Parameters.AddWithValue("@P", d.ProductID);
+                                    if (cmd.ExecuteNonQuery() == 0)
+                                        throw new InvalidOperationException("Stock changed concurrently for product " + d.ProductID);
+                                }
                             }
 
                             using (var cmd = DbHelper.CreateCommand(
@@ -133,6 +107,65 @@ namespace ApplianceManagement.Data
                         AppLog.Error("SaveSale failed", ex);
                         throw;
                     }
+                }
+            }
+        }
+
+        private static bool TryReadPhysicalStock(SqlConnection conn, SqlTransaction trans, int productId, out int stock, out decimal unitCost)
+        {
+            stock = 0;
+            unitCost = 0;
+            try
+            {
+                using (var cmd = DbHelper.CreateCommand(
+                    "SELECT CurrentStock, PurchasePrice FROM Products WITH (UPDLOCK, ROWLOCK) WHERE ProductID=@P AND IsActive=1", conn, trans))
+                {
+                    cmd.Parameters.AddWithValue("@P", productId);
+                    using (var r = cmd.ExecuteReader())
+                    {
+                        if (!r.Read())
+                            throw new InvalidOperationException("Product not found or inactive (ID " + productId + ").");
+                        stock = Convert.ToInt32(r["CurrentStock"]);
+                        unitCost = Convert.ToDecimal(r["PurchasePrice"]);
+                        return true;
+                    }
+                }
+            }
+            catch (SqlException)
+            {
+                return false; // column missing — use ledger path
+            }
+        }
+
+        private static void InsertSaleDetail(SqlConnection conn, SqlTransaction trans, int saleId, SaleDetail d, decimal unitCost)
+        {
+            try
+            {
+                using (var cmd = DbHelper.CreateCommand(
+                    "INSERT INTO SaleDetail(SaleID,ProductID,Quantity,SalePrice,Discount,Amount,UnitCost) VALUES(@S,@P,@Q,@Pr,@Di,@Am,@Uc)", conn, trans))
+                {
+                    cmd.Parameters.AddWithValue("@S", saleId);
+                    cmd.Parameters.AddWithValue("@P", d.ProductID);
+                    cmd.Parameters.AddWithValue("@Q", d.Quantity);
+                    cmd.Parameters.AddWithValue("@Pr", d.SalePrice);
+                    cmd.Parameters.AddWithValue("@Di", d.Discount);
+                    cmd.Parameters.AddWithValue("@Am", d.Amount);
+                    cmd.Parameters.AddWithValue("@Uc", unitCost);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+            catch (SqlException)
+            {
+                using (var cmd = DbHelper.CreateCommand(
+                    "INSERT INTO SaleDetail(SaleID,ProductID,Quantity,SalePrice,Discount,Amount) VALUES(@S,@P,@Q,@Pr,@Di,@Am)", conn, trans))
+                {
+                    cmd.Parameters.AddWithValue("@S", saleId);
+                    cmd.Parameters.AddWithValue("@P", d.ProductID);
+                    cmd.Parameters.AddWithValue("@Q", d.Quantity);
+                    cmd.Parameters.AddWithValue("@Pr", d.SalePrice);
+                    cmd.Parameters.AddWithValue("@Di", d.Discount);
+                    cmd.Parameters.AddWithValue("@Am", d.Amount);
+                    cmd.ExecuteNonQuery();
                 }
             }
         }
@@ -198,7 +231,6 @@ namespace ApplianceManagement.Data
             }
         }
 
-        /// <summary>Atomically allocates next counter under row lock.</summary>
         private static int NextCounter(SqlConnection conn, SqlTransaction trans, string settingName)
         {
             using (var cmd = DbHelper.CreateCommand(

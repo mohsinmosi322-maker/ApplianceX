@@ -155,14 +155,6 @@ namespace ApplianceManagement.Forms
             }
         }
 
-        private void AddT(Panel p, string l, out TextBox t, ref int y, bool ro)
-        {
-            p.Controls.Add(new Label { Text = l, Font = UiHelper.NormalFont, Location = new Point(10, y), Size = new Size(90, 22) });
-            t = new TextBox { Location = new Point(105, y - 2), Size = new Size(210, 24), Text = "0.00", ReadOnly = ro };
-            UiHelper.StyleTextBox(t); if (ro) t.BackColor = Color.FromArgb(240, 240, 240);
-            p.Controls.Add(t); y += 26;
-        }
-
         private void RefreshGrid()
         {
             dgv.DataSource = null; dgv.DataSource = cart;
@@ -172,7 +164,6 @@ namespace ApplianceManagement.Forms
             foreach (var i in cart) cartBaseTotal += i.Amount;
             calcBusy = true;
             txtTotal.Text = cartBaseTotal.ToString("0.00");
-            // keep existing % if any
             decimal pct = 0; decimal.TryParse(txtDiscount.Text, out pct);
             if (pct < 0) pct = 0; if (pct > 100) pct = 100;
             decimal discAmt = Math.Round(cartBaseTotal * pct / 100m, 2);
@@ -275,18 +266,27 @@ namespace ApplianceManagement.Forms
             {
                 var sale = new SaleHeader
                 {
-                    SaleDate = DateTime.Now, CustomerID = walkIn.CustomerID,
-                    TotalAmount = total, Discount = discAmt, NetAmount = net,
-                    PaidAmount = paid, BalanceAmount = net - paid, Details = new List<SaleDetail>(cart)
+                    SaleDate = DateTime.Now,
+                    CustomerID = walkIn.CustomerID,
+                    CustomerName = walkIn.CustomerName,
+                    TotalAmount = total,
+                    Discount = discAmt,
+                    NetAmount = net,
+                    PaidAmount = paid,
+                    BalanceAmount = net - paid,
+                    Details = new List<SaleDetail>(cart)
                 };
                 saleRepo.SaveSale(sale);
-                MessageBox.Show("Sale saved successfully!", "Success");
+                MessageBox.Show("Sale saved successfully!\nInvoice: " + sale.InvoiceNo, "Success");
 
-                // Print if allowed (Authenticator / Settings control)
                 if (UiHelper.IsPrintAllowed())
                 {
                     try { BillPrinter.PrintSaleBill(sale); }
-                    catch (Exception pex) { MessageBox.Show("Print failed: " + pex.Message); }
+                    catch (Exception pex)
+                    {
+                        AppLog.Error("Print failed", pex);
+                        MessageBox.Show("Print failed: " + pex.Message);
+                    }
                 }
 
                 this.Tag = "NOSAVECONFIRM";
@@ -294,7 +294,11 @@ namespace ApplianceManagement.Forms
                     MainForm.Instance.OpenChild(new SaleForm(), "SALE");
                 this.Close();
             }
-            catch (Exception ex) { MessageBox.Show("Error: " + ex.Message); }
+            catch (Exception ex)
+            {
+                AppLog.Error("Sale save UI error", ex);
+                MessageBox.Show("Error: " + ex.Message);
+            }
         }
     }
 }
