@@ -9,6 +9,8 @@ namespace ApplianceManagement.Helpers
 {
     public static class LicenseReader
     {
+        // NOTE: Hardcoded key is a known limitation of the current soft-license design.
+        // Enterprise follow-up: replace with asymmetric signatures (vendor private key).
         private static readonly byte[] Key = Encoding.UTF8.GetBytes("AppLicKey16Bytes");
         private static readonly byte[] IV = Encoding.UTF8.GetBytes("AppLicIV16Bytes!");
 
@@ -39,7 +41,13 @@ namespace ApplianceManagement.Helpers
         {
             try
             {
-                if (!File.Exists(LicensePath)) { Current = null; return false; }
+                if (!File.Exists(LicensePath))
+                {
+                    Current = null;
+                    AppLog.Warn("license.dat not found at " + LicensePath);
+                    return false;
+                }
+
                 string plain = Decrypt(File.ReadAllText(LicensePath).Trim());
                 var xml = XElement.Parse(plain);
                 Current = new LicenseInfo
@@ -57,9 +65,15 @@ namespace ApplianceManagement.Helpers
                     VendorContact = (string)xml.Element("VendorContact") ?? "",
                     AppVersion = (string)xml.Element("AppVersion") ?? "2.1.0"
                 };
+                AppLog.Info("License loaded for store: " + Current.StoreName + ", expires " + Current.ExpiryDate.ToString("yyyy-MM-dd"));
                 return true;
             }
-            catch { Current = null; return false; }
+            catch (Exception ex)
+            {
+                Current = null;
+                AppLog.Error("Failed to load license.dat", ex);
+                return false;
+            }
         }
 
         public static bool IsValid()
@@ -71,7 +85,8 @@ namespace ApplianceManagement.Helpers
         {
             using (var aes = Aes.Create())
             {
-                aes.Key = Key; aes.IV = IV;
+                aes.Key = Key;
+                aes.IV = IV;
                 byte[] data = Convert.FromBase64String(cipher);
                 using (var ms = new MemoryStream(data))
                 using (var cs = new CryptoStream(ms, aes.CreateDecryptor(), CryptoStreamMode.Read))
