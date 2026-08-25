@@ -60,9 +60,8 @@ namespace ApplianceManagement.Data
             using (var conn = DbHelper.GetConnection())
             {
                 conn.Open();
-                // Prefer physical column; fall back expression works either way
                 string sql = Base() +
-                    " WHERE p.IsActive=1 AND " + StockExpr() + " <= p.MinimumStock ORDER BY p.ProductName";
+                    " WHERE p.IsActive=1 AND ISNULL((SELECT SUM(QuantityIn)-SUM(QuantityOut) FROM InventoryTransaction WHERE ProductID=p.ProductID),0) <= p.MinimumStock ORDER BY p.ProductName";
                 using (var cmd = DbHelper.CreateCommand(sql, conn))
                 using (var r = cmd.ExecuteReader()) while (r.Read()) list.Add(Map(r));
             }
@@ -85,7 +84,6 @@ namespace ApplianceManagement.Data
             using (var conn = DbHelper.GetConnection())
             {
                 conn.Open();
-                // Try with CurrentStock column (post-migration)
                 try
                 {
                     using (var cmd = DbHelper.CreateCommand(
@@ -161,61 +159,28 @@ namespace ApplianceManagement.Data
             return null;
         }
 
-        /// <summary>
-        /// Prefer Products.CurrentStock when present; else ledger sum (compatible with pre-migration DBs).
-        /// </summary>
-        private string StockExpr() =>
-            "ISNULL(NULLIF(p.CurrentStock, -2147483648), ISNULL((SELECT SUM(QuantityIn)-SUM(QuantityOut) FROM InventoryTransaction WHERE ProductID=p.ProductID),0))";
+        // Ledger-based stock — works before and after migration.
+        // After running 001_Phase0_EnterpriseFixes.sql, SaveSale/Purchase also maintain Products.CurrentStock.
+        private string Base() =>
+            @"SELECT p.*,c.CategoryName,
+              ISNULL((SELECT SUM(QuantityIn)-SUM(QuantityOut) FROM InventoryTransaction WHERE ProductID=p.ProductID),0) AS CurrentStock
+              FROM Products p LEFT JOIN Categories c ON p.CategoryID=c.CategoryID";
 
-        // Simpler: coalesce physical column with ledger — SQL Server ignores missing column only via try/fallback at query build time.
-        // We use CASE pattern that works after migration; pre-migration uses ledger-only BaseLegacy if needed.
-        private string Base()
+        private Product Map(SqlDataReader r) => new Product
         {
-            // After migration CurrentStock exists. Expression still correct if column is 0-default backfilled.
-            return @"SELECT p.*,c.CategoryName,
-                ISNULL(p.CurrentStock,
-                    ISNULL((SELECT SUM(QuantityIn)-SUM(QuantityOut) FROM InventoryTransaction WHERE ProductID=p.ProductID),0)
-                ) AS CurrentStockCalc
-                FROM Products p LEFT JOIN Categories c ON p.CategoryID=c.CategoryID";
-        }
-
-        private Product Map(SqlDataReader r)
-        {
-            int stock = 0;
-            try
-            {
-                // Prefer calculated alias; fall back to column name
-                if (HasColumn(r, "CurrentStockCalc") && r["CurrentStockCalc"] != DBNull.Value)
-                    stock = Convert.ToInt32(r["CurrentStockCalc"]);
-                else if (HasColumn(r, "CurrentStock") && r["CurrentStock"] != DBNull.Value)
-                    stock = Convert.ToInt32(r["CurrentStock"]);
-            }
-            catch { stock = 0; }
-
-            return new Product
-            {
-                ProductID = (int)r["ProductID"],
-                ProductCode = r["ProductCode"].ToString(),
-                Barcode = r["Barcode"] == DBNull.Value ? null : r["Barcode"].ToString(),
-                ProductName = r["ProductName"].ToString(),
-                CategoryID = r["CategoryID"] == DBNull.Value ? 0 : (int)r["CategoryID"],
-                CategoryName = r["CategoryName"] == DBNull.Value ? "" : r["CategoryName"].ToString(),
-                PurchasePrice = (decimal)r["PurchasePrice"],
-                SalePrice = (decimal)r["SalePrice"],
-                MinimumStock = r["MinimumStock"] == DBNull.Value ? 0 : (int)r["MinimumStock"],
-                CurrentStock = stock,
-                IsActive = (bool)r["IsActive"],
-                CreatedDate = (DateTime)r["CreatedDate"]
-            };
-        }
-
-        private static bool HasColumn(SqlDataReader r, string name)
-        {
-            for (int i = 0; i < r.FieldCount; i++)
-                if (string.Equals(r.GetName(i), name, StringComparison.OrdinalIgnoreCase))
-                    return true;
-            return false;
-        }
+            ProductID = (int)r["ProductID"],
+            ProductCode = r["ProductCode"].ToString(),
+            Barcode = r["Barcode"] == DBNull.Value ? null : r["Barcode"].ToString(),
+            ProductName = r["ProductName"].ToString(),
+            CategoryID = r["CategoryID"] == DBNull.Value ? 0 : (int)r["CategoryID"],
+            CategoryName = r["CategoryName"] == DBNull.Value ? "" : r["CategoryName"].ToString(),
+            PurchasePrice = (decimal)r["PurchasePrice"],
+            SalePrice = (decimal)r["SalePrice"],
+            MinimumStock = r["MinimumStock"] == DBNull.Value ? 0 : (int)r["MinimumStock"],
+            CurrentStock = Convert.ToInt32(r["CurrentStock"]),
+            IsActive = (bool)r["IsActive"],
+            CreatedDate = (DateTime)r["CreatedDate"]
+        };
 
         public List<Product> GetAllForManage()
         {

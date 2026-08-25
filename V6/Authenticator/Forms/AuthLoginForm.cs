@@ -8,15 +8,15 @@ using System.Windows.Forms;
 namespace Authenticator.Forms
 {
     /// <summary>
-    /// Authenticator must not open without login.
-    /// Default password: master123 (change after first login via main form if needed).
-    /// Password hash stored in auth_master.dat next to the exe.
+    /// Master gate for Authenticator. Default password only accepted when auth_master.dat is missing;
+    /// user is then forced to set a new password (not shown on UI).
     /// </summary>
     public class AuthLoginForm : Form
     {
         private TextBox txtPassword;
         private Button btnLogin;
         private const string DefaultPassword = "master123";
+
         private static string MasterFile
         {
             get { return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "auth_master.dat"); }
@@ -33,7 +33,7 @@ namespace Authenticator.Forms
         private void InitializeComponent()
         {
             this.Text = "Authenticator Login";
-            this.ClientSize = new Size(380, 220);
+            this.ClientSize = new Size(380, 200);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
@@ -101,15 +101,6 @@ namespace Authenticator.Forms
             btnLogin.FlatAppearance.BorderSize = 0;
             btnLogin.Click += (s, e) => TryLogin();
             this.Controls.Add(btnLogin);
-
-            this.Controls.Add(new Label
-            {
-                Text = "Default: master123",
-                Font = new Font("Segoe UI", 8F),
-                ForeColor = Color.Gray,
-                Location = new Point(40, 180),
-                Size = new Size(300, 20)
-            });
         }
 
         private void TryLogin()
@@ -121,17 +112,73 @@ namespace Authenticator.Forms
                 return;
             }
 
-            if (Verify(txtPassword.Text))
-            {
-                LoginSuccess = true;
-                this.DialogResult = DialogResult.OK;
-                this.Close();
-            }
-            else
+            bool firstRun = !File.Exists(MasterFile);
+            if (!Verify(txtPassword.Text))
             {
                 MessageBox.Show("Invalid master password.", "Login Failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 txtPassword.Clear();
                 txtPassword.Focus();
+                return;
+            }
+
+            if (firstRun)
+            {
+                if (!PromptNewMasterPassword())
+                    return;
+            }
+
+            LoginSuccess = true;
+            this.DialogResult = DialogResult.OK;
+            this.Close();
+        }
+
+        private bool PromptNewMasterPassword()
+        {
+            using (var dlg = new Form())
+            {
+                dlg.Text = "Set Master Password";
+                dlg.FormBorderStyle = FormBorderStyle.FixedDialog;
+                dlg.ClientSize = new Size(360, 180);
+                dlg.StartPosition = FormStartPosition.CenterParent;
+                dlg.MaximizeBox = false;
+                dlg.MinimizeBox = false;
+
+                var lbl = new Label
+                {
+                    Text = "First run: choose a new master password (min 8 characters).",
+                    Location = new Point(20, 15),
+                    Size = new Size(320, 40)
+                };
+                var t1 = new TextBox { Location = new Point(20, 60), Size = new Size(310, 26), PasswordChar = '●' };
+                var t2 = new TextBox { Location = new Point(20, 95), Size = new Size(310, 26), PasswordChar = '●' };
+                var ok = new Button { Text = "Save", DialogResult = DialogResult.OK, Location = new Point(150, 135), Size = new Size(90, 30) };
+                var cancel = new Button { Text = "Cancel", DialogResult = DialogResult.Cancel, Location = new Point(250, 135), Size = new Size(80, 30) };
+                dlg.Controls.AddRange(new Control[] { lbl, t1, t2, ok, cancel });
+                dlg.AcceptButton = ok;
+                dlg.CancelButton = cancel;
+
+                if (dlg.ShowDialog(this) != DialogResult.OK)
+                    return false;
+
+                if (string.IsNullOrEmpty(t1.Text) || t1.Text.Length < 8)
+                {
+                    MessageBox.Show("Password must be at least 8 characters.");
+                    return false;
+                }
+                if (t1.Text != t2.Text)
+                {
+                    MessageBox.Show("Passwords do not match.");
+                    return false;
+                }
+                if (t1.Text == DefaultPassword)
+                {
+                    MessageBox.Show("Choose a password different from the installation default.");
+                    return false;
+                }
+
+                SetMasterPassword(t1.Text);
+                MessageBox.Show("Master password saved. Keep it secure.", "Authenticator", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return true;
             }
         }
 

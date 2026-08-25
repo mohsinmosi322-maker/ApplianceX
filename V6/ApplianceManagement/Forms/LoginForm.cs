@@ -81,14 +81,12 @@ namespace ApplianceManagement.Forms
 
             card.Controls.AddRange(new Control[] { lblTitle, lblUser, txtUsername, lblPass, txtPassword, btnLogin });
             this.Controls.Add(card);
-            // Do NOT set AcceptButton - that steals Enter from username
         }
 
         private void DoLogin()
         {
             try
             {
-                // LICENSE REQUIRED
                 if (!LicenseReader.TryLoad())
                 {
                     MessageBox.Show(
@@ -115,6 +113,7 @@ namespace ApplianceManagement.Forms
                 var user = new UserRepository().Authenticate(txtUsername.Text.Trim(), txtPassword.Text);
                 if (user != null)
                 {
+                    AppLog.Info("Login success: " + user.UserName);
                     this.Hide();
                     var main = new MainForm(user);
                     main.FormClosed += (s, args) => this.Close();
@@ -122,6 +121,7 @@ namespace ApplianceManagement.Forms
                 }
                 else
                 {
+                    AppLog.Warn("Login failed for user: " + txtUsername.Text.Trim());
                     MessageBox.Show("Invalid username or password.", "Login Failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     txtPassword.Clear();
                     txtPassword.Focus();
@@ -129,6 +129,7 @@ namespace ApplianceManagement.Forms
             }
             catch (Exception ex)
             {
+                AppLog.Error("Login / DB error", ex);
                 MessageBox.Show("Unable to connect to database.\n\n" + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
