@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
-using System.IO;
 using System.Linq;
 using System.Windows.Forms;
 using ApplianceManagement.Data;
@@ -19,16 +18,12 @@ namespace ApplianceManagement.Forms
         private readonly User _user;
         private Size _laidOut;
 
-        private Panel _tabStrip, _header, _footer;
-        private Button _tabDash, _tabMain, _btnRefresh;
+        private Panel _header, _footer;
+        private Button _btnRefresh;
         private Label _lblRefreshed;
         private Label _lblStore, _lblStoreInfo, _lblRight1, _lblRight2;
         private Panel _footerIcon;
         private Label _footerIconText, _footerTitle, _footerTag, _footerCredit1, _footerCredit2;
-
-        private Panel _welcomeView;
-        private PictureBox _pic;
-        private Label _lblTitle, _lblSub, _lblHint;
 
         private Panel _dashView;
         private Label _lblRecent, _lblLow;
@@ -48,28 +43,27 @@ namespace ApplianceManagement.Forms
             _user = user;
             DoubleBuffered = true;
             SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint, true);
+            Dock = DockStyle.Fill;
             BackColor = UiHelper.BgColor;
             BuildChrome();
-            BuildWelcomeView();
             BuildDashboardView();
             StyleAll();
-            SwitchView(true);
             this.Resize += (s, e) =>
             {
                 if (this.Size == _laidOut) return;
                 LayoutAll();
             };
             LayoutAll();
+            RefreshData();
         }
 
         private void BuildChrome()
         {
-            _tabStrip = new Panel { BackColor = Color.White };
-            _tabDash = MakeTab("Dashboard");
-            _tabMain = MakeTab("Welcome");
-            _tabDash.Click += (s, e) => SwitchView(true);
-            _tabMain.Click += (s, e) => SwitchView(false);
-
+            _header = new Panel { BackColor = Color.White };
+            _lblStore = new Label { AutoSize = true, Location = new Point(16, 10) };
+            _lblStoreInfo = new Label { AutoSize = true, Location = new Point(18, 46), ForeColor = Color.FromArgb(110, 122, 136) };
+            _lblRight1 = new Label { AutoSize = true, ForeColor = Color.FromArgb(110, 122, 136) };
+            _lblRight2 = new Label { AutoSize = true, ForeColor = Color.FromArgb(110, 122, 136) };
             _btnRefresh = new Button
             {
                 Text = "Refresh",
@@ -80,16 +74,8 @@ namespace ApplianceManagement.Forms
             };
             _btnRefresh.FlatAppearance.BorderSize = 0;
             _btnRefresh.Click += (s, e) => RefreshData();
-
-            _lblRefreshed = new Label { AutoSize = true, ForeColor = Color.FromArgb(110, 122, 136), TextAlign = ContentAlignment.MiddleRight };
-            _tabStrip.Controls.AddRange(new Control[] { _tabDash, _tabMain, _btnRefresh, _lblRefreshed });
-
-            _header = new Panel { BackColor = Color.White };
-            _lblStore = new Label { AutoSize = true, Location = new Point(16, 10) };
-            _lblStoreInfo = new Label { AutoSize = true, Location = new Point(18, 46), ForeColor = Color.FromArgb(110, 122, 136) };
-            _lblRight1 = new Label { AutoSize = true, ForeColor = Color.FromArgb(110, 122, 136) };
-            _lblRight2 = new Label { AutoSize = true, ForeColor = Color.FromArgb(110, 122, 136) };
-            _header.Controls.AddRange(new Control[] { _lblStore, _lblStoreInfo, _lblRight1, _lblRight2 });
+            _lblRefreshed = new Label { AutoSize = true, ForeColor = Color.FromArgb(110, 122, 136) };
+            _header.Controls.AddRange(new Control[] { _lblStore, _lblStoreInfo, _lblRight1, _lblRight2, _btnRefresh, _lblRefreshed });
 
             _footer = new Panel();
             _footerIcon = new Panel { Size = new Size(38, 38), Location = new Point(14, 8) };
@@ -101,49 +87,7 @@ namespace ApplianceManagement.Forms
             _footerCredit2 = new Label { AutoSize = true, ForeColor = Color.FromArgb(170, 190, 207) };
             _footer.Controls.AddRange(new Control[] { _footerIcon, _footerTitle, _footerTag, _footerCredit1, _footerCredit2 });
 
-            Controls.AddRange(new Control[] { _tabStrip, _header, _footer });
-        }
-
-        private Button MakeTab(string text)
-        {
-            var b = new Button
-            {
-                Text = text,
-                FlatStyle = FlatStyle.Flat,
-                Size = new Size(120, 32),
-                Location = new Point(12, 7),
-                Cursor = Cursors.Hand,
-                TabStop = false
-            };
-            b.FlatAppearance.BorderSize = 0;
-            return b;
-        }
-
-        private void BuildWelcomeView()
-        {
-            _welcomeView = new Panel();
-            _pic = new PictureBox { BackColor = Color.Transparent, SizeMode = PictureBoxSizeMode.AutoSize };
-            try { _pic.Image = LoadWelcomeArt(); }
-            catch { _pic.Dispose(); _pic = null; }
-            _lblTitle = new Label { AutoSize = true, BackColor = Color.Transparent };
-            _lblSub = new Label { AutoSize = true, BackColor = Color.Transparent };
-            _lblHint = new Label { AutoSize = true, BackColor = Color.Transparent };
-            if (_pic != null) _welcomeView.Controls.Add(_pic);
-            _welcomeView.Controls.AddRange(new Control[] { _lblTitle, _lblSub, _lblHint });
-            Controls.Add(_welcomeView);
-        }
-
-        private Bitmap LoadWelcomeArt()
-        {
-            SvgImage svg;
-            try { svg = SvgImage.FromEmbeddedResource("ApplianceManagement.Resources.main_screen.svg"); }
-            catch
-            {
-                string file = Path.Combine(Application.StartupPath, "main_screen.svg");
-                if (!File.Exists(file)) throw;
-                svg = SvgImage.FromFile(file);
-            }
-            return svg.Render(420);
+            Controls.AddRange(new Control[] { _header, _footer });
         }
 
         private void BuildDashboardView()
@@ -218,24 +162,6 @@ namespace ApplianceManagement.Forms
             _cards[index].Caption.Text = caption;
         }
 
-        private void SwitchView(bool dashboard)
-        {
-            _dashView.Visible = dashboard;
-            _welcomeView.Visible = !dashboard;
-            StyleTabs(dashboard);
-            if (dashboard) RefreshData();
-        }
-
-        private void StyleTabs(bool dashboard)
-        {
-            Button on = dashboard ? _tabDash : _tabMain;
-            Button off = dashboard ? _tabMain : _tabDash;
-            on.BackColor = UiHelper.ThemeColor;
-            on.ForeColor = Color.White;
-            off.BackColor = Color.FromArgb(238, 242, 247);
-            off.ForeColor = Color.FromArgb(70, 85, 100);
-        }
-
         public void RefreshData()
         {
             try
@@ -278,7 +204,7 @@ namespace ApplianceManagement.Forms
             }
             catch (Exception ex)
             {
-                _lblRefreshed.Text = "Refresh failed — check database";
+                _lblRefreshed.Text = "Refresh failed";
                 for (int i = 0; i < _cards.Count; i++) SetCard(i, "—", ex.Message.Length > 60 ? ex.Message.Substring(0, 60) : ex.Message);
             }
             LayoutAll();
@@ -292,7 +218,6 @@ namespace ApplianceManagement.Forms
         private void StyleAll()
         {
             BackColor = UiHelper.BgColor;
-            _tabStrip.BackColor = Color.White;
             _header.BackColor = Color.White;
             _footer.BackColor = UiHelper.ThemeDark;
             _lblStore.Text = UiHelper.GetShopName().ToUpperInvariant();
@@ -335,16 +260,6 @@ namespace ApplianceManagement.Forms
             _lblLow.ForeColor = UiHelper.ThemeDark;
             _dgvRecent.Font = UiHelper.NormalFont;
             _dgvLow.Font = UiHelper.NormalFont;
-            StyleTabs(_dashView.Visible);
-            _lblTitle.Text = UiHelper.AppName;
-            _lblTitle.Font = new Font(UiHelper.TitleFont.FontFamily, UiHelper.TitleFont.Size + 6, FontStyle.Bold);
-            _lblTitle.ForeColor = UiHelper.ThemeDark;
-            _lblSub.Text = "Welcome, " + _user.FullName + " (" + _user.Role + ")  —  " + UiHelper.GetShopName();
-            _lblSub.Font = UiHelper.HeaderFont;
-            _lblSub.ForeColor = Color.FromArgb(80, 95, 110);
-            _lblHint.Text = "F2 Sale   F3 Purchase   F4 Close   F12 Save";
-            _lblHint.Font = UiHelper.SmallFont;
-            _lblHint.ForeColor = Color.Gray;
             LayoutAll();
         }
 
@@ -358,44 +273,25 @@ namespace ApplianceManagement.Forms
 
         private void LayoutAll()
         {
-            if (_tabStrip == null || Width < 50 || Height < 50) return;
+            if (_header == null || Width < 50 || Height < 50) return;
             _laidOut = this.Size;
             int w = Width, h = Height;
-            _tabStrip.SetBounds(0, 0, w, 48);
-            _header.SetBounds(0, 48, w, 76);
+            _header.SetBounds(0, 0, w, 76);
             _footer.SetBounds(0, h - 54, w, 54);
-            _tabDash.Location = new Point(12, 7);
-            _tabMain.Location = new Point(12 + _tabDash.Width + 8, 7);
-            _btnRefresh.Location = new Point(w - 12 - _btnRefresh.Width, 8);
-            _lblRefreshed.Location = new Point(_btnRefresh.Left - 10 - _lblRefreshed.Width, 15);
-            _lblRight1.Location = new Point(w - 16 - _lblRight1.Width, 14);
-            _lblRight2.Location = new Point(w - 16 - _lblRight2.Width, 38);
+            _btnRefresh.Location = new Point(w - 16 - _btnRefresh.Width, 12);
+            _lblRefreshed.Location = new Point(_btnRefresh.Left - 12 - _lblRefreshed.Width, 18);
+            _lblRight1.Location = new Point(w - 16 - _lblRight1.Width, 44);
+            _lblRight2.Location = new Point(Math.Min(_lblRight1.Left, w - 16 - _lblRight2.Width), 44);
+            _lblRight2.Location = new Point(w - 16 - _lblRight2.Width, 44);
             _footerIcon.Location = new Point(14, 8);
             _footerTitle.Location = new Point(64, 8);
             _footerTag.Location = new Point(64, 30);
             _footerCredit1.Location = new Point(w - 14 - _footerCredit1.Width, 8);
             _footerCredit2.Location = new Point(w - 14 - _footerCredit2.Width, 29);
-            int top = 48 + 76;
-            var content = new Rectangle(0, top, w, Math.Max(120, h - top - 54));
-            _welcomeView.SetBounds(content.X, content.Y, content.Width, content.Height);
-            _dashView.SetBounds(content.X, content.Y, content.Width, content.Height);
-            LayoutWelcome(content);
-            LayoutDashboard(content);
-        }
 
-        private void LayoutWelcome(Rectangle content)
-        {
-            var items = new List<Control>();
-            if (_pic != null) items.Add(_pic);
-            items.Add(_lblTitle); items.Add(_lblSub); items.Add(_lblHint);
-            int total = 18 * (items.Count - 1);
-            foreach (Control c in items) total += c.Height;
-            int y = content.Y + (content.Height - total) / 2 - Math.Max(0, content.Height / 20);
-            foreach (Control c in items)
-            {
-                c.Location = new Point(content.X + (content.Width - c.Width) / 2, y);
-                y += c.Height + 18;
-            }
+            var content = new Rectangle(0, 76, w, Math.Max(120, h - 76 - 54));
+            _dashView.SetBounds(content.X, content.Y, content.Width, content.Height);
+            LayoutDashboard(content);
         }
 
         private void LayoutDashboard(Rectangle content)
