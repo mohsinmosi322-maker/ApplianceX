@@ -43,7 +43,7 @@ namespace ApplianceManagement.Forms
                 if (e.KeyCode == Keys.F12) { txtDiscount.Focus(); txtDiscount.SelectAll(); }
             };
 
-            Panel top = new Panel { Dock = DockStyle.Top, Height = 96, BackColor = Color.White };
+            Panel top = new Panel { Dock = DockStyle.Top, Height = 88, BackColor = Color.White };
             top.Controls.Add(new Label { Text = "Invoice  AUTO", Font = UiHelper.HeaderFont, ForeColor = UiHelper.ThemeDark, Location = new Point(16, 12), AutoSize = true });
             top.Controls.Add(new Label { Text = DateTime.Now.ToString("dd MMM yyyy  HH:mm"), Font = UiHelper.NormalFont, ForeColor = Color.FromArgb(110, 122, 136), Location = new Point(200, 14), AutoSize = true });
             top.Controls.Add(new Label { Text = "Supplier", Font = UiHelper.SmallFont, Location = new Point(430, 14), AutoSize = true });
@@ -51,7 +51,6 @@ namespace ApplianceManagement.Forms
             UiHelper.StyleComboBox(cmbSupplier);
             cmbSupplier.SelectedIndexChanged += (s, e) => { if (cmbSupplier.SelectedItem != null) selectedSupplier = (Supplier)cmbSupplier.SelectedItem; };
             top.Controls.Add(cmbSupplier);
-
             top.Controls.Add(new Label { Text = "Search", Font = UiHelper.SmallFont, Location = new Point(16, 52), AutoSize = true });
             txtSearch = new TextBox { Location = new Point(70, 48), Size = new Size(320, 28) };
             UiHelper.StyleTextBox(txtSearch);
@@ -98,51 +97,59 @@ namespace ApplianceManagement.Forms
             top.Controls.Add(txtQty);
             this.Controls.Add(top);
 
-            Panel bottom = new Panel { Dock = DockStyle.Bottom, Height = 52, BackColor = Color.White };
-            Button btnSave = new Button { Text = "SAVE  (F12)", Location = new Point(16, 8), Size = new Size(150, 36) };
-            UiHelper.StyleButton(btnSave); btnSave.Click += (s, e) => Save();
-            Button btnClose = new Button { Text = "CLOSE  (F4)", Location = new Point(180, 8), Size = new Size(150, 36) };
-            UiHelper.StyleButton(btnClose); btnClose.Click += (s, e) => this.Close();
-            bottom.Controls.Add(btnSave); bottom.Controls.Add(btnClose);
-            this.Controls.Add(bottom);
-
-            Panel tot = new Panel { Dock = DockStyle.Right, Width = 300, BackColor = Color.White };
-            int y = 16;
-            tot.Controls.Add(new Label { Text = "Totals", Font = UiHelper.HeaderFont, ForeColor = UiHelper.ThemeDark, Location = new Point(16, y), AutoSize = true }); y += 36;
-            tot.Controls.Add(new Label { Text = "Total", Font = UiHelper.SmallFont, Location = new Point(16, y + 4), AutoSize = true });
-            txtTotal = new TextBox { Location = new Point(110, y), Size = new Size(160, 28), Text = "0.00" };
-            UiHelper.StyleTextBox(txtTotal); tot.Controls.Add(txtTotal);
-            txtTotal.TextChanged += (s, e) => OnTotalChanged();
-            txtTotal.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; txtDiscount.Focus(); txtDiscount.SelectAll(); } };
-            y += 40;
-            tot.Controls.Add(new Label { Text = "Disc %", Font = UiHelper.SmallFont, Location = new Point(16, y + 4), AutoSize = true });
-            txtDiscount = new TextBox { Location = new Point(110, y), Size = new Size(160, 28), Text = "0" };
-            UiHelper.StyleTextBox(txtDiscount); tot.Controls.Add(txtDiscount);
-            txtDiscount.TextChanged += (s, e) => OnPctChanged();
-            txtDiscount.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; txtDiscAmt.Focus(); txtDiscAmt.SelectAll(); } };
-            y += 40;
-            tot.Controls.Add(new Label { Text = "Discount", Font = UiHelper.SmallFont, Location = new Point(16, y + 4), AutoSize = true });
-            txtDiscAmt = new TextBox { Location = new Point(110, y), Size = new Size(160, 28), Text = "0.00" };
-            UiHelper.StyleTextBox(txtDiscAmt); tot.Controls.Add(txtDiscAmt);
-            txtDiscAmt.TextChanged += (s, e) => OnAmtChanged();
-            txtDiscAmt.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; txtNet.Focus(); txtNet.SelectAll(); } };
-            y += 40;
-            tot.Controls.Add(new Label { Text = "Net", Font = UiHelper.HeaderFont, ForeColor = UiHelper.ThemeColor, Location = new Point(16, y + 2), AutoSize = true });
-            txtNet = new TextBox { Location = new Point(110, y), Size = new Size(160, 28), Text = "0.00" };
-            UiHelper.StyleTextBox(txtNet); tot.Controls.Add(txtNet);
-            txtNet.TextChanged += (s, e) => OnNetChanged();
-            txtNet.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; txtPaid.Text = txtNet.Text; txtPaid.Focus(); txtPaid.SelectAll(); } };
-            y += 40;
-            tot.Controls.Add(new Label { Text = "Paid", Font = UiHelper.SmallFont, Location = new Point(16, y + 4), AutoSize = true });
-            txtPaid = new TextBox { Location = new Point(110, y), Size = new Size(160, 28), Text = "0.00" };
-            UiHelper.StyleTextBox(txtPaid); tot.Controls.Add(txtPaid);
-            txtPaid.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; Save(); } };
-            this.Controls.Add(tot);
+            this.Controls.Add(BuildTotalsFooter());
 
             dgv = new DataGridView { Dock = DockStyle.Fill };
             UiHelper.StyleGrid(dgv);
             this.Controls.Add(dgv);
             dgv.BringToFront();
+        }
+
+        private Panel BuildTotalsFooter()
+        {
+            Panel foot = new Panel { Dock = DockStyle.Bottom, Height = 78, BackColor = Color.White };
+            int x = 16;
+            AddFootLabel(foot, "Total", x, 10); txtTotal = AddFootBox(foot, x, 32, 110, "0.00"); txtTotal.TextChanged += (s, e) => OnTotalChanged();
+            txtTotal.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; txtDiscount.Focus(); txtDiscount.SelectAll(); } };
+            x += 126;
+            AddFootLabel(foot, "Disc %", x, 10); txtDiscount = AddFootBox(foot, x, 32, 70, "0"); txtDiscount.TextChanged += (s, e) => OnPctChanged();
+            txtDiscount.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; txtDiscAmt.Focus(); txtDiscAmt.SelectAll(); } };
+            x += 86;
+            AddFootLabel(foot, "Discount", x, 10); txtDiscAmt = AddFootBox(foot, x, 32, 110, "0.00"); txtDiscAmt.TextChanged += (s, e) => OnAmtChanged();
+            txtDiscAmt.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; txtNet.Focus(); txtNet.SelectAll(); } };
+            x += 126;
+            AddFootLabel(foot, "Net", x, 10); txtNet = AddFootBox(foot, x, 32, 120, "0.00"); txtNet.ForeColor = UiHelper.ThemeColor;
+            txtNet.TextChanged += (s, e) => OnNetChanged();
+            txtNet.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; txtPaid.Text = txtNet.Text; txtPaid.Focus(); txtPaid.SelectAll(); } };
+            x += 136;
+            AddFootLabel(foot, "Paid", x, 10); txtPaid = AddFootBox(foot, x, 32, 110, "0.00");
+            txtPaid.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; Save(); } };
+
+            Button btnSave = new Button { Text = "SAVE (F12)", Size = new Size(130, 36), Anchor = AnchorStyles.Top | AnchorStyles.Right };
+            Button btnClose = new Button { Text = "CLOSE (F4)", Size = new Size(130, 36), Anchor = AnchorStyles.Top | AnchorStyles.Right };
+            UiHelper.StyleButton(btnSave); UiHelper.StyleButton(btnClose);
+            btnSave.Click += (s, e) => Save();
+            btnClose.Click += (s, e) => this.Close();
+            foot.Controls.Add(btnSave); foot.Controls.Add(btnClose);
+            foot.Resize += (s, e) =>
+            {
+                btnClose.Location = new Point(foot.Width - 16 - btnClose.Width, 22);
+                btnSave.Location = new Point(btnClose.Left - 10 - btnSave.Width, 22);
+            };
+            return foot;
+        }
+
+        private static void AddFootLabel(Control p, string t, int x, int y)
+        {
+            p.Controls.Add(new Label { Text = t, Font = UiHelper.SmallFont, Location = new Point(x, y), AutoSize = true });
+        }
+
+        private static TextBox AddFootBox(Control p, int x, int y, int w, string val)
+        {
+            var t = new TextBox { Location = new Point(x, y), Size = new Size(w, 28), Text = val };
+            UiHelper.StyleTextBox(t);
+            p.Controls.Add(t);
+            return t;
         }
 
         private void SelectSug()
