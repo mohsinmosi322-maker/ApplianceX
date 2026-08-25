@@ -7,8 +7,7 @@ using ApplianceManagement.Models;
 namespace ApplianceManagement.Helpers
 {
     /// <summary>
-    /// Simple polished thermal-style bill print (80mm friendly layout).
-    /// Controlled by AppSettings AllowBillPrint.
+    /// Thermal-style sale bill (80mm friendly).
     /// </summary>
     public static class BillPrinter
     {
@@ -20,8 +19,7 @@ namespace ApplianceManagement.Helpers
             _sale = sale;
 
             var doc = new PrintDocument();
-            doc.DocumentName = "Sale Bill";
-            // Prefer narrow width for thermal; fallback to default
+            doc.DocumentName = "Sale Bill " + (sale.InvoiceNo ?? "");
             try
             {
                 doc.DefaultPageSettings.PaperSize = new PaperSize("Thermal80", 300, 800);
@@ -38,11 +36,15 @@ namespace ApplianceManagement.Helpers
                 preview.Height = 700;
                 preview.ShowDialog();
             }
-            // Also offer direct print
+
             if (MessageBox.Show("Send to printer?", "Print", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
             {
                 try { doc.Print(); }
-                catch (Exception ex) { MessageBox.Show("Printer error: " + ex.Message); }
+                catch (Exception ex)
+                {
+                    AppLog.Error("Print failed", ex);
+                    MessageBox.Show("Printer error: " + ex.Message);
+                }
             }
         }
 
@@ -61,7 +63,6 @@ namespace ApplianceManagement.Helpers
             using (var bold = new Font("Segoe UI", 8f, FontStyle.Bold))
             using (var small = new Font("Segoe UI", 7f))
             {
-                // Header
                 g.DrawString(shop, titleFont, Brushes.Black, left, y);
                 y += 22;
                 if (!string.IsNullOrEmpty(phone))
@@ -74,14 +75,19 @@ namespace ApplianceManagement.Helpers
 
                 g.DrawString("SALE RECEIPT", bold, Brushes.Black, left, y);
                 y += 16;
+                if (!string.IsNullOrEmpty(_sale.InvoiceNo))
+                {
+                    g.DrawString("Invoice: " + _sale.InvoiceNo, bold, Brushes.Black, left, y);
+                    y += 14;
+                }
                 g.DrawString("Date: " + _sale.SaleDate.ToString("dd/MM/yyyy HH:mm"), normal, Brushes.Black, left, y);
                 y += 14;
-                g.DrawString("Customer: Walk-in Customer", normal, Brushes.Black, left, y);
+                string cust = string.IsNullOrEmpty(_sale.CustomerName) ? "Walk-in Customer" : _sale.CustomerName;
+                g.DrawString("Customer: " + cust, normal, Brushes.Black, left, y);
                 y += 14;
                 g.DrawLine(Pens.Black, left, y, left + width, y);
                 y += 8;
 
-                // Column headers
                 g.DrawString("Item", bold, Brushes.Black, left, y);
                 g.DrawString("Qty", bold, Brushes.Black, left + 140, y);
                 g.DrawString("Amount", bold, Brushes.Black, left + 180, y);
@@ -91,7 +97,7 @@ namespace ApplianceManagement.Helpers
 
                 foreach (var d in _sale.Details)
                 {
-                    string name = d.ProductName;
+                    string name = d.ProductName ?? "";
                     if (name.Length > 22) name = name.Substring(0, 22);
                     g.DrawString(name, normal, Brushes.Black, left, y);
                     g.DrawString(d.Quantity.ToString(), normal, Brushes.Black, left + 145, y);
