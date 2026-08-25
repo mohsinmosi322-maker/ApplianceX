@@ -1,4 +1,3 @@
-using System;
 using System.Drawing;
 using System.Windows.Forms;
 using ApplianceManagement.Data;
@@ -11,28 +10,32 @@ namespace ApplianceManagement.Forms
         public LowStockForm()
         {
             this.Text = "Low Stock Report";
-            this.Size = new Size(960, 560);
+            this.Size = new Size(1020, 640);
             this.BackColor = UiHelper.BgColor;
             this.KeyPreview = true;
+            this.Padding = new Padding(12);
             UiHelper.AttachF4Close(this);
 
-            var dgv = new DataGridView { Location = new Point(15, 15), Size = new Size(920, 470) };
+            var list = new ProductRepository().GetLowStock();
+
+            Panel top = new Panel { Dock = DockStyle.Top, Height = 52, BackColor = Color.White };
+            top.Controls.Add(new Label
+            {
+                Text = "Items at or below minimum stock:  " + list.Count,
+                Font = UiHelper.HeaderFont,
+                ForeColor = UiHelper.DangerColor,
+                AutoSize = true,
+                Location = new Point(16, 16)
+            });
+            this.Controls.Add(top);
+
+            var dgv = new DataGridView { Dock = DockStyle.Fill };
             UiHelper.StyleGrid(dgv);
             this.Controls.Add(dgv);
-
-            var list = new ProductRepository().GetLowStock();
+            dgv.BringToFront();
             dgv.DataSource = list;
             foreach (var h in new[] { "ProductID", "CategoryID", "IsActive", "CreatedDate", "PurchasePrice" })
                 if (dgv.Columns.Contains(h)) dgv.Columns[h].Visible = false;
-
-            this.Controls.Add(new Label
-            {
-                Text = "Items at or below minimum stock level: " + list.Count,
-                Font = UiHelper.HeaderFont,
-                ForeColor = UiHelper.DangerColor,
-                Location = new Point(15, 500),
-                Size = new Size(500, 25)
-            });
         }
     }
 }

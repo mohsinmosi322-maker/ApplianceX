@@ -28,34 +28,40 @@ namespace ApplianceManagement.Forms
 
         private void InitializeComponent()
         {
-            this.Text = "New Item"; this.Size = new Size(520, 460); this.MinimumSize = new Size(520, 460);
-            this.BackColor = UiHelper.BgColor; this.KeyPreview = true;
+            this.Text = "New Item";
+            this.Size = new Size(560, 520);
+            this.MinimumSize = new Size(520, 480);
+            this.BackColor = UiHelper.BgColor;
+            this.KeyPreview = true;
             UiHelper.AttachF4Close(this);
-            this.KeyDown += (s, e) => { if (e.KeyCode == Keys.F12) Save();  };
+            this.KeyDown += (s, e) => { if (e.KeyCode == Keys.F12) Save(); };
 
-            int y = 20;
-            AddL("Product Name:", 20, y); txtName = AddT(160, y, 280); txtName.KeyDown += Next; y += 38;
-            AddL("Product Code:", 20, y); txtCode = AddT(160, y, 150); txtCode.ReadOnly = true; txtCode.BackColor = Color.FromArgb(240, 240, 240); y += 38;
-            AddL("Barcode:", 20, y); txtBarcode = AddT(160, y, 200); txtBarcode.KeyDown += Next; y += 38;
-            chkCategory = new CheckBox { Text = "Use Category", Font = UiHelper.NormalFont, Location = new Point(20, y), Size = new Size(130, 25), Checked = true };
+            Panel card = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(28, 20, 28, 20) };
+            this.Controls.Add(card);
+
+            int y = 12;
+            AddL(card, "Product Name", 0, y); txtName = AddT(card, 150, y, 300); txtName.KeyDown += Next; y += 42;
+            AddL(card, "Product Code", 0, y); txtCode = AddT(card, 150, y, 160); txtCode.ReadOnly = true; txtCode.BackColor = Color.FromArgb(245, 247, 250); y += 42;
+            AddL(card, "Barcode", 0, y); txtBarcode = AddT(card, 150, y, 220); txtBarcode.KeyDown += Next; y += 42;
+            chkCategory = new CheckBox { Text = "Use Category", Font = UiHelper.NormalFont, Location = new Point(0, y), Size = new Size(140, 26), Checked = true };
             chkCategory.CheckedChanged += (s, e) => cmbCategory.Enabled = chkCategory.Checked;
-            this.Controls.Add(chkCategory);
-            cmbCategory = new ComboBox { Location = new Point(160, y), Size = new Size(280, 26), DropDownStyle = ComboBoxStyle.DropDownList };
-            UiHelper.StyleComboBox(cmbCategory); this.Controls.Add(cmbCategory); y += 42;
-            AddL("Purchase Price:", 20, y); txtPurchase = AddT(160, y, 150); txtPurchase.KeyDown += Next; y += 38;
-            AddL("Sale Price:", 20, y); txtSale = AddT(160, y, 150); txtSale.KeyDown += Next; y += 38;
-            AddL("Min Stock Level:", 20, y); txtMinStock = AddT(160, y, 100); txtMinStock.Text = "0"; txtMinStock.KeyDown += Next; y += 50;
+            card.Controls.Add(chkCategory);
+            cmbCategory = new ComboBox { Location = new Point(150, y), Size = new Size(300, 26), DropDownStyle = ComboBoxStyle.DropDownList };
+            UiHelper.StyleComboBox(cmbCategory); card.Controls.Add(cmbCategory); y += 46;
+            AddL(card, "Purchase Price", 0, y); txtPurchase = AddT(card, 150, y, 160); txtPurchase.KeyDown += Next; y += 42;
+            AddL(card, "Sale Price", 0, y); txtSale = AddT(card, 150, y, 160); txtSale.KeyDown += Next; y += 42;
+            AddL(card, "Min Stock", 0, y); txtMinStock = AddT(card, 150, y, 100); txtMinStock.Text = "0"; txtMinStock.KeyDown += Next; y += 56;
 
-            Button btnSave = new Button { Text = "SAVE (F12)", Location = new Point(160, y), Size = new Size(130, 34) };
+            Button btnSave = new Button { Text = "SAVE (F12)", Location = new Point(150, y), Size = new Size(140, 38) };
             UiHelper.StyleButton(btnSave); btnSave.Click += (s, e) => Save();
-            Button btnClose = new Button { Text = "CLOSE", Location = new Point(310, y), Size = new Size(130, 34) };
+            Button btnClose = new Button { Text = "CLOSE (F4)", Location = new Point(304, y), Size = new Size(140, 38) };
             UiHelper.StyleButton(btnClose); btnClose.Click += (s, e) => this.Close();
-            this.Controls.Add(btnSave); this.Controls.Add(btnClose);
+            card.Controls.Add(btnSave); card.Controls.Add(btnClose);
         }
 
         private void Next(object s, KeyEventArgs e) { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; SelectNextControl((Control)s, true, true, true, true); } }
-        private void AddL(string t, int x, int y) { this.Controls.Add(new Label { Text = t, Font = UiHelper.NormalFont, Location = new Point(x, y + 3), Size = new Size(130, 22) }); }
-        private TextBox AddT(int x, int y, int w) { var t = new TextBox { Location = new Point(x, y), Size = new Size(w, 26) }; UiHelper.StyleTextBox(t); this.Controls.Add(t); return t; }
+        private void AddL(Control parent, string t, int x, int y) { parent.Controls.Add(new Label { Text = t, Font = UiHelper.NormalFont, Location = new Point(x, y + 4), Size = new Size(140, 22) }); }
+        private TextBox AddT(Control parent, int x, int y, int w) { var t = new TextBox { Location = new Point(x, y), Size = new Size(w, 28) }; UiHelper.StyleTextBox(t); parent.Controls.Add(t); return t; }
 
         private void Save()
         {

@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 using ApplianceManagement.Data;
 using ApplianceManagement.Helpers;
@@ -21,65 +22,79 @@ namespace ApplianceManagement.Forms
 
         private void InitializeComponent()
         {
-            this.BackColor = UiHelper.BgColor;
-            this.ClientSize = new Size(400, 340);
+            this.BackColor = UiHelper.ThemeDark;
+            this.ClientSize = new Size(460, 420);
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;
             this.StartPosition = FormStartPosition.CenterScreen;
-            this.Text = "Login";
+            this.Text = "Sign in";
             this.KeyPreview = true;
 
-            Panel card = new Panel { BackColor = Color.White, Location = new Point(30, 25), Size = new Size(340, 280) };
+            Panel card = new Panel
+            {
+                BackColor = Color.White,
+                Location = new Point(40, 36),
+                Size = new Size(380, 340)
+            };
+            card.Paint += (s, e) =>
+            {
+                using (var p = new Pen(Color.FromArgb(226, 232, 240)))
+                    e.Graphics.DrawRectangle(p, 0, 0, card.Width - 1, card.Height - 1);
+            };
+
+            Panel accent = new Panel { Dock = DockStyle.Top, Height = 6, BackColor = UiHelper.ThemeColor };
+            card.Controls.Add(accent);
 
             Label lblTitle = new Label
             {
-                Text = "APPLIANCE MANAGEMENT",
-                Font = UiHelper.TitleFont,
-                ForeColor = UiHelper.ThemeColor,
-                Location = new Point(10, 20),
-                Size = new Size(320, 30),
+                Text = "APPLIANCE X",
+                Font = new Font("Segoe UI", 16F, FontStyle.Bold),
+                ForeColor = UiHelper.ThemeDark,
+                Location = new Point(20, 28),
+                Size = new Size(340, 32),
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+            Label lblSub = new Label
+            {
+                Text = "Sign in to continue",
+                Font = UiHelper.SmallFont,
+                ForeColor = Color.FromArgb(110, 122, 136),
+                Location = new Point(20, 60),
+                Size = new Size(340, 20),
                 TextAlign = ContentAlignment.MiddleCenter
             };
 
-            Label lblUser = new Label { Text = "Username", Font = UiHelper.NormalFont, Location = new Point(30, 70), Size = new Size(100, 20) };
-            txtUsername = new TextBox { Location = new Point(30, 92), Size = new Size(280, 28) };
+            Label lblUser = new Label { Text = "Username", Font = UiHelper.SmallFont, ForeColor = Color.FromArgb(80, 90, 100), Location = new Point(36, 100), Size = new Size(300, 18) };
+            txtUsername = new TextBox { Location = new Point(36, 120), Size = new Size(308, 30) };
             UiHelper.StyleTextBox(txtUsername);
             txtUsername.KeyDown += (s, e) =>
             {
-                if (e.KeyCode == Keys.Enter)
-                {
-                    e.SuppressKeyPress = true;
-                    e.Handled = true;
-                    txtPassword.Focus();
-                }
+                if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; txtPassword.Focus(); }
             };
 
-            Label lblPass = new Label { Text = "Password", Font = UiHelper.NormalFont, Location = new Point(30, 130), Size = new Size(100, 20) };
-            txtPassword = new TextBox { Location = new Point(30, 152), Size = new Size(280, 28), PasswordChar = '●' };
+            Label lblPass = new Label { Text = "Password", Font = UiHelper.SmallFont, ForeColor = Color.FromArgb(80, 90, 100), Location = new Point(36, 164), Size = new Size(300, 18) };
+            txtPassword = new TextBox { Location = new Point(36, 184), Size = new Size(308, 30), PasswordChar = '●' };
             UiHelper.StyleTextBox(txtPassword);
             txtPassword.KeyDown += (s, e) =>
             {
-                if (e.KeyCode == Keys.Enter)
-                {
-                    e.SuppressKeyPress = true;
-                    e.Handled = true;
-                    btnLogin.Focus();
-                }
+                if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; DoLogin(); }
             };
 
-            btnLogin = new Button { Text = "LOGIN", Location = new Point(30, 200), Size = new Size(280, 40) };
+            btnLogin = new Button { Text = "SIGN IN", Location = new Point(36, 240), Size = new Size(308, 44) };
             UiHelper.StyleButton(btnLogin);
             btnLogin.Click += (s, e) => DoLogin();
-            btnLogin.KeyDown += (s, e) =>
+
+            Label hint = new Label
             {
-                if (e.KeyCode == Keys.Enter)
-                {
-                    e.SuppressKeyPress = true;
-                    DoLogin();
-                }
+                Text = "License file required next to the application.",
+                Font = UiHelper.SmallFont,
+                ForeColor = Color.FromArgb(140, 150, 160),
+                Location = new Point(20, 300),
+                Size = new Size(340, 20),
+                TextAlign = ContentAlignment.MiddleCenter
             };
 
-            card.Controls.AddRange(new Control[] { lblTitle, lblUser, txtUsername, lblPass, txtPassword, btnLogin });
+            card.Controls.AddRange(new Control[] { lblTitle, lblSub, lblUser, txtUsername, lblPass, txtPassword, btnLogin, hint });
             this.Controls.Add(card);
         }
 
@@ -90,14 +105,14 @@ namespace ApplianceManagement.Forms
                 if (!LicenseReader.TryLoad())
                 {
                     MessageBox.Show(
-                        "license.dat not found.\n\nApplication cannot start without a valid license.\nContact vendor and place license.dat next to the application.",
+                        "license.dat not found.\n\nPlace a valid license next to the application.",
                         "License Required", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     return;
                 }
                 if (!LicenseReader.IsValid())
                 {
                     MessageBox.Show(
-                        "License expired on " + LicenseReader.Current.ExpiryDate.ToString("dd/MM/yyyy") + ".\n\nContact vendor to renew.",
+                        "License expired on " + LicenseReader.Current.ExpiryDate.ToString("dd/MM/yyyy") + ".",
                         "License Expired", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     return;
                 }
