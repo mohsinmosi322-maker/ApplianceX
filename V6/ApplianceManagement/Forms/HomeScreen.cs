@@ -10,12 +10,6 @@ using ApplianceManagement.Models;
 
 namespace ApplianceManagement.Forms
 {
-    /// <summary>
-    /// Home area of the main window, shown while no MDI child forms are open.
-    /// Toggles between the welcome (branding + SVG artwork) view and a live
-    /// dashboard: KPI cards, recent sales and low stock, laid out after the
-    /// reference mockup (tab strip, company header, branded footer).
-    /// </summary>
     public class HomeScreen : Panel
     {
         private const string DevelopedBy = "Developed by Mohsin";
@@ -23,8 +17,8 @@ namespace ApplianceManagement.Forms
         private static readonly Pen CardBorderPen = new Pen(Color.FromArgb(226, 235, 244));
 
         private readonly User _user;
+        private Size _laidOut;
 
-        // chrome
         private Panel _tabStrip, _header, _footer;
         private Button _tabDash, _tabMain, _btnRefresh;
         private Label _lblRefreshed;
@@ -32,12 +26,10 @@ namespace ApplianceManagement.Forms
         private Panel _footerIcon;
         private Label _footerIconText, _footerTitle, _footerTag, _footerCredit1, _footerCredit2;
 
-        // welcome view
         private Panel _welcomeView;
         private PictureBox _pic;
         private Label _lblTitle, _lblSub, _lblHint;
 
-        // dashboard view
         private Panel _dashView;
         private Label _lblRecent, _lblLow;
         private DataGridView _dgvRecent, _dgvLow;
@@ -55,31 +47,34 @@ namespace ApplianceManagement.Forms
         {
             _user = user;
             DoubleBuffered = true;
+            SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint, true);
             BackColor = UiHelper.BgColor;
             BuildChrome();
             BuildWelcomeView();
             BuildDashboardView();
             StyleAll();
             SwitchView(true);
-            this.Resize += (s, e) => LayoutAll();
+            this.Resize += (s, e) =>
+            {
+                if (this.Size == _laidOut) return;
+                LayoutAll();
+            };
             LayoutAll();
         }
 
-        // ===== chrome: tab strip / company header / footer =====
-
         private void BuildChrome()
         {
-            _tabStrip = new Panel { BackColor = Color.White, Dock = DockStyle.None };
-            _tabDash = MakeTab("▦  Dashboard");
-            _tabMain = MakeTab("⌂  Main Screen");
+            _tabStrip = new Panel { BackColor = Color.White };
+            _tabDash = MakeTab("Dashboard");
+            _tabMain = MakeTab("Welcome");
             _tabDash.Click += (s, e) => SwitchView(true);
             _tabMain.Click += (s, e) => SwitchView(false);
 
             _btnRefresh = new Button
             {
-                Text = "⟳  Refresh",
+                Text = "Refresh",
                 FlatStyle = FlatStyle.Flat,
-                Size = new Size(104, 32),
+                Size = new Size(96, 32),
                 Cursor = Cursors.Hand,
                 TabStop = false
             };
@@ -87,7 +82,6 @@ namespace ApplianceManagement.Forms
             _btnRefresh.Click += (s, e) => RefreshData();
 
             _lblRefreshed = new Label { AutoSize = true, ForeColor = Color.FromArgb(110, 122, 136), TextAlign = ContentAlignment.MiddleRight };
-
             _tabStrip.Controls.AddRange(new Control[] { _tabDash, _tabMain, _btnRefresh, _lblRefreshed });
 
             _header = new Panel { BackColor = Color.White };
@@ -116,7 +110,7 @@ namespace ApplianceManagement.Forms
             {
                 Text = text,
                 FlatStyle = FlatStyle.Flat,
-                Size = new Size(150, 34),
+                Size = new Size(120, 32),
                 Location = new Point(12, 7),
                 Cursor = Cursors.Hand,
                 TabStop = false
@@ -125,16 +119,12 @@ namespace ApplianceManagement.Forms
             return b;
         }
 
-        // ===== welcome view (SVG artwork + branding) =====
-
         private void BuildWelcomeView()
         {
             _welcomeView = new Panel();
-
             _pic = new PictureBox { BackColor = Color.Transparent, SizeMode = PictureBoxSizeMode.AutoSize };
             try { _pic.Image = LoadWelcomeArt(); }
             catch { _pic.Dispose(); _pic = null; }
-
             _lblTitle = new Label { AutoSize = true, BackColor = Color.Transparent };
             _lblSub = new Label { AutoSize = true, BackColor = Color.Transparent };
             _lblHint = new Label { AutoSize = true, BackColor = Color.Transparent };
@@ -146,10 +136,7 @@ namespace ApplianceManagement.Forms
         private Bitmap LoadWelcomeArt()
         {
             SvgImage svg;
-            try
-            {
-                svg = SvgImage.FromEmbeddedResource("ApplianceManagement.Resources.main_screen.svg");
-            }
+            try { svg = SvgImage.FromEmbeddedResource("ApplianceManagement.Resources.main_screen.svg"); }
             catch
             {
                 string file = Path.Combine(Application.StartupPath, "main_screen.svg");
@@ -159,20 +146,17 @@ namespace ApplianceManagement.Forms
             return svg.Render(420);
         }
 
-        // ===== dashboard view (KPI cards + lists) =====
-
         private void BuildDashboardView()
         {
             _dashView = new Panel();
-
-            _cards.Add(MakeCard("Rs", Color.FromArgb(39, 174, 96)));   // today sales
-            _cards.Add(MakeCard("⇓", Color.FromArgb(41, 128, 185)));    // today purchases
-            _cards.Add(MakeCard("Σ", Color.FromArgb(22, 160, 133)));    // month sales
-            _cards.Add(MakeCard("Π", Color.FromArgb(142, 68, 173)));    // month purchases
-            _cards.Add(MakeCard("▣", Color.FromArgb(243, 156, 18)));    // stock value
-            _cards.Add(MakeCard("☰", Color.FromArgb(52, 73, 94)));      // products
-            _cards.Add(MakeCard("⚠", Color.FromArgb(192, 57, 43)));     // low stock
-            _cards.Add(MakeCard("☺", Color.FromArgb(26, 188, 156)));    // customers
+            _cards.Add(MakeCard("Rs", Color.FromArgb(39, 174, 96)));
+            _cards.Add(MakeCard("In", Color.FromArgb(41, 128, 185)));
+            _cards.Add(MakeCard("Mo", Color.FromArgb(22, 160, 133)));
+            _cards.Add(MakeCard("Pu", Color.FromArgb(142, 68, 173)));
+            _cards.Add(MakeCard("St", Color.FromArgb(243, 156, 18)));
+            _cards.Add(MakeCard("#", Color.FromArgb(52, 73, 94)));
+            _cards.Add(MakeCard("!", Color.FromArgb(192, 57, 43)));
+            _cards.Add(MakeCard("Cu", Color.FromArgb(26, 188, 156)));
 
             _lblRecent = new Label { AutoSize = true };
             _lblLow = new Label { AutoSize = true };
@@ -219,20 +203,11 @@ namespace ApplianceManagement.Forms
             card.Panel = new Panel { BackColor = Color.White, Size = new Size(210, 88) };
             card.Panel.Paint += (s, e) =>
                 e.Graphics.DrawRectangle(CardBorderPen, 0, 0, card.Panel.Width - 1, card.Panel.Height - 1);
-
             var icon = new Panel { BackColor = accent, Size = new Size(44, 44), Location = new Point(14, 22) };
-            card.Glyph = new Label
-            {
-                Dock = DockStyle.Fill,
-                TextAlign = ContentAlignment.MiddleCenter,
-                ForeColor = Color.White,
-                Text = glyph
-            };
+            card.Glyph = new Label { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter, ForeColor = Color.White, Text = glyph };
             icon.Controls.Add(card.Glyph);
-
             card.Value = new Label { AutoSize = true, Location = new Point(70, 16), ForeColor = Color.FromArgb(44, 62, 80) };
             card.Caption = new Label { AutoSize = true, Location = new Point(70, 52), ForeColor = Color.FromArgb(130, 144, 158) };
-
             card.Panel.Controls.AddRange(new Control[] { icon, card.Value, card.Caption });
             return card;
         }
@@ -242,8 +217,6 @@ namespace ApplianceManagement.Forms
             _cards[index].Value.Text = value;
             _cards[index].Caption.Text = caption;
         }
-
-        // ===== behaviour =====
 
         private void SwitchView(bool dashboard)
         {
@@ -269,18 +242,16 @@ namespace ApplianceManagement.Forms
             {
                 DateTime today = DateTime.Today;
                 DateTime monthStart = new DateTime(today.Year, today.Month, 1);
-
                 var sales = new SaleRepository().GetSales(monthStart, today);
                 var purchases = new PurchaseRepository().GetPurchases(monthStart, today);
                 var products = new ProductRepository().GetAllActive();
                 var lowStock = new ProductRepository().GetLowStock();
                 int customers = new CustomerRepository().CountActive();
-
                 var todaySales = sales.Where(s => s.SaleDate.Date == today).ToList();
                 var todayPurch = purchases.Where(p => p.PurchaseDate.Date == today).ToList();
 
-                SetCard(0, "Rs " + todaySales.Sum(x => x.NetAmount).ToString("N0"), todaySales.Count + (todaySales.Count == 1 ? " bill today" : " bills today"));
-                SetCard(1, "Rs " + todayPurch.Sum(x => x.NetAmount).ToString("N0"), todayPurch.Count + (todayPurch.Count == 1 ? " invoice today" : " invoices today"));
+                SetCard(0, "Rs " + todaySales.Sum(x => x.NetAmount).ToString("N0"), todaySales.Count + " bills today");
+                SetCard(1, "Rs " + todayPurch.Sum(x => x.NetAmount).ToString("N0"), todayPurch.Count + " invoices today");
                 SetCard(2, "Rs " + sales.Sum(x => x.NetAmount).ToString("N0"), "since " + monthStart.ToString("dd MMM yyyy"));
                 SetCard(3, "Rs " + purchases.Sum(x => x.NetAmount).ToString("N0"), "since " + monthStart.ToString("dd MMM yyyy"));
                 SetCard(4, "Rs " + products.Sum(p => (decimal)p.CurrentStock * p.SalePrice).ToString("N0"), products.Sum(p => p.CurrentStock) + " units in stock");
@@ -295,7 +266,7 @@ namespace ApplianceManagement.Forms
                     _dgvRecent.Rows.Add(s.SaleDate.ToString("dd MMM HH:mm"), s.InvoiceNo, s.CustomerName, s.NetAmount);
 
                 var lowTop = lowStock.Take(12).ToList();
-                _lblLow.Text = "Low Stock Items (" + lowStock.Count + (lowStock.Count > 12 ? " — showing first 12" : "") + ")";
+                _lblLow.Text = "Low Stock Items (" + lowStock.Count + ")";
                 _dgvLow.Rows.Clear();
                 foreach (var p in lowTop)
                 {
@@ -303,7 +274,6 @@ namespace ApplianceManagement.Forms
                     if (p.CurrentStock <= 0)
                         _dgvLow.Rows[row].DefaultCellStyle.ForeColor = UiHelper.DangerColor;
                 }
-
                 _lblRefreshed.Text = "Refreshed: " + DateTime.Now.ToString("dd MMM yyyy HH:mm");
             }
             catch (Exception ex)
@@ -314,7 +284,6 @@ namespace ApplianceManagement.Forms
             LayoutAll();
         }
 
-        /// <summary>Re-applies theme fonts/colors and license branding texts.</summary>
         public void RefreshBranding()
         {
             StyleAll();
@@ -326,28 +295,22 @@ namespace ApplianceManagement.Forms
             _tabStrip.BackColor = Color.White;
             _header.BackColor = Color.White;
             _footer.BackColor = UiHelper.ThemeDark;
-
             _lblStore.Text = UiHelper.GetShopName().ToUpperInvariant();
             _lblStore.Font = new Font(UiHelper.TitleFont.FontFamily, UiHelper.TitleFont.Size + 2, FontStyle.Bold);
             _lblStore.ForeColor = UiHelper.ThemeDark;
-
             string info = UiHelper.AppName;
             string phone = UiHelper.GetShopPhone();
             if (!string.IsNullOrEmpty(phone)) info += "  •  " + phone;
-            if (!string.IsNullOrEmpty(UiHelper.ContactNumber)) info += "  •  " + UiHelper.ContactNumber;
             _lblStoreInfo.Text = info;
             _lblStoreInfo.Font = UiHelper.SmallFont;
-
             _lblRight1.Text = "System date: " + DateTime.Now.ToString("dd-MMM-yyyy");
             _lblRight2.Text = "Signed in as " + _user.FullName + " (" + _user.Role + ")";
             _lblRight1.Font = UiHelper.SmallFont;
             _lblRight2.Font = UiHelper.SmallFont;
-
             _btnRefresh.BackColor = UiHelper.ThemeColor;
             _btnRefresh.ForeColor = Color.White;
             _btnRefresh.Font = UiHelper.ButtonFont;
             _lblRefreshed.Font = UiHelper.SmallFont;
-
             _footerIcon.BackColor = Color.White;
             _footerIconText.Text = Initials(UiHelper.AppName);
             _footerIconText.Font = new Font(UiHelper.TitleFont.FontFamily, UiHelper.TitleFont.Size, FontStyle.Bold);
@@ -358,14 +321,13 @@ namespace ApplianceManagement.Forms
             _footerTag.Font = UiHelper.SmallFont;
             _footerCredit1.Text = DevelopedBy;
             _footerCredit1.Font = UiHelper.SmallFont;
-            _footerCredit2.Text = "© " + DateTime.Now.Year + " " + UiHelper.AppName + ". All rights reserved.";
+            _footerCredit2.Text = "© " + DateTime.Now.Year + " " + UiHelper.AppName;
             _footerCredit2.Font = UiHelper.SmallFont;
-
             foreach (var c in _cards)
             {
                 c.Value.Font = new Font(UiHelper.TitleFont.FontFamily, UiHelper.TitleFont.Size + 1, FontStyle.Bold);
                 c.Caption.Font = UiHelper.SmallFont;
-                c.Glyph.Font = new Font(UiHelper.ButtonFont.FontFamily, UiHelper.ButtonFont.Size + 4, FontStyle.Bold);
+                c.Glyph.Font = new Font(UiHelper.ButtonFont.FontFamily, UiHelper.ButtonFont.Size + 2, FontStyle.Bold);
             }
             _lblRecent.Font = UiHelper.HeaderFont;
             _lblRecent.ForeColor = UiHelper.ThemeDark;
@@ -374,18 +336,15 @@ namespace ApplianceManagement.Forms
             _dgvRecent.Font = UiHelper.NormalFont;
             _dgvLow.Font = UiHelper.NormalFont;
             StyleTabs(_dashView.Visible);
-
-            // welcome view
             _lblTitle.Text = UiHelper.AppName;
             _lblTitle.Font = new Font(UiHelper.TitleFont.FontFamily, UiHelper.TitleFont.Size + 6, FontStyle.Bold);
             _lblTitle.ForeColor = UiHelper.ThemeDark;
             _lblSub.Text = "Welcome, " + _user.FullName + " (" + _user.Role + ")  —  " + UiHelper.GetShopName();
             _lblSub.Font = UiHelper.HeaderFont;
             _lblSub.ForeColor = Color.FromArgb(80, 95, 110);
-            _lblHint.Text = "Use the menu bar to start a Sale, Purchase or Report   |   F4=Close   F12=Save";
+            _lblHint.Text = "F2 Sale   F3 Purchase   F4 Close   F12 Save";
             _lblHint.Font = UiHelper.SmallFont;
             _lblHint.ForeColor = Color.Gray;
-
             LayoutAll();
         }
 
@@ -397,31 +356,25 @@ namespace ApplianceManagement.Forms
             return (parts[0].Substring(0, 1) + parts[1].Substring(0, 1)).ToUpperInvariant();
         }
 
-        // ===== layout =====
-
         private void LayoutAll()
         {
             if (_tabStrip == null || Width < 50 || Height < 50) return;
+            _laidOut = this.Size;
             int w = Width, h = Height;
-
             _tabStrip.SetBounds(0, 0, w, 48);
             _header.SetBounds(0, 48, w, 76);
             _footer.SetBounds(0, h - 54, w, 54);
-
             _tabDash.Location = new Point(12, 7);
             _tabMain.Location = new Point(12 + _tabDash.Width + 8, 7);
             _btnRefresh.Location = new Point(w - 12 - _btnRefresh.Width, 8);
             _lblRefreshed.Location = new Point(_btnRefresh.Left - 10 - _lblRefreshed.Width, 15);
-
             _lblRight1.Location = new Point(w - 16 - _lblRight1.Width, 14);
             _lblRight2.Location = new Point(w - 16 - _lblRight2.Width, 38);
-
             _footerIcon.Location = new Point(14, 8);
             _footerTitle.Location = new Point(64, 8);
             _footerTag.Location = new Point(64, 30);
             _footerCredit1.Location = new Point(w - 14 - _footerCredit1.Width, 8);
             _footerCredit2.Location = new Point(w - 14 - _footerCredit2.Width, 29);
-
             int top = 48 + 76;
             var content = new Rectangle(0, top, w, Math.Max(120, h - top - 54));
             _welcomeView.SetBounds(content.X, content.Y, content.Width, content.Height);
@@ -434,10 +387,7 @@ namespace ApplianceManagement.Forms
         {
             var items = new List<Control>();
             if (_pic != null) items.Add(_pic);
-            items.Add(_lblTitle);
-            items.Add(_lblSub);
-            items.Add(_lblHint);
-
+            items.Add(_lblTitle); items.Add(_lblSub); items.Add(_lblHint);
             int total = 18 * (items.Count - 1);
             foreach (Control c in items) total += c.Height;
             int y = content.Y + (content.Height - total) / 2 - Math.Max(0, content.Height / 20);
@@ -456,10 +406,7 @@ namespace ApplianceManagement.Forms
             int x0 = content.X + Math.Max(pad, (content.Width - blockW) / 2);
             int y = content.Y + pad;
             for (int i = 0; i < _cards.Count; i++)
-            {
                 _cards[i].Panel.SetBounds(x0 + (i % 4) * (cardW + gap), y + (i / 4) * (cardH + gap), cardW, cardH);
-            }
-
             int listsY = content.Y + pad + 2 * cardH + gap + 18;
             int gridH = Math.Max(120, content.Y + content.Height - listsY - 28 - pad);
             int gridW = Math.Max(200, (content.Width - 2 * pad - gap) / 2);
