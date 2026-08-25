@@ -1,0 +1,7 @@
+D:\ApplianceX\V6\ApplianceManagement\bin\Debug\ApplianceManagement.exe.config
+D:\ApplianceX\V6\ApplianceManagement\bin\Debug\ApplianceManagement.exe
+D:\ApplianceX\V6\ApplianceManagement\bin\Debug\ApplianceManagement.pdb
+D:\ApplianceX\V6\ApplianceManagement\obj\Debug\ApplianceManagement.csproj.AssemblyReference.cache
+D:\ApplianceX\V6\ApplianceManagement\obj\Debug\ApplianceManagement.csproj.CoreCompileInputs.cache
+D:\ApplianceX\V6\ApplianceManagement\obj\Debug\ApplianceManagement.exe
+D:\ApplianceX\V6\ApplianceManagement\obj\Debug\ApplianceManagement.pdb

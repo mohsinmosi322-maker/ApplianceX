@@ -1,0 +1,7 @@
+D:\ApplianceX\V6\Authenticator\bin\Debug\Authenticator.exe.config
+D:\ApplianceX\V6\Authenticator\bin\Debug\Authenticator.exe
+D:\ApplianceX\V6\Authenticator\bin\Debug\Authenticator.pdb
+D:\ApplianceX\V6\Authenticator\obj\Debug\Authenticator.csproj.AssemblyReference.cache
+D:\ApplianceX\V6\Authenticator\obj\Debug\Authenticator.csproj.CoreCompileInputs.cache
+D:\ApplianceX\V6\Authenticator\obj\Debug\Authenticator.exe
+D:\ApplianceX\V6\Authenticator\obj\Debug\Authenticator.pdb
