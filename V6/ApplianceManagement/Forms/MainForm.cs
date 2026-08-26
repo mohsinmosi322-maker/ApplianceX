@@ -46,9 +46,10 @@ namespace ApplianceManagement.Forms
             this.FormClosing += MainForm_FormClosing;
             this.KeyPreview = true;
             this.MdiChildActivate += (s, e) => SyncHome();
-            this.Text = UiHelper.AppName + "  —  " + UiHelper.GetShopName();
+            this.Text = UiHelper.AppName + "  \u2014  " + UiHelper.GetShopName();
             BuildMenu();
             this.Load += MainForm_Load;
+            this.Resize += (s, e) => PositionHomeOverMdi();
         }
 
         private void BuildMenu()
@@ -120,17 +121,29 @@ namespace ApplianceManagement.Forms
         }
 
         /// <summary>
-        /// HomeScreen is a Panel. Never add it to MdiClient (crash) and never host it
-        /// as an MDI child Form (that is what jammed the dashboard at the top).
-        /// Parent it to MainForm, Dock.Fill, sit it above MdiClient, below the menu.
+        /// IMPORTANT: Do NOT use Dock.Fill on MainForm when IsMdiContainer=true.
+        /// MdiClient fights Dock.Fill and the dashboard looks "half jammed" at the top.
+        /// Match HomeScreen size/position to MdiClient and Anchor all sides.
+        /// Never add a Panel to mdiClient.Controls (ArgumentException).
         /// </summary>
         private void SetupHome()
         {
+            if (mdiClient == null) return;
+
             homeScreen = new HomeScreen(CurrentUser);
-            homeScreen.Dock = DockStyle.Fill;
+            homeScreen.Visible = true;
             this.Controls.Add(homeScreen);
+            PositionHomeOverMdi();
             homeScreen.BringToFront();
             menuStrip.BringToFront();
+        }
+
+        private void PositionHomeOverMdi()
+        {
+            if (homeScreen == null || mdiClient == null) return;
+            // Same rectangle as the MDI client area (below menu, full width/height)
+            homeScreen.Bounds = mdiClient.Bounds;
+            homeScreen.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
         }
 
         private void SyncHome()
@@ -140,14 +153,16 @@ namespace ApplianceManagement.Forms
             homeScreen.Visible = showDash;
             if (showDash)
             {
+                PositionHomeOverMdi();
                 homeScreen.BringToFront();
                 menuStrip.BringToFront();
+                homeScreen.RefreshData();
             }
         }
 
         public void RefreshBranding()
         {
-            this.Text = UiHelper.AppName + "  —  " + UiHelper.GetShopName();
+            this.Text = UiHelper.AppName + "  \u2014  " + UiHelper.GetShopName();
             this.BackColor = UiHelper.BgColor;
             if (menuStrip != null)
             {
@@ -157,6 +172,7 @@ namespace ApplianceManagement.Forms
             }
             if (mdiClient != null) mdiClient.BackColor = UiHelper.BgColor;
             if (homeScreen != null) homeScreen.RefreshBranding();
+            PositionHomeOverMdi();
         }
 
         private void ApplyPermissions()
