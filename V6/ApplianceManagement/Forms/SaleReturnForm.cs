@@ -129,7 +129,7 @@ namespace ApplianceManagement.Forms
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.Message, "Load invoice", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                DialogHelpers.Error(this, ex.Message);
                 _invoiceLines.Clear();
                 dgv.DataSource = null;
             }
@@ -188,19 +188,19 @@ namespace ApplianceManagement.Forms
         {
             if (_saleId <= 0 || _invoiceLines == null || _invoiceLines.Count == 0)
             {
-                MessageBox.Show("Load an original invoice first (F5).");
+                DialogHelpers.Error(this, "Load an original invoice first (F5).");
                 return;
             }
             if (!(dgv.DataSource is List<ReturnGridRow> rows))
             {
-                MessageBox.Show("Nothing to return.");
+                DialogHelpers.Error(this, "Nothing to return.");
                 return;
             }
 
             string reason = txtReason.Text.Trim();
             if (string.IsNullOrEmpty(reason))
             {
-                MessageBox.Show("Return reason is required.");
+                DialogHelpers.Error(this, "Return reason is required.");
                 txtReason.Focus();
                 return;
             }
@@ -227,20 +227,17 @@ namespace ApplianceManagement.Forms
 
             if (details.Count == 0)
             {
-                MessageBox.Show("Enter Return Qty on at least one line.");
+                DialogHelpers.Error(this, "Enter Return Qty on at least one line.");
                 return;
             }
 
             decimal refund = 0;
             decimal.TryParse(txtRefund.Text, out refund);
 
-            if (MessageBox.Show(
+            if (!DialogHelpers.Confirm(this,
                     "Save sale return against " + _invoiceNo + "?\nLines: " + details.Count +
                     "\nRefund: " + refund.ToString("0.00") +
-                    "\nReason: " + reason,
-                    "Confirm",
-                    MessageBoxButtons.YesNo,
-                    MessageBoxIcon.Question) != DialogResult.Yes)
+                    "\nReason: " + reason))
                 return;
 
             try
@@ -257,15 +254,15 @@ namespace ApplianceManagement.Forms
                     Details = details
                 };
                 _service.Save(header);
-                MessageBox.Show("Return saved.\nReturn No: " + header.ReturnNo + "\nStock increased.", "Success");
+                DialogHelpers.Info(this, "Return saved.\nReturn No: " + header.ReturnNo + "\nStock increased.");
                 this.Tag = "NOSAVECONFIRM";
-                // reload invoice to refresh returnable
                 LoadInvoice();
                 txtReason.Clear();
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                AppLog.Error("Sale return save", ex);
+                DialogHelpers.Error(this, ex.Message);
             }
         }
 
