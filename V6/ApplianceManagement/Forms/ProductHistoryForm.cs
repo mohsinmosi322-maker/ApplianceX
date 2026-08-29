@@ -1,9 +1,9 @@
 using System;
 using System.Drawing;
 using System.Windows.Forms;
-using ApplianceManagement.Data;
 using ApplianceManagement.Helpers;
 using ApplianceManagement.Models;
+using ApplianceManagement.Services;
 
 namespace ApplianceManagement.Forms
 {
@@ -16,9 +16,8 @@ namespace ApplianceManagement.Forms
             this.StartPosition = FormStartPosition.CenterParent;
             this.BackColor = UiHelper.BgColor;
             this.KeyPreview = true;
-            this.Tag = "NOSAVECONFIRM"; // never ask confirm on close
+            this.Tag = "NOSAVECONFIRM";
 
-            // ESC / F4 close silently — no exit dialog
             this.KeyDown += (s, e) =>
             {
                 if (e.KeyCode == Keys.Escape || e.KeyCode == Keys.F4)
@@ -44,14 +43,14 @@ namespace ApplianceManagement.Forms
             {
                 if (saleHistory)
                 {
-                    var rows = new SaleRepository().GetProductSaleHistory(product.ProductID);
+                    var rows = new SaleService().GetProductHistory(product.ProductID);
                     dgv.DataSource = rows;
                     if (rows == null || rows.Count == 0)
                         MessageBox.Show("No sale history for this product.", "History", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
                 else
                 {
-                    var rows = new PurchaseRepository().GetProductPurchaseHistory(product.ProductID);
+                    var rows = new PurchaseService().GetProductHistory(product.ProductID);
                     dgv.DataSource = rows;
                     if (rows == null || rows.Count == 0)
                         MessageBox.Show("No purchase history for this product.", "History", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -62,25 +61,5 @@ namespace ApplianceManagement.Forms
                 MessageBox.Show("Could not load history:\n" + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
-    }
-
-    public class ProductSaleHistoryRow
-    {
-        public DateTime Date { get; set; }
-        public string Invoice { get; set; }
-        public string Customer { get; set; }
-        public int Qty { get; set; }
-        public decimal Price { get; set; }
-        public decimal Amount { get; set; }
-    }
-
-    public class ProductPurchaseHistoryRow
-    {
-        public DateTime Date { get; set; }
-        public string Invoice { get; set; }
-        public string Supplier { get; set; }
-        public int Qty { get; set; }
-        public decimal Price { get; set; }
-        public decimal Amount { get; set; }
     }
 }

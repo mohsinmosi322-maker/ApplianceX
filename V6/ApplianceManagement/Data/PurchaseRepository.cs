@@ -1,18 +1,18 @@
 using System;
 using System.Collections.Generic;
 using System.Data.SqlClient;
-using ApplianceManagement.Forms;
 using ApplianceManagement.Helpers;
 using ApplianceManagement.Models;
+using ApplianceManagement.Services;
 
 namespace ApplianceManagement.Data
 {
     public class PurchaseRepository
     {
+        private readonly InventoryService _inv = new InventoryService();
+
         /// <summary>
-        /// Purchase qty = number of packs.
-        /// Stock increases by qty * PackSize (units).
-        /// UnitCost stored = PurchasePrice / PackSize for COGS alignment with unit sales.
+        /// Line Quantity = packs. Ledger QuantityIn = packs × PackSize (base units).
         /// </summary>
         public int SavePurchase(PurchaseHeader purchase)
         {
@@ -48,29 +48,10 @@ namespace ApplianceManagement.Data
 
                         foreach (var d in purchase.Details)
                         {
-                            // Pack size for this product (default 1)
-                            decimal packSize = 1m;
-                            try
-                            {
-                                using (var cmd = DbHelper.CreateCommand(
-                                    "SELECT ISNULL(PackSize,1) FROM Products WHERE ProductID=@P", conn, trans))
-                                {
-                                    cmd.Parameters.AddWithValue("@P", d.ProductID);
-                                    var o = cmd.ExecuteScalar();
-                                    if (o != null && o != DBNull.Value)
-                                    {
-                                        packSize = Convert.ToDecimal(o);
-                                        if (packSize <= 0) packSize = 1m;
-                                    }
-                                }
-                            }
-                            catch (SqlException) { packSize = 1m; }
-
-                            int packs = d.Quantity;
-                            if (packs < 1) packs = 1;
-                            int unitsIn = (int)Math.Round(packs * packSize);
-                            if (unitsIn < 1) unitsIn = packs;
-                            decimal unitCost = packSize == 1m ? d.PurchasePrice : Math.Round(d.PurchasePrice / packSize, 4);
+                            decimal packSize = ReadPackSize(conn, trans, d.ProductID);
+                            int packs = d.Quantity < 1 ? 1 : d.Quantity;
+                            int unitsIn = PackMath.PacksToUnits(packs, packSize);
+                            decimal unitCost = PackMath.UnitCost(d.PurchasePrice, packSize);
 
                             using (var cmd = DbHelper.CreateCommand(
                                 "INSERT INTO PurchaseDetail(PurchaseID,ProductID,Quantity,PurchasePrice,Discount,Amount) VALUES(@P,@Pr,@Q,@Price,@Di,@Am)", conn, trans))
@@ -84,46 +65,29 @@ namespace ApplianceManagement.Data
                                 cmd.ExecuteNonQuery();
                             }
 
-                            // Physical stock in UNITS
+                            // Keep product last purchase unit cost for COGS display
                             try
                             {
                                 using (var cmd = DbHelper.CreateCommand(
-                                    "UPDATE Products SET CurrentStock = ISNULL(CurrentStock,0) + @Q, PurchasePrice = @Price WHERE ProductID=@P", conn, trans))
+                                    "UPDATE Products SET PurchasePrice = @Price WHERE ProductID=@P", conn, trans))
                                 {
-                                    cmd.Parameters.AddWithValue("@Q", unitsIn);
                                     cmd.Parameters.AddWithValue("@Price", unitCost);
                                     cmd.Parameters.AddWithValue("@P", d.ProductID);
                                     cmd.ExecuteNonQuery();
                                 }
                             }
-                            catch (SqlException)
-                            {
-                                try
-                                {
-                                    using (var cmd = DbHelper.CreateCommand(
-                                        "UPDATE Products SET PurchasePrice = @Price WHERE ProductID=@P", conn, trans))
-                                    {
-                                        cmd.Parameters.AddWithValue("@Price", unitCost);
-                                        cmd.Parameters.AddWithValue("@P", d.ProductID);
-                                        cmd.ExecuteNonQuery();
-                                    }
-                                }
-                                catch (SqlException) { }
-                            }
+                            catch (SqlException) { }
 
-                            using (var cmd = DbHelper.CreateCommand(
-                                "INSERT INTO InventoryTransaction(TransactionDate,ProductID,TransactionType,ReferenceID,QuantityIn,QuantityOut,UnitCost,Remarks) " +
-                                "VALUES(@Dt,@P,@T,@R,@Q,0,@C,@Rem)", conn, trans))
-                            {
-                                cmd.Parameters.AddWithValue("@Dt", purchase.PurchaseDate);
-                                cmd.Parameters.AddWithValue("@P", d.ProductID);
-                                cmd.Parameters.AddWithValue("@T", InventoryTransactionType.Purchase);
-                                cmd.Parameters.AddWithValue("@R", purchaseId);
-                                cmd.Parameters.AddWithValue("@Q", unitsIn);
-                                cmd.Parameters.AddWithValue("@C", unitCost);
-                                cmd.Parameters.AddWithValue("@Rem", "Purchase: " + invoiceNo + " packs=" + packs + " packSize=" + packSize);
-                                cmd.ExecuteNonQuery();
-                            }
+                            _inv.Post(
+                                conn, trans,
+                                d.ProductID,
+                                InventoryTransactionType.Purchase,
+                                purchaseId,
+                                quantityIn: unitsIn,
+                                quantityOut: 0,
+                                unitCost: unitCost,
+                                remarks: "Purchase: " + invoiceNo + " packs=" + packs + " packSize=" + packSize,
+                                when: purchase.PurchaseDate);
                         }
 
                         trans.Commit();
@@ -138,6 +102,23 @@ namespace ApplianceManagement.Data
                     }
                 }
             }
+        }
+
+        private static decimal ReadPackSize(SqlConnection conn, SqlTransaction trans, int productId)
+        {
+            try
+            {
+                using (var cmd = DbHelper.CreateCommand(
+                    "SELECT ISNULL(PackSize,1) FROM Products WHERE ProductID=@P", conn, trans))
+                {
+                    cmd.Parameters.AddWithValue("@P", productId);
+                    var o = cmd.ExecuteScalar();
+                    if (o == null || o == DBNull.Value) return 1m;
+                    decimal p = Convert.ToDecimal(o);
+                    return PackMath.NormalizePackSize(p);
+                }
+            }
+            catch (SqlException) { return 1m; }
         }
 
         public List<ProductPurchaseHistoryRow> GetProductPurchaseHistory(int productId)

@@ -3,12 +3,14 @@ using System.Collections.Generic;
 using System.Data.SqlClient;
 using ApplianceManagement.Helpers;
 using ApplianceManagement.Models;
-using ApplianceManagement.Forms;
+using ApplianceManagement.Services;
 
 namespace ApplianceManagement.Data
 {
     public class SaleRepository
     {
+        private readonly InventoryService _inv = new InventoryService();
+
         public int SaveSale(SaleHeader sale)
         {
             using (var conn = DbHelper.GetConnection())
@@ -43,44 +45,20 @@ namespace ApplianceManagement.Data
 
                         foreach (var d in sale.Details)
                         {
-                            // Single source of truth: inventory ledger
-                            int available;
-                            decimal unitCost;
-                            ReadLedgerStock(conn, trans, d.ProductID, out available, out unitCost);
-
-                            if (available < d.Quantity)
-                                throw new InvalidOperationException(
-                                    "Insufficient stock for " + (d.ProductName ?? ("Product " + d.ProductID)) +
-                                    ". Available: " + available + ", requested: " + d.Quantity);
-
+                            decimal unitCost = ReadUnitCost(conn, trans, d.ProductID);
+                            _inv.EnsureStock(conn, trans, d.ProductID, d.Quantity, d.ProductName);
                             InsertSaleDetail(conn, trans, saleId, d, unitCost);
 
-                            // Cache column (if present) — best effort
-                            try
-                            {
-                                using (var cmd = DbHelper.CreateCommand(
-                                    "UPDATE Products SET CurrentStock = ISNULL(CurrentStock,0) - @Q WHERE ProductID=@P AND ISNULL(CurrentStock,0) >= @Q", conn, trans))
-                                {
-                                    cmd.Parameters.AddWithValue("@Q", d.Quantity);
-                                    cmd.Parameters.AddWithValue("@P", d.ProductID);
-                                    cmd.ExecuteNonQuery();
-                                }
-                            }
-                            catch (SqlException) { }
-
-                            using (var cmd = DbHelper.CreateCommand(
-                                "INSERT INTO InventoryTransaction(TransactionDate,ProductID,TransactionType,ReferenceID,QuantityIn,QuantityOut,UnitCost,Remarks) " +
-                                "VALUES(@Dt,@P,@T,@R,0,@Q,@C,@Rem)", conn, trans))
-                            {
-                                cmd.Parameters.AddWithValue("@Dt", sale.SaleDate);
-                                cmd.Parameters.AddWithValue("@P", d.ProductID);
-                                cmd.Parameters.AddWithValue("@T", InventoryTransactionType.Sale);
-                                cmd.Parameters.AddWithValue("@R", saleId);
-                                cmd.Parameters.AddWithValue("@Q", d.Quantity);
-                                cmd.Parameters.AddWithValue("@C", unitCost);
-                                cmd.Parameters.AddWithValue("@Rem", "Sale: " + invoiceNo);
-                                cmd.ExecuteNonQuery();
-                            }
+                            _inv.Post(
+                                conn, trans,
+                                d.ProductID,
+                                InventoryTransactionType.Sale,
+                                saleId,
+                                quantityIn: 0,
+                                quantityOut: d.Quantity,
+                                unitCost: unitCost,
+                                remarks: "Sale: " + invoiceNo,
+                                when: sale.SaleDate);
                         }
 
                         trans.Commit();
@@ -97,27 +75,22 @@ namespace ApplianceManagement.Data
             }
         }
 
-        /// <summary>Ledger stock = SUM(In)-SUM(Out). Unit cost from Products.PurchasePrice.</summary>
-        private static void ReadLedgerStock(SqlConnection conn, SqlTransaction trans, int productId, out int stock, out decimal unitCost)
+        private static decimal ReadUnitCost(SqlConnection conn, SqlTransaction trans, int productId)
         {
             using (var cmd = DbHelper.CreateCommand(
-                "SELECT PurchasePrice, " +
-                "ISNULL((SELECT SUM(QuantityIn)-SUM(QuantityOut) FROM InventoryTransaction WITH (UPDLOCK) WHERE ProductID=@P),0) AS Stock " +
-                "FROM Products WITH (UPDLOCK, ROWLOCK) WHERE ProductID=@P AND IsActive=1", conn, trans))
+                "SELECT PurchasePrice FROM Products WITH (UPDLOCK, ROWLOCK) WHERE ProductID=@P AND IsActive=1", conn, trans))
             {
                 cmd.Parameters.AddWithValue("@P", productId);
-                using (var r = cmd.ExecuteReader())
-                {
-                    if (!r.Read())
-                        throw new InvalidOperationException("Product not found or inactive (ID " + productId + ").");
-                    unitCost = Convert.ToDecimal(r["PurchasePrice"]);
-                    stock = Convert.ToInt32(r["Stock"]);
-                }
+                var o = cmd.ExecuteScalar();
+                if (o == null || o == DBNull.Value)
+                    throw new InvalidOperationException("Product not found or inactive (ID " + productId + ").");
+                return Convert.ToDecimal(o);
             }
         }
 
         public void SaveSaleReturn(int productId, int qty, string reason)
         {
+            if (qty <= 0) throw new InvalidOperationException("Return quantity must be > 0.");
             using (var conn = DbHelper.GetConnection())
             {
                 conn.Open();
@@ -125,39 +98,16 @@ namespace ApplianceManagement.Data
                 {
                     try
                     {
-                        decimal unitCost = 0;
-                        using (var cmd = DbHelper.CreateCommand("SELECT PurchasePrice FROM Products WHERE ProductID=@P", conn, trans))
-                        {
-                            cmd.Parameters.AddWithValue("@P", productId);
-                            var o = cmd.ExecuteScalar();
-                            if (o == null) throw new InvalidOperationException("Product not found.");
-                            unitCost = Convert.ToDecimal(o);
-                        }
-
-                        try
-                        {
-                            using (var cmd = DbHelper.CreateCommand(
-                                "UPDATE Products SET CurrentStock = ISNULL(CurrentStock,0) + @Q WHERE ProductID=@P", conn, trans))
-                            {
-                                cmd.Parameters.AddWithValue("@Q", qty);
-                                cmd.Parameters.AddWithValue("@P", productId);
-                                cmd.ExecuteNonQuery();
-                            }
-                        }
-                        catch (SqlException) { }
-
-                        using (var cmd = DbHelper.CreateCommand(
-                            "INSERT INTO InventoryTransaction(TransactionDate,ProductID,TransactionType,ReferenceID,QuantityIn,QuantityOut,UnitCost,Remarks) " +
-                            "VALUES(@Dt,@P,@T,NULL,@Q,0,@C,@Rem)", conn, trans))
-                        {
-                            cmd.Parameters.AddWithValue("@Dt", DateTime.Now);
-                            cmd.Parameters.AddWithValue("@P", productId);
-                            cmd.Parameters.AddWithValue("@T", InventoryTransactionType.SaleReturn);
-                            cmd.Parameters.AddWithValue("@Q", qty);
-                            cmd.Parameters.AddWithValue("@C", unitCost);
-                            cmd.Parameters.AddWithValue("@Rem", string.IsNullOrEmpty(reason) ? "Sale return" : reason);
-                            cmd.ExecuteNonQuery();
-                        }
+                        decimal unitCost = ReadUnitCost(conn, trans, productId);
+                        _inv.Post(
+                            conn, trans,
+                            productId,
+                            InventoryTransactionType.SaleReturn,
+                            null,
+                            quantityIn: qty,
+                            quantityOut: 0,
+                            unitCost: unitCost,
+                            remarks: string.IsNullOrEmpty(reason) ? "Sale return" : reason);
 
                         trans.Commit();
                         AppLog.Info("Sale return product=" + productId + " qty=" + qty);
