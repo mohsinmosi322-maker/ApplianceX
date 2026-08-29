@@ -139,6 +139,7 @@ namespace ApplianceManagement.Forms
 
             var mnuHelp = new ToolStripMenuItem("  Help  ");
             mnuHelp.DropDownItems.Add("Shortcuts", null, (s, e) => ShowShortcuts());
+            mnuHelp.DropDownItems.Add("Application Logs", null, (s, e) => OpenChild(new LogViewerForm(), ""));
             mnuHelp.DropDownItems.Add("About", null, (s, e) =>
                 MessageBox.Show(UiHelper.AppName + "  v" + UiHelper.AppVersion + "\n" + UiHelper.GetShopName() +
                     "\n\nF2 Sale   F3 Purchase   F4 Close   F9 History   F12 Save",
@@ -344,7 +345,8 @@ namespace ApplianceManagement.Forms
 
         public void OpenChild(Form child, string permKey)
         {
-            if (!AppSettings.HasPermission(CurrentUser.UserName, CurrentUser.Role, permKey))
+            if (!string.IsNullOrEmpty(permKey) &&
+                !AppSettings.HasPermission(CurrentUser.UserName, CurrentUser.Role, permKey))
             {
                 MessageBox.Show("You do not have access to this form.", "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 child.Dispose();
