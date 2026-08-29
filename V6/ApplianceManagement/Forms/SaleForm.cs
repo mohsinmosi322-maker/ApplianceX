@@ -38,10 +38,16 @@ namespace ApplianceManagement.Forms
             UiHelper.AttachF4Close(this);
             this.KeyDown += Form_KeyDown;
 
+            // Professional blue banner
+            this.Controls.Add(UiHelper.CreateFormBanner(
+                "SALE",
+                "Point of sale  \u2022  Search products  \u2022  Discount & payment  \u2022  F9 history",
+                FormAccent.Sale, FormAccent.SaleDark));
+
             Panel top = new Panel { Dock = DockStyle.Top, Height = 88, BackColor = Color.White };
-            top.Controls.Add(new Label { Text = "Invoice  AUTO", Font = UiHelper.HeaderFont, ForeColor = UiHelper.ThemeDark, Location = new Point(16, 10), AutoSize = true });
+            top.Controls.Add(new Label { Text = "Invoice  AUTO", Font = UiHelper.HeaderFont, ForeColor = FormAccent.SaleDark, Location = new Point(16, 10), AutoSize = true });
             top.Controls.Add(new Label { Text = DateTime.Now.ToString("dd MMM yyyy  HH:mm"), Font = UiHelper.NormalFont, ForeColor = Color.FromArgb(110, 122, 136), Location = new Point(200, 12), AutoSize = true });
-            top.Controls.Add(new Label { Text = "Customer: Walk-in", Font = UiHelper.NormalFont, Location = new Point(430, 12), AutoSize = true });
+            top.Controls.Add(new Label { Text = "Customer: Walk-in", Font = UiHelper.NormalFont, ForeColor = FormAccent.Sale, Location = new Point(430, 12), AutoSize = true });
             top.Controls.Add(new Label { Text = "Search", Font = UiHelper.SmallFont, Location = new Point(16, 50), AutoSize = true });
             txtSearch = new TextBox { Location = new Point(70, 46), Size = new Size(320, 28) };
             UiHelper.StyleTextBox(txtSearch);
@@ -56,7 +62,7 @@ namespace ApplianceManagement.Forms
             top.Controls.Add(new Label { Text = "Enter add  F8 remove  F9 history  Up/Down grid  F12 disc", Font = UiHelper.SmallFont, ForeColor = Color.FromArgb(140, 150, 160), Location = new Point(520, 50), AutoSize = true });
             this.Controls.Add(top);
 
-            lstSuggest = new ListBox { Location = new Point(70, 86), Size = new Size(420, 160), Visible = false, Font = UiHelper.NormalFont, IntegralHeight = false };
+            lstSuggest = new ListBox { Location = new Point(70, 140), Size = new Size(420, 160), Visible = false, Font = UiHelper.NormalFont, IntegralHeight = false };
             lstSuggest.Click += (s, e) => SelectSug();
             lstSuggest.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; SelectSug(); } };
             this.Controls.Add(lstSuggest);
@@ -64,7 +70,7 @@ namespace ApplianceManagement.Forms
             this.Controls.Add(BuildTotalsFooter());
 
             dgv = new DataGridView { Dock = DockStyle.Fill };
-            UiHelper.StyleGrid(dgv);
+            UiHelper.StyleGridWithAccent(dgv, FormAccent.Sale);
             dgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             dgv.MultiSelect = false;
             this.Controls.Add(dgv);
@@ -177,7 +183,6 @@ namespace ApplianceManagement.Forms
         {
             string q = txtSearch.Text.Trim();
             if (q.Length < 2) { lstSuggest.Visible = false; return; }
-            // Don't clear selectedProduct while typing after select until text changes substantially
             var list = productRepo.Search(q);
             lstSuggest.DataSource = null;
             lstSuggest.DataSource = list;
@@ -188,7 +193,7 @@ namespace ApplianceManagement.Forms
 
         private Panel BuildTotalsFooter()
         {
-            Panel foot = new Panel { Dock = DockStyle.Bottom, Height = 78, BackColor = Color.White };
+            Panel foot = new Panel { Dock = DockStyle.Bottom, Height = 78, BackColor = Color.FromArgb(236, 245, 252) };
             int x = 16;
             AddFootLabel(foot, "Total", x, 10); txtTotal = AddFootBox(foot, x, 32, 110, "0.00"); txtTotal.TextChanged += (s, e) => OnTotalChanged();
             txtTotal.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; txtDiscount.Focus(); txtDiscount.SelectAll(); } };
@@ -199,7 +204,7 @@ namespace ApplianceManagement.Forms
             AddFootLabel(foot, "Discount", x, 10); txtDiscAmt = AddFootBox(foot, x, 32, 110, "0.00"); txtDiscAmt.TextChanged += (s, e) => OnAmtChanged();
             txtDiscAmt.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; txtNet.Focus(); txtNet.SelectAll(); } };
             x += 126;
-            AddFootLabel(foot, "Net", x, 10); txtNet = AddFootBox(foot, x, 32, 120, "0.00"); txtNet.ForeColor = UiHelper.ThemeColor; txtNet.Font = UiHelper.HeaderFont;
+            AddFootLabel(foot, "Net", x, 10); txtNet = AddFootBox(foot, x, 32, 120, "0.00"); txtNet.ForeColor = FormAccent.Sale; txtNet.Font = UiHelper.HeaderFont;
             txtNet.TextChanged += (s, e) => OnNetChanged();
             txtNet.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; txtPaid.Text = txtNet.Text; txtPaid.Focus(); txtPaid.SelectAll(); } };
             x += 136;
@@ -208,7 +213,8 @@ namespace ApplianceManagement.Forms
 
             Button btnSave = new Button { Text = "SAVE (F12)", Size = new Size(130, 36), Anchor = AnchorStyles.Top | AnchorStyles.Right };
             Button btnClose = new Button { Text = "CLOSE (F4)", Size = new Size(130, 36), Anchor = AnchorStyles.Top | AnchorStyles.Right };
-            UiHelper.StyleButton(btnSave); UiHelper.StyleButton(btnClose);
+            UiHelper.StyleAccentButton(btnSave, FormAccent.Sale, FormAccent.SaleDark);
+            UiHelper.StyleAccentButton(btnClose, FormAccent.SaleDark, FormAccent.Sale);
             btnSave.Click += (s, e) => Save();
             btnClose.Click += (s, e) => this.Close();
             foot.Controls.Add(btnSave); foot.Controls.Add(btnClose);
