@@ -53,10 +53,15 @@ namespace ApplianceManagement.Forms
                 }
             };
 
+            this.Controls.Add(UiHelper.CreateFormBanner(
+                "SALE RETURN",
+                "Customer returns  \u2022  Stock will INCREASE  \u2022  Discount & paid  \u2022  F9 history",
+                FormAccent.SaleReturn, FormAccent.SaleReturnDark));
+
             Panel top = new Panel { Dock = DockStyle.Top, Height = 88, BackColor = Color.White };
-            top.Controls.Add(new Label { Text = "RETURN  AUTO", Font = UiHelper.HeaderFont, ForeColor = UiHelper.ThemeDark, Location = new Point(16, 10), AutoSize = true });
+            top.Controls.Add(new Label { Text = "RETURN  AUTO", Font = UiHelper.HeaderFont, ForeColor = FormAccent.SaleReturnDark, Location = new Point(16, 10), AutoSize = true });
             top.Controls.Add(new Label { Text = DateTime.Now.ToString("dd MMM yyyy  HH:mm"), Font = UiHelper.NormalFont, ForeColor = Color.FromArgb(110, 122, 136), Location = new Point(200, 12), AutoSize = true });
-            top.Controls.Add(new Label { Text = "Stock will INCREASE", Font = UiHelper.NormalFont, ForeColor = Color.FromArgb(39, 174, 96), Location = new Point(430, 12), AutoSize = true });
+            top.Controls.Add(new Label { Text = "Stock will INCREASE", Font = UiHelper.NormalFont, ForeColor = FormAccent.Purchase, Location = new Point(430, 12), AutoSize = true });
             top.Controls.Add(new Label { Text = "Search", Font = UiHelper.SmallFont, Location = new Point(16, 50), AutoSize = true });
             txtSearch = new TextBox { Location = new Point(70, 46), Size = new Size(320, 28) };
             UiHelper.StyleTextBox(txtSearch);
@@ -98,7 +103,8 @@ namespace ApplianceManagement.Forms
                 Product p = selectedProduct;
                 int qty = 1; int.TryParse(txtQty.Text, out qty); if (qty < 1) qty = 1;
                 decimal unitPrice = p.UnitSalePrice;
-                var ex = cart.Find(x => x.ProductID == p.ProductID);
+                // use 'line' not 'x' — avoids CS0136 with footer int x below
+                var ex = cart.Find(line => line.ProductID == p.ProductID);
                 if (ex != null) { ex.Quantity += qty; ex.Amount = ex.Quantity * ex.SalePrice; }
                 else cart.Add(new SaleDetail { ProductID = p.ProductID, ProductCode = p.ProductCode, ProductName = p.ProductName, Quantity = qty, SalePrice = unitPrice, Amount = qty * unitPrice });
                 RefreshGrid(); txtSearch.Clear(); selectedProduct = null; txtQty.Text = "1"; lstSuggest.Visible = false; txtSearch.Focus();
@@ -106,25 +112,26 @@ namespace ApplianceManagement.Forms
             top.Controls.Add(txtQty);
             this.Controls.Add(top);
 
-            lstSuggest = new ListBox { Location = new Point(70, 86), Size = new Size(420, 160), Visible = false, Font = UiHelper.NormalFont, IntegralHeight = false };
+            lstSuggest = new ListBox { Location = new Point(70, 140), Size = new Size(420, 160), Visible = false, Font = UiHelper.NormalFont, IntegralHeight = false };
             lstSuggest.Click += (s, e) => SelectSug();
             this.Controls.Add(lstSuggest);
 
-            Panel foot = new Panel { Dock = DockStyle.Bottom, Height = 78, BackColor = Color.White };
-            int x = 16;
-            foot.Controls.Add(new Label { Text = "Total", Font = UiHelper.SmallFont, Location = new Point(x, 10), AutoSize = true });
-            txtTotal = Box(foot, x, 32, 110); txtTotal.Text = "0.00"; x += 126;
-            foot.Controls.Add(new Label { Text = "Disc %", Font = UiHelper.SmallFont, Location = new Point(x, 10), AutoSize = true });
-            txtDiscount = Box(foot, x, 32, 70); txtDiscount.Text = "0"; txtDiscount.TextChanged += (s, e) => OnPct(); x += 86;
-            foot.Controls.Add(new Label { Text = "Discount", Font = UiHelper.SmallFont, Location = new Point(x, 10), AutoSize = true });
-            txtDiscAmt = Box(foot, x, 32, 110); txtDiscAmt.Text = "0.00"; txtDiscAmt.TextChanged += (s, e) => OnAmt(); x += 126;
-            foot.Controls.Add(new Label { Text = "Net", Font = UiHelper.SmallFont, Location = new Point(x, 10), AutoSize = true });
-            txtNet = Box(foot, x, 32, 120); txtNet.Text = "0.00"; txtNet.ForeColor = UiHelper.ThemeColor; x += 136;
-            foot.Controls.Add(new Label { Text = "Paid", Font = UiHelper.SmallFont, Location = new Point(x, 10), AutoSize = true });
-            txtPaid = Box(foot, x, 32, 110); txtPaid.Text = "0.00";
+            Panel foot = new Panel { Dock = DockStyle.Bottom, Height = 78, BackColor = Color.FromArgb(253, 242, 233) };
+            int fx = 16;
+            foot.Controls.Add(new Label { Text = "Total", Font = UiHelper.SmallFont, Location = new Point(fx, 10), AutoSize = true });
+            txtTotal = Box(foot, fx, 32, 110); txtTotal.Text = "0.00"; fx += 126;
+            foot.Controls.Add(new Label { Text = "Disc %", Font = UiHelper.SmallFont, Location = new Point(fx, 10), AutoSize = true });
+            txtDiscount = Box(foot, fx, 32, 70); txtDiscount.Text = "0"; txtDiscount.TextChanged += (s, e) => OnPct(); fx += 86;
+            foot.Controls.Add(new Label { Text = "Discount", Font = UiHelper.SmallFont, Location = new Point(fx, 10), AutoSize = true });
+            txtDiscAmt = Box(foot, fx, 32, 110); txtDiscAmt.Text = "0.00"; txtDiscAmt.TextChanged += (s, e) => OnAmt(); fx += 126;
+            foot.Controls.Add(new Label { Text = "Net", Font = UiHelper.SmallFont, Location = new Point(fx, 10), AutoSize = true });
+            txtNet = Box(foot, fx, 32, 120); txtNet.Text = "0.00"; txtNet.ForeColor = FormAccent.SaleReturn; fx += 136;
+            foot.Controls.Add(new Label { Text = "Paid", Font = UiHelper.SmallFont, Location = new Point(fx, 10), AutoSize = true });
+            txtPaid = Box(foot, fx, 32, 110); txtPaid.Text = "0.00";
             Button btnSave = new Button { Text = "SAVE RETURN (F12)", Size = new Size(160, 36), Anchor = AnchorStyles.Top | AnchorStyles.Right };
             Button btnClose = new Button { Text = "CLOSE (F4)", Size = new Size(120, 36), Anchor = AnchorStyles.Top | AnchorStyles.Right };
-            UiHelper.StyleButton(btnSave); UiHelper.StyleButton(btnClose);
+            UiHelper.StyleAccentButton(btnSave, FormAccent.SaleReturn, FormAccent.SaleReturnDark);
+            UiHelper.StyleAccentButton(btnClose, FormAccent.SaleReturnDark, FormAccent.SaleReturn);
             btnSave.Click += (s, e) => Save();
             btnClose.Click += (s, e) => this.Close();
             foot.Controls.Add(btnSave); foot.Controls.Add(btnClose);
@@ -136,15 +143,15 @@ namespace ApplianceManagement.Forms
             this.Controls.Add(foot);
 
             dgv = new DataGridView { Dock = DockStyle.Fill };
-            UiHelper.StyleGrid(dgv);
+            UiHelper.StyleGridWithAccent(dgv, FormAccent.SaleReturn);
             this.Controls.Add(dgv);
             dgv.BringToFront();
             lstSuggest.BringToFront();
         }
 
-        private TextBox Box(Control p, int x, int y, int w)
+        private TextBox Box(Control p, int posX, int y, int w)
         {
-            var t = new TextBox { Location = new Point(x, y), Size = new Size(w, 28) };
+            var t = new TextBox { Location = new Point(posX, y), Size = new Size(w, 28) };
             UiHelper.StyleTextBox(t);
             p.Controls.Add(t);
             return t;
