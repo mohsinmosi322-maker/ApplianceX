@@ -120,16 +120,9 @@ namespace ApplianceManagement.Forms
             SetupHome();
         }
 
-        /// <summary>
-        /// IMPORTANT: Do NOT use Dock.Fill on MainForm when IsMdiContainer=true.
-        /// MdiClient fights Dock.Fill and the dashboard looks "half jammed" at the top.
-        /// Match HomeScreen size/position to MdiClient and Anchor all sides.
-        /// Never add a Panel to mdiClient.Controls (ArgumentException).
-        /// </summary>
         private void SetupHome()
         {
             if (mdiClient == null) return;
-
             homeScreen = new HomeScreen(CurrentUser);
             homeScreen.Visible = true;
             this.Controls.Add(homeScreen);
@@ -141,7 +134,6 @@ namespace ApplianceManagement.Forms
         private void PositionHomeOverMdi()
         {
             if (homeScreen == null || mdiClient == null) return;
-            // Same rectangle as the MDI client area (below menu, full width/height)
             homeScreen.Bounds = mdiClient.Bounds;
             homeScreen.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
         }
@@ -237,7 +229,9 @@ namespace ApplianceManagement.Forms
                 child.Dispose();
                 return;
             }
-            bool allowMulti = child is SaleForm || child is PurchaseForm || child is NewItemForm || child is ReportsForm;
+
+            // Sale + Reports: multiple windows allowed. Purchase + rest: single instance, switch to existing.
+            bool allowMulti = child is SaleForm || child is ReportsForm;
             if (!allowMulti)
             {
                 foreach (Form f in this.MdiChildren)
@@ -245,11 +239,13 @@ namespace ApplianceManagement.Forms
                     if (f.GetType() == child.GetType())
                     {
                         f.Activate();
+                        f.BringToFront();
                         child.Dispose();
                         return;
                     }
                 }
             }
+
             if (homeScreen != null) homeScreen.Visible = false;
             child.MdiParent = this;
             UiHelper.ApplyFormSize(child);
@@ -261,7 +257,7 @@ namespace ApplianceManagement.Forms
         private void ShowShortcuts()
         {
             MessageBox.Show(
-                "F2    New Sale\nF3    New Purchase\nF4    Close window\nF8    Remove selected line (Sale)\nF12   Save / focus discount\nEnter  Confirm field",
+                "F2    New Sale (multiple allowed)\nF3    Purchase (one window only)\nF4    Close window\nF8    Remove selected line (Sale)\nF12   Save / focus discount\nEnter  Confirm field",
                 "Keyboard Shortcuts", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
