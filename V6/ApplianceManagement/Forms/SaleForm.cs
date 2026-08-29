@@ -38,12 +38,6 @@ namespace ApplianceManagement.Forms
             UiHelper.AttachF4Close(this);
             this.KeyDown += Form_KeyDown;
 
-            // Professional blue banner
-            this.Controls.Add(UiHelper.CreateFormBanner(
-                "SALE",
-                "Point of sale  \u2022  Search products  \u2022  Discount & payment  \u2022  F9 history",
-                FormAccent.Sale, FormAccent.SaleDark));
-
             Panel top = new Panel { Dock = DockStyle.Top, Height = 88, BackColor = Color.White };
             top.Controls.Add(new Label { Text = "Invoice  AUTO", Font = UiHelper.HeaderFont, ForeColor = FormAccent.SaleDark, Location = new Point(16, 10), AutoSize = true });
             top.Controls.Add(new Label { Text = DateTime.Now.ToString("dd MMM yyyy  HH:mm"), Font = UiHelper.NormalFont, ForeColor = Color.FromArgb(110, 122, 136), Location = new Point(200, 12), AutoSize = true });
@@ -61,6 +55,12 @@ namespace ApplianceManagement.Forms
             top.Controls.Add(txtQty);
             top.Controls.Add(new Label { Text = "Enter add  F8 remove  F9 history  Up/Down grid  F12 disc", Font = UiHelper.SmallFont, ForeColor = Color.FromArgb(140, 150, 160), Location = new Point(520, 50), AutoSize = true });
             this.Controls.Add(top);
+
+            // Banner last so Dock.Top puts it at the very top
+            this.Controls.Add(UiHelper.CreateFormBanner(
+                "SALE",
+                "Point of sale  \u2022  Unit = pack price / pack size  \u2022  Discount & payment  \u2022  F9 history",
+                FormAccent.Sale, FormAccent.SaleDark));
 
             lstSuggest = new ListBox { Location = new Point(70, 140), Size = new Size(420, 160), Visible = false, Font = UiHelper.NormalFont, IntegralHeight = false };
             lstSuggest.Click += (s, e) => SelectSug();
@@ -103,13 +103,24 @@ namespace ApplianceManagement.Forms
             idx += delta;
             if (idx < 0) idx = 0;
             if (idx >= cart.Count) idx = cart.Count - 1;
+            if (idx < 0 || idx >= dgv.Rows.Count) return;
             dgv.ClearSelection();
-            if (idx >= 0 && idx < dgv.Rows.Count)
+            dgv.Rows[idx].Selected = true;
+            DataGridViewCell visible = null;
+            foreach (DataGridViewCell c in dgv.Rows[idx].Cells)
             {
-                dgv.Rows[idx].Selected = true;
-                dgv.CurrentCell = dgv.Rows[idx].Cells[0];
-                dgv.Focus();
+                if (c.OwningColumn != null && c.OwningColumn.Visible)
+                {
+                    visible = c;
+                    break;
+                }
             }
+            if (visible != null)
+            {
+                try { dgv.CurrentCell = visible; }
+                catch { }
+            }
+            try { dgv.Focus(); } catch { }
         }
 
         private void Search_KeyDown(object s, KeyEventArgs e)
@@ -138,8 +149,9 @@ namespace ApplianceManagement.Forms
             Product p = selectedProduct;
             int qty = 1; int.TryParse(txtQty.Text, out qty); if (qty < 1) qty = 1;
             if (qty > p.CurrentStock) { MessageBox.Show("Insufficient stock. Available: " + p.CurrentStock); return; }
+            // Sale: unit price = pack sale price / pack size
             decimal unitPrice = p.UnitSalePrice;
-            var ex = cart.Find(x => x.ProductID == p.ProductID);
+            var ex = cart.Find(line => line.ProductID == p.ProductID);
             if (ex != null)
             {
                 if (ex.Quantity + qty > p.CurrentStock) { MessageBox.Show("Insufficient stock."); return; }
