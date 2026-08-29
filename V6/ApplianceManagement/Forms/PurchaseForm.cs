@@ -17,7 +17,6 @@ namespace ApplianceManagement.Forms
         private ProductRepository productRepo = new ProductRepository();
         private SupplierRepository supplierRepo = new SupplierRepository();
         private PurchaseService purchaseService = new PurchaseService();
-        private PurchaseRepository purchaseRepo = new PurchaseRepository();
         private List<PurchaseDetail> cart = new List<PurchaseDetail>();
         private Supplier selectedSupplier;
         private Product selectedProduct;
@@ -73,7 +72,7 @@ namespace ApplianceManagement.Forms
             top.Controls.Add(txtQty);
             top.Controls.Add(new Label
             {
-                Text = "Enter add  F9 history  F12 disc  (qty = packs)",
+                Text = "Enter add  F8 remove  F9 history  Up/Down  F12 disc",
                 Font = UiHelper.SmallFont,
                 ForeColor = Color.FromArgb(140, 150, 160),
                 Location = new Point(520, 52),
@@ -105,6 +104,8 @@ namespace ApplianceManagement.Forms
 
             dgv = new DataGridView { Dock = DockStyle.Fill };
             UiHelper.StyleGridWithAccent(dgv, FormAccent.Purchase);
+            dgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            dgv.MultiSelect = false;
             this.Controls.Add(dgv);
             dgv.BringToFront();
             lstSuggest.BringToFront();
@@ -114,6 +115,44 @@ namespace ApplianceManagement.Forms
         {
             if (e.KeyCode == Keys.F12) { txtDiscount.Focus(); txtDiscount.SelectAll(); e.Handled = true; }
             if (e.KeyCode == Keys.F9) { ShowProductHistory(); e.Handled = true; }
+            if (e.KeyCode == Keys.F8 && dgv.SelectedRows.Count > 0)
+            {
+                int i = dgv.SelectedRows[0].Index;
+                if (i >= 0 && i < cart.Count) { cart.RemoveAt(i); RefreshGrid(); }
+                e.Handled = true;
+            }
+            if ((e.KeyCode == Keys.Up || e.KeyCode == Keys.Down) && cart.Count > 0)
+            {
+                MoveGridSelection(e.KeyCode == Keys.Up ? -1 : 1);
+                e.Handled = true;
+            }
+        }
+
+        private void MoveGridSelection(int delta)
+        {
+            if (cart.Count == 0) return;
+            int idx = 0;
+            if (dgv.SelectedRows.Count > 0) idx = dgv.SelectedRows[0].Index;
+            idx += delta;
+            if (idx < 0) idx = 0;
+            if (idx >= cart.Count) idx = cart.Count - 1;
+            if (idx < 0 || idx >= dgv.Rows.Count) return;
+            dgv.ClearSelection();
+            dgv.Rows[idx].Selected = true;
+            DataGridViewCell visible = null;
+            foreach (DataGridViewCell c in dgv.Rows[idx].Cells)
+            {
+                if (c.OwningColumn != null && c.OwningColumn.Visible)
+                {
+                    visible = c;
+                    break;
+                }
+            }
+            if (visible != null)
+            {
+                try { dgv.CurrentCell = visible; } catch { }
+            }
+            try { dgv.Focus(); } catch { }
         }
 
         private void Search_KeyDown(object s, KeyEventArgs e)
@@ -133,7 +172,7 @@ namespace ApplianceManagement.Forms
                         txtQty.Focus();
                         txtQty.SelectAll();
                     }
-                    else MessageBox.Show("Product not found.");
+                    else DialogHelpers.Error(this, "Product not found.");
                 }
             }
             if (e.KeyCode == Keys.Down && lstSuggest.Visible) { lstSuggest.Focus(); e.Handled = true; }
@@ -192,6 +231,12 @@ namespace ApplianceManagement.Forms
         {
             Product p = selectedProduct;
             if (p == null && txtSearch.Tag is Product t) p = t;
+            if (p == null && dgv.SelectedRows.Count > 0)
+            {
+                int i = dgv.SelectedRows[0].Index;
+                if (i >= 0 && i < cart.Count)
+                    p = productRepo.GetByCode(cart[i].ProductCode);
+            }
             if (p == null)
             {
                 string q = txtSearch.Text.Trim();
@@ -201,7 +246,7 @@ namespace ApplianceManagement.Forms
             }
             if (p == null)
             {
-                MessageBox.Show("Select or search a product first, then press F9.");
+                DialogHelpers.Error(this, "Select or search a product first, then press F9.");
                 return;
             }
             selectedProduct = p;
@@ -364,9 +409,9 @@ namespace ApplianceManagement.Forms
 
         private void Save()
         {
-            if (cart.Count == 0) { MessageBox.Show("Add products first."); return; }
-            if (selectedSupplier == null) { MessageBox.Show("Select supplier (add from Settings)."); return; }
-            if (MessageBox.Show("Save this purchase?\nStock will increase by packs × pack size.", "Confirm", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+            if (cart.Count == 0) { DialogHelpers.Error(this, "Add products first."); return; }
+            if (selectedSupplier == null) { DialogHelpers.Error(this, "Select supplier (Masters → Suppliers)."); return; }
+            if (!DialogHelpers.Confirm(this, "Save this purchase?\nStock will increase by packs × pack size."))
                 return;
             try
             {
@@ -389,7 +434,7 @@ namespace ApplianceManagement.Forms
                     Details = cart
                 };
                 purchaseService.Save(header);
-                MessageBox.Show("Purchase saved!\nInvoice: " + header.InvoiceNo, "Success");
+                DialogHelpers.Info(this, "Purchase saved!\nInvoice: " + header.InvoiceNo);
                 this.Tag = "NOSAVECONFIRM";
                 cart.Clear();
                 RefreshGrid();
@@ -401,7 +446,8 @@ namespace ApplianceManagement.Forms
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Error: " + ex.Message);
+                AppLog.Error("Purchase save UI", ex);
+                DialogHelpers.Error(this, "Error: " + ex.Message);
             }
         }
     }

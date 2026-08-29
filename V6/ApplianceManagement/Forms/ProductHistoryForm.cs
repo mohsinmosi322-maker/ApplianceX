@@ -39,26 +39,40 @@ namespace ApplianceManagement.Forms
             this.Controls.Add(dgv);
             dgv.BringToFront();
 
+            Label empty = new Label
+            {
+                Dock = DockStyle.Bottom,
+                Height = 28,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Font = UiHelper.SmallFont,
+                ForeColor = Color.Gray,
+                Text = ""
+            };
+            this.Controls.Add(empty);
+
             try
             {
                 if (saleHistory)
                 {
                     var rows = new SaleService().GetProductHistory(product.ProductID);
                     dgv.DataSource = rows;
-                    if (rows == null || rows.Count == 0)
-                        MessageBox.Show("No sale history for this product.", "History", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    empty.Text = (rows == null || rows.Count == 0)
+                        ? "No sale history for this product."
+                        : rows.Count + " sale line(s)";
                 }
                 else
                 {
                     var rows = new PurchaseService().GetProductHistory(product.ProductID);
                     dgv.DataSource = rows;
-                    if (rows == null || rows.Count == 0)
-                        MessageBox.Show("No purchase history for this product.", "History", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    empty.Text = (rows == null || rows.Count == 0)
+                        ? "No purchase history for this product."
+                        : rows.Count + " purchase line(s)";
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Could not load history:\n" + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                empty.Text = "Could not load history: " + ex.Message;
+                empty.ForeColor = Color.FromArgb(183, 28, 28);
             }
         }
     }
