@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data.SqlClient;
+using ApplianceManagement.Forms;
 using ApplianceManagement.Helpers;
 using ApplianceManagement.Models;
 
@@ -54,7 +55,6 @@ namespace ApplianceManagement.Data
                                 cmd.ExecuteNonQuery();
                             }
 
-                            // Prefer physical stock column when present
                             try
                             {
                                 using (var cmd = DbHelper.CreateCommand(
@@ -104,6 +104,35 @@ namespace ApplianceManagement.Data
                     }
                 }
             }
+        }
+
+        public List<ProductPurchaseHistoryRow> GetProductPurchaseHistory(int productId)
+        {
+            var list = new List<ProductPurchaseHistoryRow>();
+            using (var conn = DbHelper.GetConnection())
+            {
+                conn.Open();
+                using (var cmd = DbHelper.CreateCommand(
+                    "SELECT h.PurchaseDate, h.InvoiceNo, s.SupplierName, d.Quantity, d.PurchasePrice, d.Amount " +
+                    "FROM PurchaseDetail d INNER JOIN PurchaseHeader h ON d.PurchaseID=h.PurchaseID " +
+                    "INNER JOIN Suppliers s ON h.SupplierID=s.SupplierID " +
+                    "WHERE d.ProductID=@P ORDER BY h.PurchaseDate DESC", conn))
+                {
+                    cmd.Parameters.AddWithValue("@P", productId);
+                    using (var r = cmd.ExecuteReader())
+                        while (r.Read())
+                            list.Add(new ProductPurchaseHistoryRow
+                            {
+                                Date = (DateTime)r["PurchaseDate"],
+                                Invoice = r["InvoiceNo"].ToString(),
+                                Supplier = r["SupplierName"].ToString(),
+                                Qty = Convert.ToInt32(r["Quantity"]),
+                                Price = Convert.ToDecimal(r["PurchasePrice"]),
+                                Amount = Convert.ToDecimal(r["Amount"])
+                            });
+                }
+            }
+            return list;
         }
 
         public List<PurchaseHeader> GetPurchases(DateTime from, DateTime to)

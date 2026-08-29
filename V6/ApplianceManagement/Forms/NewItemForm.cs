@@ -13,7 +13,8 @@ namespace ApplianceManagement.Forms
         private CategoryRepository categoryRepo = new CategoryRepository();
         private TextBox txtName, txtCode, txtBarcode, txtPurchase, txtSale, txtMinStock;
         private ComboBox cmbCategory;
-        private CheckBox chkCategory;
+        private CheckBox chkCategory, chkEditExisting;
+        private int? editingProductId = null;
 
         public NewItemForm()
         {
@@ -29,7 +30,7 @@ namespace ApplianceManagement.Forms
         private void InitializeComponent()
         {
             this.Text = "New Item";
-            this.Size = new Size(560, 520);
+            this.Size = new Size(580, 540);
             this.MinimumSize = new Size(520, 480);
             this.BackColor = UiHelper.BgColor;
             this.KeyPreview = true;
@@ -40,8 +41,61 @@ namespace ApplianceManagement.Forms
             this.Controls.Add(card);
 
             int y = 12;
+            // Product Code ABOVE name, with Edit existing checkbox
+            AddL(card, "Product Code", 0, y);
+            txtCode = AddT(card, 150, y, 140);
+            txtCode.ReadOnly = true;
+            txtCode.BackColor = Color.FromArgb(245, 247, 250);
+            chkEditExisting = new CheckBox
+            {
+                Text = "Edit existing (enter code)",
+                Font = UiHelper.SmallFont,
+                Location = new Point(300, y + 2),
+                Size = new Size(220, 24)
+            };
+            chkEditExisting.CheckedChanged += (s, e) =>
+            {
+                if (chkEditExisting.Checked)
+                {
+                    txtCode.ReadOnly = false;
+                    txtCode.BackColor = Color.White;
+                    txtCode.Clear();
+                    txtCode.Focus();
+                }
+                else
+                {
+                    editingProductId = null;
+                    txtCode.ReadOnly = true;
+                    txtCode.BackColor = Color.FromArgb(245, 247, 250);
+                    string next = productRepo.GetNextProductCode();
+                    txtCode.Text = next;
+                    txtBarcode.Text = next;
+                    txtName.Clear(); txtPurchase.Clear(); txtSale.Clear(); txtMinStock.Text = "0";
+                    cmbCategory.Enabled = true; chkCategory.Enabled = true;
+                }
+            };
+            card.Controls.Add(chkEditExisting);
+            txtCode.Leave += (s, e) =>
+            {
+                if (!chkEditExisting.Checked) return;
+                string code = txtCode.Text.Trim();
+                if (string.IsNullOrEmpty(code)) return;
+                var p = productRepo.GetByCode(code);
+                if (p == null) { MessageBox.Show("Product code not found."); editingProductId = null; return; }
+                editingProductId = p.ProductID;
+                txtName.Text = p.ProductName;
+                txtBarcode.Text = p.Barcode ?? p.ProductCode;
+                txtPurchase.Text = p.PurchasePrice.ToString("0.00");
+                txtSale.Text = p.SalePrice.ToString("0.00");
+                txtMinStock.Text = p.MinimumStock.ToString();
+                // Edit mode: name + rates only
+                txtBarcode.ReadOnly = true;
+                cmbCategory.Enabled = false;
+                chkCategory.Enabled = false;
+            };
+            y += 42;
+
             AddL(card, "Product Name", 0, y); txtName = AddT(card, 150, y, 300); txtName.KeyDown += Next; y += 42;
-            AddL(card, "Product Code", 0, y); txtCode = AddT(card, 150, y, 160); txtCode.ReadOnly = true; txtCode.BackColor = Color.FromArgb(245, 247, 250); y += 42;
             AddL(card, "Barcode", 0, y); txtBarcode = AddT(card, 150, y, 220); txtBarcode.KeyDown += Next; y += 42;
             chkCategory = new CheckBox { Text = "Use Category", Font = UiHelper.NormalFont, Location = new Point(0, y), Size = new Size(140, 26), Checked = true };
             chkCategory.CheckedChanged += (s, e) => cmbCategory.Enabled = chkCategory.Checked;
@@ -68,9 +122,18 @@ namespace ApplianceManagement.Forms
             try
             {
                 if (string.IsNullOrWhiteSpace(txtName.Text)) { MessageBox.Show("Name required."); return; }
-                if (productRepo.ExistsCode(txtCode.Text.Trim())) { MessageBox.Show("Code exists."); return; }
                 decimal pur = 0, sale = 0; int min = 0;
                 decimal.TryParse(txtPurchase.Text, out pur); decimal.TryParse(txtSale.Text, out sale); int.TryParse(txtMinStock.Text, out min);
+
+                if (chkEditExisting.Checked && editingProductId.HasValue)
+                {
+                    productRepo.Update(editingProductId.Value, txtName.Text.Trim(), pur, sale, min, true);
+                    MessageBox.Show("Product updated (name / rates).");
+                    chkEditExisting.Checked = false;
+                    return;
+                }
+
+                if (productRepo.ExistsCode(txtCode.Text.Trim())) { MessageBox.Show("Code exists."); return; }
                 int catId = 1;
                 if (chkCategory.Checked && cmbCategory.SelectedValue != null) catId = (int)cmbCategory.SelectedValue;
                 else if (cmbCategory.Items.Count > 0) catId = ((Category)cmbCategory.Items[0]).CategoryID;
