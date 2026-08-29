@@ -14,6 +14,7 @@ namespace ApplianceManagement.Forms
         private TextBox txtName, txtCode, txtBarcode, txtPurchase, txtSale, txtMinStock, txtPackSize;
         private ComboBox cmbCategory, cmbUom;
         private CheckBox chkCategory, chkEditExisting, chkUom;
+        private Label lblUnitPreview;
         private int? editingProductId = null;
 
         public NewItemForm()
@@ -24,26 +25,33 @@ namespace ApplianceManagement.Forms
             cmbCategory.ValueMember = "CategoryID";
             string next = productRepo.GetNextProductCode();
             txtCode.Text = next; txtBarcode.Text = next;
-            // Default: category + UOM unchecked/disabled
             chkCategory.Checked = false;
             cmbCategory.Enabled = false;
             chkUom.Checked = false;
             cmbUom.Enabled = false;
-            txtPackSize.Enabled = false;
+            // Pack size ALWAYS enabled so price division works without UOM
+            txtPackSize.Enabled = true;
+            txtPackSize.Text = "1";
+            UpdateUnitPreview();
             txtName.Focus();
         }
 
         private void InitializeComponent()
         {
             this.Text = "New Item";
-            this.Size = new Size(600, 580);
-            this.MinimumSize = new Size(520, 500);
+            this.Size = new Size(620, 620);
+            this.MinimumSize = new Size(520, 520);
             this.BackColor = UiHelper.BgColor;
             this.KeyPreview = true;
             UiHelper.AttachF4Close(this);
             this.KeyDown += (s, e) => { if (e.KeyCode == Keys.F12) Save(); };
 
-            Panel card = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(28, 20, 28, 20) };
+            this.Controls.Add(UiHelper.CreateFormBanner(
+                "NEW ITEM",
+                "Create / edit product  ·  Pack size divides sale price into unit price",
+                FormAccent.NewItem, FormAccent.NewItemDark));
+
+            Panel card = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(28, 16, 28, 16) };
             this.Controls.Add(card);
 
             int y = 12;
@@ -70,7 +78,6 @@ namespace ApplianceManagement.Forms
                 else ResetNewMode();
             };
             card.Controls.Add(chkEditExisting);
-            // Enter on code loads product when edit mode
             txtCode.KeyDown += (s, e) =>
             {
                 if (e.KeyCode == Keys.Enter)
@@ -87,7 +94,6 @@ namespace ApplianceManagement.Forms
 
             chkCategory = new CheckBox { Text = "Category", Font = UiHelper.NormalFont, Location = new Point(0, y), Size = new Size(140, 26), Checked = false };
             chkCategory.CheckedChanged += (s, e) => cmbCategory.Enabled = chkCategory.Checked;
-            // Right-click enables category
             chkCategory.MouseUp += (s, e) => { if (e.Button == MouseButtons.Right) { chkCategory.Checked = true; cmbCategory.Enabled = true; } };
             card.Controls.Add(chkCategory);
             cmbCategory = new ComboBox { Location = new Point(150, y), Size = new Size(300, 26), DropDownStyle = ComboBoxStyle.DropDownList, Enabled = false };
@@ -97,29 +103,67 @@ namespace ApplianceManagement.Forms
             chkUom.CheckedChanged += (s, e) =>
             {
                 cmbUom.Enabled = chkUom.Checked;
-                txtPackSize.Enabled = chkUom.Checked;
-                if (!chkUom.Checked) { cmbUom.SelectedIndex = -1; txtPackSize.Text = "1"; }
+                if (!chkUom.Checked) cmbUom.SelectedIndex = -1;
             };
-            chkUom.MouseUp += (s, e) => { if (e.Button == MouseButtons.Right) { chkUom.Checked = true; cmbUom.Enabled = true; txtPackSize.Enabled = true; } };
+            chkUom.MouseUp += (s, e) => { if (e.Button == MouseButtons.Right) { chkUom.Checked = true; cmbUom.Enabled = true; } };
             card.Controls.Add(chkUom);
             cmbUom = new ComboBox { Location = new Point(150, y), Size = new Size(160, 26), DropDownStyle = ComboBoxStyle.DropDownList, Enabled = false };
             UiHelper.StyleComboBox(cmbUom);
             cmbUom.Items.AddRange(new object[] { "Piece", "Kilograms", "Grams", "Litre", "Meter" });
             card.Controls.Add(cmbUom);
-            card.Controls.Add(new Label { Text = "Pack size", Font = UiHelper.SmallFont, Location = new Point(320, y + 4), AutoSize = true });
-            txtPackSize = AddT(card, 390, y, 80); txtPackSize.Text = "1"; txtPackSize.Enabled = false; y += 46;
+            y += 42;
+
+            // Pack size ALWAYS on (not tied to UOM)
+            AddL(card, "Pack size", 0, y);
+            txtPackSize = AddT(card, 150, y, 100);
+            txtPackSize.Text = "1";
+            txtPackSize.Enabled = true;
+            txtPackSize.TextChanged += (s, e) => UpdateUnitPreview();
+            card.Controls.Add(new Label
+            {
+                Text = "e.g. 50 for 50kg bag — Sale uses price ÷ pack",
+                Font = UiHelper.SmallFont,
+                ForeColor = Color.Gray,
+                Location = new Point(260, y + 4),
+                AutoSize = true
+            });
+            y += 42;
 
             AddL(card, "Purchase Price", 0, y); txtPurchase = AddT(card, 150, y, 160); txtPurchase.KeyDown += Next; y += 42;
-            AddL(card, "Sale Price", 0, y); txtSale = AddT(card, 150, y, 160); txtSale.KeyDown += Next;
-            card.Controls.Add(new Label { Text = "(pack price; unit = price / pack size)", Font = UiHelper.SmallFont, ForeColor = Color.Gray, Location = new Point(320, y + 4), AutoSize = true });
+            AddL(card, "Sale Price (pack)", 0, y); txtSale = AddT(card, 150, y, 160);
+            txtSale.KeyDown += Next;
+            txtSale.TextChanged += (s, e) => UpdateUnitPreview();
+            lblUnitPreview = new Label
+            {
+                Text = "Unit sale price: —",
+                Font = UiHelper.HeaderFont,
+                ForeColor = FormAccent.NewItem,
+                Location = new Point(320, y + 2),
+                AutoSize = true
+            };
+            card.Controls.Add(lblUnitPreview);
             y += 42;
             AddL(card, "Min Stock", 0, y); txtMinStock = AddT(card, 150, y, 100); txtMinStock.Text = "0"; txtMinStock.KeyDown += Next; y += 56;
 
             Button btnSave = new Button { Text = "SAVE (F12)", Location = new Point(150, y), Size = new Size(140, 38) };
-            UiHelper.StyleButton(btnSave); btnSave.Click += (s, e) => Save();
+            UiHelper.StyleAccentButton(btnSave, FormAccent.NewItem, FormAccent.NewItemDark);
+            btnSave.Click += (s, e) => Save();
             Button btnClose = new Button { Text = "CLOSE (F4)", Location = new Point(304, y), Size = new Size(140, 38) };
-            UiHelper.StyleButton(btnClose); btnClose.Click += (s, e) => this.Close();
+            UiHelper.StyleAccentButton(btnClose, FormAccent.NewItemDark, FormAccent.NewItem);
+            btnClose.Click += (s, e) => this.Close();
             card.Controls.Add(btnSave); card.Controls.Add(btnClose);
+        }
+
+        private void UpdateUnitPreview()
+        {
+            if (lblUnitPreview == null || txtSale == null || txtPackSize == null) return;
+            decimal sale = 0, pack = 1;
+            decimal.TryParse(txtSale.Text, out sale);
+            decimal.TryParse(txtPackSize.Text, out pack);
+            if (pack <= 0) pack = 1;
+            decimal unit = pack == 1m ? sale : Math.Round(sale / pack, 4);
+            lblUnitPreview.Text = "Unit sale price: " + unit.ToString("0.####") +
+                (pack != 1m ? ("  (" + sale.ToString("0.##") + " ÷ " + pack.ToString("0.####") + ")") : "");
         }
 
         private void LoadByCode()
@@ -134,12 +178,18 @@ namespace ApplianceManagement.Forms
             txtPurchase.Text = p.PurchasePrice.ToString("0.00");
             txtSale.Text = p.SalePrice.ToString("0.00");
             txtMinStock.Text = p.MinimumStock.ToString();
+            txtPackSize.Text = p.PackSize > 0 ? p.PackSize.ToString("0.####") : "1";
             if (!string.IsNullOrEmpty(p.UnitOfMeasure))
             {
                 chkUom.Checked = true;
                 if (cmbUom.Items.Contains(p.UnitOfMeasure)) cmbUom.SelectedItem = p.UnitOfMeasure;
-                txtPackSize.Text = p.PackSize > 0 ? p.PackSize.ToString("0.####") : "1";
             }
+            else
+            {
+                chkUom.Checked = false;
+                cmbUom.SelectedIndex = -1;
+            }
+            UpdateUnitPreview();
             txtName.Focus();
         }
 
@@ -152,7 +202,9 @@ namespace ApplianceManagement.Forms
             txtCode.Text = next; txtBarcode.Text = next;
             txtName.Clear(); txtPurchase.Clear(); txtSale.Clear(); txtMinStock.Text = "0";
             chkCategory.Checked = false; cmbCategory.Enabled = false;
-            chkUom.Checked = false; cmbUom.Enabled = false; txtPackSize.Enabled = false; txtPackSize.Text = "1";
+            chkUom.Checked = false; cmbUom.Enabled = false; cmbUom.SelectedIndex = -1;
+            txtPackSize.Enabled = true; txtPackSize.Text = "1";
+            UpdateUnitPreview();
         }
 
         private void Next(object s, KeyEventArgs e) { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; SelectNextControl((Control)s, true, true, true, true); } }
@@ -165,14 +217,21 @@ namespace ApplianceManagement.Forms
             {
                 if (string.IsNullOrWhiteSpace(txtName.Text)) { MessageBox.Show("Name required."); return; }
                 decimal pur = 0, sale = 0, pack = 1; int min = 0;
-                decimal.TryParse(txtPurchase.Text, out pur); decimal.TryParse(txtSale.Text, out sale); int.TryParse(txtMinStock.Text, out min);
-                decimal.TryParse(txtPackSize.Text, out pack); if (pack <= 0) pack = 1;
+                decimal.TryParse(txtPurchase.Text, out pur);
+                decimal.TryParse(txtSale.Text, out sale);
+                int.TryParse(txtMinStock.Text, out min);
+                if (!decimal.TryParse(txtPackSize.Text, out pack) || pack <= 0)
+                {
+                    MessageBox.Show("Pack size must be a number greater than 0.");
+                    txtPackSize.Focus();
+                    return;
+                }
                 string uom = chkUom.Checked && cmbUom.SelectedItem != null ? cmbUom.SelectedItem.ToString() : null;
 
                 if (chkEditExisting.Checked && editingProductId.HasValue)
                 {
                     productRepo.UpdateFull(editingProductId.Value, txtName.Text.Trim(), pur, sale, min, true, uom, pack);
-                    MessageBox.Show("Product updated.");
+                    MessageBox.Show("Product updated.\nUnit sale price: " + Math.Round(sale / pack, 4).ToString("0.####"));
                     chkEditExisting.Checked = false;
                     return;
                 }
@@ -181,15 +240,25 @@ namespace ApplianceManagement.Forms
                 int catId = 1;
                 if (chkCategory.Checked && cmbCategory.SelectedValue != null) catId = (int)cmbCategory.SelectedValue;
                 else if (cmbCategory.Items.Count > 0) catId = ((Category)cmbCategory.Items[0]).CategoryID;
-                productRepo.Insert(new Product
+
+                int newId = productRepo.Insert(new Product
                 {
                     ProductCode = txtCode.Text.Trim(),
                     Barcode = string.IsNullOrWhiteSpace(txtBarcode.Text) ? txtCode.Text.Trim() : txtBarcode.Text.Trim(),
-                    ProductName = txtName.Text.Trim(), CategoryID = catId,
-                    PurchasePrice = pur, SalePrice = sale, MinimumStock = min,
-                    UnitOfMeasure = uom, PackSize = pack
+                    ProductName = txtName.Text.Trim(),
+                    CategoryID = catId,
+                    PurchasePrice = pur,
+                    SalePrice = sale,
+                    MinimumStock = min,
+                    UnitOfMeasure = uom,
+                    PackSize = pack
                 });
-                MessageBox.Show("Saved!");
+
+                // Ensure PackSize written even if first INSERT path skipped columns
+                try { productRepo.UpdateFull(newId, txtName.Text.Trim(), pur, sale, min, true, uom, pack); }
+                catch { }
+
+                MessageBox.Show("Saved!\nUnit sale price: " + Math.Round(sale / pack, 4).ToString("0.####"));
                 ResetNewMode();
                 txtName.Focus();
             }

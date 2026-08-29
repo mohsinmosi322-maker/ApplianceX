@@ -15,18 +15,21 @@ namespace ApplianceManagement.Models {
     public int CurrentStock { get; set; }
     /// <summary>e.g. Piece, Kilograms, Grams — empty = plain unit</summary>
     public string UnitOfMeasure { get; set; }
-    /// <summary>Pack size; unit sale price = SalePrice / PackSize when PackSize &gt; 1</summary>
+    /// <summary>Pack size; unit sale price = SalePrice / PackSize when PackSize &gt; 0 and != 1</summary>
     public decimal PackSize { get; set; }
     public decimal StockValue { get { return CurrentStock * PurchasePrice; } }
+    /// <summary>Price charged per 1 unit in Sale / Sale Return.</summary>
     public decimal UnitSalePrice {
       get {
-        if (PackSize > 1m) return Math.Round(SalePrice / PackSize, 4);
-        return SalePrice;
+        decimal pack = PackSize <= 0 ? 1m : PackSize;
+        if (pack == 1m) return SalePrice;
+        return Math.Round(SalePrice / pack, 4);
       }
     }
     public override string ToString() {
       string u = string.IsNullOrEmpty(UnitOfMeasure) ? "" : (" /" + UnitOfMeasure);
-      return ProductCode + " - " + ProductName + u + " (Stock:" + CurrentStock + ")";
+      string pack = PackSize > 1m ? (" pack:" + PackSize.ToString("0.####")) : "";
+      return ProductCode + " - " + ProductName + u + pack + " (Stock:" + CurrentStock + ")";
     }
   }
 }
