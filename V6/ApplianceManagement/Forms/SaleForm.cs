@@ -52,15 +52,7 @@ namespace ApplianceManagement.Forms
             top.Controls.Add(new Label { Text = "Search", Font = UiHelper.SmallFont, Location = new Point(16, 50), AutoSize = true });
             txtSearch = new TextBox { Location = new Point(70, 46), Size = new Size(320, 28) };
             UiHelper.StyleTextBox(txtSearch);
-            txtSearch.TextChanged += (s, e) =>
-            {
-                string q = txtSearch.Text.Trim();
-                if (q.Length < 2) { lstSuggest.Visible = false; return; }
-                var list = productRepo.Search(q);
-                lstSuggest.DataSource = null; lstSuggest.DataSource = list;
-                lstSuggest.Visible = list.Count > 0;
-                if (list.Count > 0) lstSuggest.SelectedIndex = 0;
-            };
+            txtSearch.TextChanged += (s, e) => ShowSuggestions();
             txtSearch.KeyDown += (s, e) =>
             {
                 if (e.KeyCode == Keys.Enter)
@@ -74,13 +66,10 @@ namespace ApplianceManagement.Forms
                         else MessageBox.Show("Product not found.");
                     }
                 }
-                if (e.KeyCode == Keys.Down && lstSuggest.Visible) lstSuggest.Focus();
+                if (e.KeyCode == Keys.Down && lstSuggest.Visible) { lstSuggest.Focus(); e.Handled = true; }
+                if (e.KeyCode == Keys.Escape) lstSuggest.Visible = false;
             };
             top.Controls.Add(txtSearch);
-            lstSuggest = new ListBox { Location = new Point(70, 76), Size = new Size(320, 100), Visible = false };
-            lstSuggest.Click += (s, e) => SelectSug();
-            top.Controls.Add(lstSuggest);
-            lstSuggest.BringToFront();
             top.Controls.Add(new Label { Text = "Qty", Font = UiHelper.SmallFont, Location = new Point(410, 50), AutoSize = true });
             txtQty = new TextBox { Location = new Point(440, 46), Size = new Size(64, 28), Text = "1" };
             UiHelper.StyleTextBox(txtQty);
@@ -98,19 +87,43 @@ namespace ApplianceManagement.Forms
                     ex.Quantity += qty; ex.Amount = ex.Quantity * ex.SalePrice;
                 }
                 else cart.Add(new SaleDetail { ProductID = p.ProductID, ProductCode = p.ProductCode, ProductName = p.ProductName, Quantity = qty, SalePrice = p.SalePrice, Amount = qty * p.SalePrice });
-                RefreshGrid(); txtSearch.Clear(); txtSearch.Tag = null; txtQty.Text = "1"; txtSearch.Focus();
+                RefreshGrid(); txtSearch.Clear(); txtSearch.Tag = null; txtQty.Text = "1"; lstSuggest.Visible = false; txtSearch.Focus();
             };
             top.Controls.Add(txtQty);
             top.Controls.Add(new Label { Text = "Enter add   F8 remove line   F12 discount", Font = UiHelper.SmallFont, ForeColor = Color.FromArgb(140, 150, 160), Location = new Point(520, 50), AutoSize = true });
             this.Controls.Add(top);
 
-            Panel foot = BuildTotalsFooter();
-            this.Controls.Add(foot);
+            lstSuggest = new ListBox
+            {
+                Location = new Point(70, 86),
+                Size = new Size(420, 160),
+                Visible = false,
+                Font = UiHelper.NormalFont,
+                IntegralHeight = false
+            };
+            lstSuggest.Click += (s, e) => SelectSug();
+            lstSuggest.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; SelectSug(); } };
+            this.Controls.Add(lstSuggest);
+
+            this.Controls.Add(BuildTotalsFooter());
 
             dgv = new DataGridView { Dock = DockStyle.Fill };
             UiHelper.StyleGrid(dgv);
             this.Controls.Add(dgv);
             dgv.BringToFront();
+            lstSuggest.BringToFront();
+        }
+
+        private void ShowSuggestions()
+        {
+            string q = txtSearch.Text.Trim();
+            if (q.Length < 2) { lstSuggest.Visible = false; return; }
+            var list = productRepo.Search(q);
+            lstSuggest.DataSource = null;
+            lstSuggest.DataSource = list;
+            lstSuggest.Visible = list.Count > 0;
+            if (list.Count > 0) lstSuggest.SelectedIndex = 0;
+            lstSuggest.BringToFront();
         }
 
         private Panel BuildTotalsFooter()
