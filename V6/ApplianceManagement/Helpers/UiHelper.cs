@@ -320,7 +320,6 @@ namespace ApplianceManagement.Helpers
                 MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) == DialogResult.Yes;
         }
 
-        /// <summary>F4 closes. confirmOnClose=true asks exit (transaction forms). False for history/reports.</summary>
         public static void AttachF4Close(Form form, bool confirmOnClose = true)
         {
             form.KeyPreview = true;
@@ -343,6 +342,24 @@ namespace ApplianceManagement.Helpers
                 {
                     if (form.Tag != null && form.Tag.ToString() == "NOSAVECONFIRM") return;
                     if (!ConfirmExit()) e.Cancel = true;
+                }
+            };
+        }
+
+        /// <summary>Enter moves focus to the next control (POS field flow).</summary>
+        public static void AttachEnterNavigation(Form form)
+        {
+            if (form == null) return;
+            form.KeyPreview = true;
+            form.KeyDown += (s, e) =>
+            {
+                if (e.KeyCode != Keys.Enter) return;
+                Control c = form.ActiveControl;
+                if (c is TextBox || c is ComboBox || c is NumericUpDown)
+                {
+                    if (c is TextBox tb && tb.Multiline) return;
+                    e.SuppressKeyPress = true;
+                    form.SelectNextControl(c, true, true, true, true);
                 }
             };
         }
