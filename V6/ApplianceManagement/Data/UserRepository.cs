@@ -10,7 +10,6 @@ namespace ApplianceManagement.Data
 {
     public class UserRepository
     {
-        // .NET Framework 4.7.2 Rfc2898DeriveBytes uses HMACSHA1; 100k iterations is still strong for desktop apps.
         private const int Pbkdf2Iterations = 100000;
 
         public User Authenticate(string userName, string password)
@@ -107,6 +106,39 @@ namespace ApplianceManagement.Data
             }
         }
 
+        public void ChangePassword(int userId, string newPlainPassword)
+        {
+            UpdatePasswordHash(userId, HashPassword(newPlainPassword));
+        }
+
+        public void SetRole(int userId, string role)
+        {
+            using (var conn = DbHelper.GetConnection())
+            {
+                conn.Open();
+                using (var cmd = DbHelper.CreateCommand("UPDATE Users SET Role=@R WHERE UserID=@ID", conn))
+                {
+                    cmd.Parameters.AddWithValue("@R", role);
+                    cmd.Parameters.AddWithValue("@ID", userId);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
+        public void SetActive(int userId, bool active)
+        {
+            using (var conn = DbHelper.GetConnection())
+            {
+                conn.Open();
+                using (var cmd = DbHelper.CreateCommand("UPDATE Users SET IsActive=@A WHERE UserID=@ID", conn))
+                {
+                    cmd.Parameters.AddWithValue("@A", active);
+                    cmd.Parameters.AddWithValue("@ID", userId);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
         private void UpdatePasswordHash(int userId, string hash)
         {
             using (var conn = DbHelper.GetConnection())
@@ -121,7 +153,6 @@ namespace ApplianceManagement.Data
             }
         }
 
-        /// <summary>Format: iterations:saltBase64:hashBase64 (HMACSHA1 via net472 Rfc2898DeriveBytes)</summary>
         public static string HashPassword(string password)
         {
             byte[] salt = new byte[16];
