@@ -9,6 +9,11 @@ namespace ApplianceManagement.Data
 {
     public class PurchaseRepository
     {
+        /// <summary>
+        /// Purchase qty = number of packs.
+        /// Stock increases by qty * PackSize (units).
+        /// UnitCost stored = PurchasePrice / PackSize for COGS alignment with unit sales.
+        /// </summary>
         public int SavePurchase(PurchaseHeader purchase)
         {
             using (var conn = DbHelper.GetConnection())
@@ -43,38 +48,67 @@ namespace ApplianceManagement.Data
 
                         foreach (var d in purchase.Details)
                         {
+                            // Pack size for this product (default 1)
+                            decimal packSize = 1m;
+                            try
+                            {
+                                using (var cmd = DbHelper.CreateCommand(
+                                    "SELECT ISNULL(PackSize,1) FROM Products WHERE ProductID=@P", conn, trans))
+                                {
+                                    cmd.Parameters.AddWithValue("@P", d.ProductID);
+                                    var o = cmd.ExecuteScalar();
+                                    if (o != null && o != DBNull.Value)
+                                    {
+                                        packSize = Convert.ToDecimal(o);
+                                        if (packSize <= 0) packSize = 1m;
+                                    }
+                                }
+                            }
+                            catch (SqlException) { packSize = 1m; }
+
+                            int packs = d.Quantity;
+                            if (packs < 1) packs = 1;
+                            int unitsIn = (int)Math.Round(packs * packSize);
+                            if (unitsIn < 1) unitsIn = packs;
+                            decimal unitCost = packSize == 1m ? d.PurchasePrice : Math.Round(d.PurchasePrice / packSize, 4);
+
                             using (var cmd = DbHelper.CreateCommand(
                                 "INSERT INTO PurchaseDetail(PurchaseID,ProductID,Quantity,PurchasePrice,Discount,Amount) VALUES(@P,@Pr,@Q,@Price,@Di,@Am)", conn, trans))
                             {
                                 cmd.Parameters.AddWithValue("@P", purchaseId);
                                 cmd.Parameters.AddWithValue("@Pr", d.ProductID);
-                                cmd.Parameters.AddWithValue("@Q", d.Quantity);
+                                cmd.Parameters.AddWithValue("@Q", packs);
                                 cmd.Parameters.AddWithValue("@Price", d.PurchasePrice);
                                 cmd.Parameters.AddWithValue("@Di", d.Discount);
                                 cmd.Parameters.AddWithValue("@Am", d.Amount);
                                 cmd.ExecuteNonQuery();
                             }
 
+                            // Physical stock in UNITS
                             try
                             {
                                 using (var cmd = DbHelper.CreateCommand(
                                     "UPDATE Products SET CurrentStock = ISNULL(CurrentStock,0) + @Q, PurchasePrice = @Price WHERE ProductID=@P", conn, trans))
                                 {
-                                    cmd.Parameters.AddWithValue("@Q", d.Quantity);
-                                    cmd.Parameters.AddWithValue("@Price", d.PurchasePrice);
+                                    cmd.Parameters.AddWithValue("@Q", unitsIn);
+                                    cmd.Parameters.AddWithValue("@Price", unitCost);
                                     cmd.Parameters.AddWithValue("@P", d.ProductID);
                                     cmd.ExecuteNonQuery();
                                 }
                             }
                             catch (SqlException)
                             {
-                                using (var cmd = DbHelper.CreateCommand(
-                                    "UPDATE Products SET PurchasePrice = @Price WHERE ProductID=@P", conn, trans))
+                                try
                                 {
-                                    cmd.Parameters.AddWithValue("@Price", d.PurchasePrice);
-                                    cmd.Parameters.AddWithValue("@P", d.ProductID);
-                                    cmd.ExecuteNonQuery();
+                                    using (var cmd = DbHelper.CreateCommand(
+                                        "UPDATE Products SET PurchasePrice = @Price WHERE ProductID=@P", conn, trans))
+                                    {
+                                        cmd.Parameters.AddWithValue("@Price", unitCost);
+                                        cmd.Parameters.AddWithValue("@P", d.ProductID);
+                                        cmd.ExecuteNonQuery();
+                                    }
                                 }
+                                catch (SqlException) { }
                             }
 
                             using (var cmd = DbHelper.CreateCommand(
@@ -85,9 +119,9 @@ namespace ApplianceManagement.Data
                                 cmd.Parameters.AddWithValue("@P", d.ProductID);
                                 cmd.Parameters.AddWithValue("@T", InventoryTransactionType.Purchase);
                                 cmd.Parameters.AddWithValue("@R", purchaseId);
-                                cmd.Parameters.AddWithValue("@Q", d.Quantity);
-                                cmd.Parameters.AddWithValue("@C", d.PurchasePrice);
-                                cmd.Parameters.AddWithValue("@Rem", "Purchase: " + invoiceNo);
+                                cmd.Parameters.AddWithValue("@Q", unitsIn);
+                                cmd.Parameters.AddWithValue("@C", unitCost);
+                                cmd.Parameters.AddWithValue("@Rem", "Purchase: " + invoiceNo + " packs=" + packs + " packSize=" + packSize);
                                 cmd.ExecuteNonQuery();
                             }
                         }

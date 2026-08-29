@@ -16,21 +16,50 @@ namespace ApplianceManagement.Forms
             this.StartPosition = FormStartPosition.CenterParent;
             this.BackColor = UiHelper.BgColor;
             this.KeyPreview = true;
-            UiHelper.AttachF4Close(this);
+            this.Tag = "NOSAVECONFIRM"; // never ask confirm on close
+
+            // ESC / F4 close silently — no exit dialog
+            this.KeyDown += (s, e) =>
+            {
+                if (e.KeyCode == Keys.Escape || e.KeyCode == Keys.F4)
+                {
+                    e.SuppressKeyPress = true;
+                    this.Close();
+                }
+            };
+
+            Panel banner = UiHelper.CreateFormBanner(
+                saleHistory ? "SALE HISTORY" : "PURCHASE HISTORY",
+                product.ProductCode + " — " + product.ProductName + "  ·  ESC or F4 to close",
+                saleHistory ? FormAccent.Sale : FormAccent.Purchase,
+                saleHistory ? FormAccent.SaleDark : FormAccent.PurchaseDark);
+            this.Controls.Add(banner);
 
             var dgv = new DataGridView { Dock = DockStyle.Fill };
-            UiHelper.StyleGrid(dgv);
+            UiHelper.StyleGridWithAccent(dgv, saleHistory ? FormAccent.Sale : FormAccent.Purchase);
             this.Controls.Add(dgv);
+            dgv.BringToFront();
 
-            if (saleHistory)
+            try
             {
-                var rows = new SaleRepository().GetProductSaleHistory(product.ProductID);
-                dgv.DataSource = rows;
+                if (saleHistory)
+                {
+                    var rows = new SaleRepository().GetProductSaleHistory(product.ProductID);
+                    dgv.DataSource = rows;
+                    if (rows == null || rows.Count == 0)
+                        MessageBox.Show("No sale history for this product.", "History", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                else
+                {
+                    var rows = new PurchaseRepository().GetProductPurchaseHistory(product.ProductID);
+                    dgv.DataSource = rows;
+                    if (rows == null || rows.Count == 0)
+                        MessageBox.Show("No purchase history for this product.", "History", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
             }
-            else
+            catch (Exception ex)
             {
-                var rows = new PurchaseRepository().GetProductPurchaseHistory(product.ProductID);
-                dgv.DataSource = rows;
+                MessageBox.Show("Could not load history:\n" + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
     }
