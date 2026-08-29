@@ -14,5 +14,6 @@ namespace ApplianceManagement.Models {
   public static class InventoryTransactionType {
     public const string Purchase = "PURCHASE";
     public const string Sale = "SALE";
+    public const string SaleReturn = "SALE_RETURN";
   }
 }
