@@ -28,8 +28,8 @@ namespace ApplianceManagement.Forms
 
             this.Controls.Add(UiHelper.CreateFormBanner(
                 type + " REPORT",
-                type == "PROFIT" ? "Revenue − COGS = Gross Profit  ·  Export CSV" :
-                type == "SALES" ? "Green = Sale  ·  Red = Sale Return  ·  Export CSV" : "Date range  ·  Export CSV  ·  F4 close",
+                type == "PROFIT" ? "Revenue − COGS = Gross Profit · Green profit / Red loss · Export CSV" :
+                type == "SALES" ? "Green = Sale · Red = Sale Return · Export CSV" : "Date range · Export CSV · F4 close",
                 FormAccent.Reports, FormAccent.ReportsDark));
 
             Panel top = new Panel { Dock = DockStyle.Top, Height = 56, BackColor = Color.White, Padding = new Padding(12, 10, 12, 8) };
@@ -119,14 +119,7 @@ namespace ApplianceManagement.Forms
                     foreach (var r in rows) { rev += r.SaleAmount; cogs += r.Cogs; gp += r.GrossProfit; }
                     lblSummary.Text = "Revenue: " + rev.ToString("N2") + "    |    COGS: " + cogs.ToString("N2") +
                         "    |    Gross Profit: " + gp.ToString("N2");
-                    foreach (DataGridViewRow row in dgv.Rows)
-                    {
-                        if (row.Cells["GrossProfit"].Value == null) continue;
-                        decimal g = Convert.ToDecimal(row.Cells["GrossProfit"].Value);
-                        row.DefaultCellStyle.ForeColor = g >= 0
-                            ? Color.FromArgb(27, 94, 32)
-                            : Color.FromArgb(183, 28, 28);
-                    }
+                    ColorProfitRows();
                 }
             }
             catch (Exception ex) { DialogHelpers.Error(this, ex.Message); }
@@ -138,8 +131,37 @@ namespace ApplianceManagement.Forms
             {
                 if (row.Cells["Type"].Value == null) continue;
                 string typ = row.Cells["Type"].Value.ToString();
-                if (typ == "SALE") row.DefaultCellStyle.ForeColor = Color.FromArgb(27, 94, 32);
-                else if (typ == "RETURN") row.DefaultCellStyle.ForeColor = Color.FromArgb(183, 28, 28);
+                if (typ == "SALE")
+                {
+                    row.DefaultCellStyle.BackColor = Color.FromArgb(232, 245, 233);
+                    row.DefaultCellStyle.ForeColor = Color.FromArgb(27, 94, 32);
+                    row.DefaultCellStyle.SelectionBackColor = Color.FromArgb(46, 125, 50);
+                }
+                else if (typ == "RETURN")
+                {
+                    row.DefaultCellStyle.BackColor = Color.FromArgb(255, 235, 238);
+                    row.DefaultCellStyle.ForeColor = Color.FromArgb(183, 28, 28);
+                    row.DefaultCellStyle.SelectionBackColor = Color.FromArgb(198, 40, 40);
+                }
+            }
+        }
+
+        private void ColorProfitRows()
+        {
+            foreach (DataGridViewRow row in dgv.Rows)
+            {
+                if (row.Cells["GrossProfit"].Value == null) continue;
+                decimal g = Convert.ToDecimal(row.Cells["GrossProfit"].Value);
+                if (g >= 0)
+                {
+                    row.DefaultCellStyle.BackColor = Color.FromArgb(232, 245, 233);
+                    row.DefaultCellStyle.ForeColor = Color.FromArgb(27, 94, 32);
+                }
+                else
+                {
+                    row.DefaultCellStyle.BackColor = Color.FromArgb(255, 235, 238);
+                    row.DefaultCellStyle.ForeColor = Color.FromArgb(183, 28, 28);
+                }
             }
         }
 
