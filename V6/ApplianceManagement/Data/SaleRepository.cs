@@ -43,26 +43,10 @@ namespace ApplianceManagement.Data
 
                         foreach (var d in sale.Details)
                         {
+                            // Single source of truth: inventory ledger
                             int available;
                             decimal unitCost;
-                            bool hasPhysicalStock = TryReadPhysicalStock(conn, trans, d.ProductID, out available, out unitCost);
-
-                            if (!hasPhysicalStock)
-                            {
-                                using (var cmd = DbHelper.CreateCommand(
-                                    "SELECT PurchasePrice, ISNULL((SELECT SUM(QuantityIn)-SUM(QuantityOut) FROM InventoryTransaction WITH (UPDLOCK) WHERE ProductID=@P),0) AS Stock " +
-                                    "FROM Products WITH (UPDLOCK, ROWLOCK) WHERE ProductID=@P AND IsActive=1", conn, trans))
-                                {
-                                    cmd.Parameters.AddWithValue("@P", d.ProductID);
-                                    using (var r = cmd.ExecuteReader())
-                                    {
-                                        if (!r.Read())
-                                            throw new InvalidOperationException("Product not found or inactive (ID " + d.ProductID + ").");
-                                        unitCost = Convert.ToDecimal(r["PurchasePrice"]);
-                                        available = Convert.ToInt32(r["Stock"]);
-                                    }
-                                }
-                            }
+                            ReadLedgerStock(conn, trans, d.ProductID, out available, out unitCost);
 
                             if (available < d.Quantity)
                                 throw new InvalidOperationException(
@@ -71,17 +55,18 @@ namespace ApplianceManagement.Data
 
                             InsertSaleDetail(conn, trans, saleId, d, unitCost);
 
-                            if (hasPhysicalStock)
+                            // Cache column (if present) — best effort
+                            try
                             {
                                 using (var cmd = DbHelper.CreateCommand(
-                                    "UPDATE Products SET CurrentStock = CurrentStock - @Q WHERE ProductID=@P AND CurrentStock >= @Q", conn, trans))
+                                    "UPDATE Products SET CurrentStock = ISNULL(CurrentStock,0) - @Q WHERE ProductID=@P AND ISNULL(CurrentStock,0) >= @Q", conn, trans))
                                 {
                                     cmd.Parameters.AddWithValue("@Q", d.Quantity);
                                     cmd.Parameters.AddWithValue("@P", d.ProductID);
-                                    if (cmd.ExecuteNonQuery() == 0)
-                                        throw new InvalidOperationException("Stock changed concurrently for product " + d.ProductID);
+                                    cmd.ExecuteNonQuery();
                                 }
                             }
+                            catch (SqlException) { }
 
                             using (var cmd = DbHelper.CreateCommand(
                                 "INSERT INTO InventoryTransaction(TransactionDate,ProductID,TransactionType,ReferenceID,QuantityIn,QuantityOut,UnitCost,Remarks) " +
@@ -108,6 +93,25 @@ namespace ApplianceManagement.Data
                         AppLog.Error("SaveSale failed", ex);
                         throw;
                     }
+                }
+            }
+        }
+
+        /// <summary>Ledger stock = SUM(In)-SUM(Out). Unit cost from Products.PurchasePrice.</summary>
+        private static void ReadLedgerStock(SqlConnection conn, SqlTransaction trans, int productId, out int stock, out decimal unitCost)
+        {
+            using (var cmd = DbHelper.CreateCommand(
+                "SELECT PurchasePrice, " +
+                "ISNULL((SELECT SUM(QuantityIn)-SUM(QuantityOut) FROM InventoryTransaction WITH (UPDLOCK) WHERE ProductID=@P),0) AS Stock " +
+                "FROM Products WITH (UPDLOCK, ROWLOCK) WHERE ProductID=@P AND IsActive=1", conn, trans))
+            {
+                cmd.Parameters.AddWithValue("@P", productId);
+                using (var r = cmd.ExecuteReader())
+                {
+                    if (!r.Read())
+                        throw new InvalidOperationException("Product not found or inactive (ID " + productId + ").");
+                    unitCost = Convert.ToDecimal(r["PurchasePrice"]);
+                    stock = Convert.ToInt32(r["Stock"]);
                 }
             }
         }
@@ -140,7 +144,7 @@ namespace ApplianceManagement.Data
                                 cmd.ExecuteNonQuery();
                             }
                         }
-                        catch (SqlException) { /* no CurrentStock column */ }
+                        catch (SqlException) { }
 
                         using (var cmd = DbHelper.CreateCommand(
                             "INSERT INTO InventoryTransaction(TransactionDate,ProductID,TransactionType,ReferenceID,QuantityIn,QuantityOut,UnitCost,Remarks) " +
@@ -195,32 +199,6 @@ namespace ApplianceManagement.Data
                 }
             }
             return list;
-        }
-
-        private static bool TryReadPhysicalStock(SqlConnection conn, SqlTransaction trans, int productId, out int stock, out decimal unitCost)
-        {
-            stock = 0;
-            unitCost = 0;
-            try
-            {
-                using (var cmd = DbHelper.CreateCommand(
-                    "SELECT CurrentStock, PurchasePrice FROM Products WITH (UPDLOCK, ROWLOCK) WHERE ProductID=@P AND IsActive=1", conn, trans))
-                {
-                    cmd.Parameters.AddWithValue("@P", productId);
-                    using (var r = cmd.ExecuteReader())
-                    {
-                        if (!r.Read())
-                            throw new InvalidOperationException("Product not found or inactive (ID " + productId + ").");
-                        stock = Convert.ToInt32(r["CurrentStock"]);
-                        unitCost = Convert.ToDecimal(r["PurchasePrice"]);
-                        return true;
-                    }
-                }
-            }
-            catch (SqlException)
-            {
-                return false;
-            }
         }
 
         private static void InsertSaleDetail(SqlConnection conn, SqlTransaction trans, int saleId, SaleDetail d, decimal unitCost)
