@@ -106,6 +106,7 @@
     <Compile Include="Helpers\UiHelper.cs" />
     <Compile Include="Helpers\DialogHelpers.cs" />
     <Compile Include="Helpers\CsvExport.cs" />
+    <Compile Include="Helpers\BackupHelper.cs" />
     <Compile Include="Helpers\BillPrinter.cs" />
     <Compile Include="Helpers\LicenseReader.cs" />
     <Compile Include="Helpers\SvgImage.cs" />
