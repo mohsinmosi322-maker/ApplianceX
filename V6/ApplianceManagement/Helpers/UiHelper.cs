@@ -4,6 +4,28 @@ using System.Windows.Forms;
 
 namespace ApplianceManagement.Helpers
 {
+    /// <summary>Professional accent palette — one distinct color family per form type.</summary>
+    public static class FormAccent
+    {
+        public static readonly Color Sale = Color.FromArgb(41, 128, 185);       // Professional blue
+        public static readonly Color SaleDark = Color.FromArgb(28, 96, 140);
+        public static readonly Color Purchase = Color.FromArgb(39, 174, 96);  // Emerald green
+        public static readonly Color PurchaseDark = Color.FromArgb(28, 130, 72);
+        public static readonly Color SaleReturn = Color.FromArgb(230, 126, 34); // Warm orange
+        public static readonly Color SaleReturnDark = Color.FromArgb(185, 100, 25);
+        public static readonly Color NewItem = Color.FromArgb(142, 68, 173);  // Purple
+        public static readonly Color NewItemDark = Color.FromArgb(108, 52, 131);
+        public static readonly Color Inventory = Color.FromArgb(22, 160, 133); // Teal
+        public static readonly Color InventoryDark = Color.FromArgb(17, 122, 101);
+        public static readonly Color Reports = Color.FromArgb(52, 73, 94);    // Slate
+        public static readonly Color ReportsDark = Color.FromArgb(33, 47, 61);
+        public static readonly Color Settings = Color.FromArgb(52, 152, 219); // Sky blue
+        public static readonly Color SettingsDark = Color.FromArgb(41, 128, 185);
+        public static readonly Color LowStock = Color.FromArgb(192, 57, 43);  // Crimson
+        public static readonly Color LowStockDark = Color.FromArgb(150, 40, 30);
+        public static readonly Color Login = Color.FromArgb(44, 62, 80);
+    }
+
     public static class UiHelper
     {
         public static Font TitleFont { get; private set; } = new Font("Segoe UI", 14F, FontStyle.Bold);
@@ -52,6 +74,73 @@ namespace ApplianceManagement.Helpers
             }
         }
 
+        /// <summary>
+        /// Colored title banner for each form — title + short description in professional palette.
+        /// Dock Top, height 52.
+        /// </summary>
+        public static Panel CreateFormBanner(string title, string description, Color accent, Color accentDark)
+        {
+            Panel banner = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 52,
+                BackColor = accent
+            };
+            // Left accent stripe
+            Panel stripe = new Panel
+            {
+                Dock = DockStyle.Left,
+                Width = 6,
+                BackColor = accentDark
+            };
+            banner.Controls.Add(stripe);
+
+            Label lblTitle = new Label
+            {
+                Text = title,
+                Font = new Font("Segoe UI", 13F, FontStyle.Bold),
+                ForeColor = Color.White,
+                Location = new Point(18, 6),
+                AutoSize = true,
+                BackColor = Color.Transparent
+            };
+            Label lblDesc = new Label
+            {
+                Text = description,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                ForeColor = Color.FromArgb(230, 240, 250),
+                Location = new Point(18, 30),
+                AutoSize = true,
+                BackColor = Color.Transparent
+            };
+            banner.Controls.Add(lblTitle);
+            banner.Controls.Add(lblDesc);
+            return banner;
+        }
+
+        public static void StyleAccentButton(Button btn, Color accent, Color accentDark)
+        {
+            btn.FlatStyle = FlatStyle.Flat;
+            btn.FlatAppearance.BorderSize = 0;
+            btn.BackColor = accent;
+            btn.ForeColor = Color.White;
+            btn.Font = ButtonFont;
+            btn.Cursor = Cursors.Hand;
+            if (btn.Height < 30) btn.Height = 34;
+            btn.FlatAppearance.MouseOverBackColor = accentDark;
+        }
+
+        public static void StyleGridWithAccent(DataGridView dgv, Color headerColor)
+        {
+            StyleGrid(dgv);
+            dgv.ColumnHeadersDefaultCellStyle.BackColor = headerColor;
+            dgv.ColumnHeadersDefaultCellStyle.SelectionBackColor = headerColor;
+            dgv.GridColor = Color.FromArgb(
+                Math.Min(255, headerColor.R + 80),
+                Math.Min(255, headerColor.G + 80),
+                Math.Min(255, headerColor.B + 80));
+        }
+
         public static void InitializeTheme()
         {
             string theme = AppSettings.Get("Theme");
@@ -97,7 +186,7 @@ namespace ApplianceManagement.Helpers
                     ThemeAltRow = Color.FromArgb(232, 248, 245);
                     ThemeSelection = Color.FromArgb(69, 179, 157);
                     break;
-                default: // Blue variants for headers/rows/selection
+                default:
                     ThemeColor = Color.FromArgb(41, 128, 185);
                     ThemeDark = Color.FromArgb(30, 100, 150);
                     ThemeLight = Color.FromArgb(174, 214, 241);
@@ -121,7 +210,6 @@ namespace ApplianceManagement.Helpers
 
         public static Size GetPreferredFormSize()
         {
-            // Stored as "W x H" e.g. "1024 x 768"
             string res = AppSettings.Get("FormResolution");
             if (string.IsNullOrEmpty(res)) res = "1024 x 768";
             int w = 1024, h = 768;
@@ -148,7 +236,6 @@ namespace ApplianceManagement.Helpers
             var sz = GetPreferredFormSize();
             form.MinimumSize = new Size(800, 600);
             form.MaximumSize = new Size(1280, 1024);
-            // Size the window; if maximized by user, keep state but update restore bounds
             if (form.WindowState == FormWindowState.Normal)
                 form.Size = sz;
             else
@@ -171,7 +258,6 @@ namespace ApplianceManagement.Helpers
             if (root == null) return;
             root.BackColor = BgColor;
             ApplyToControlTree(root);
-            // Also apply to open MDI children
             if (root.IsMdiContainer)
             {
                 foreach (Form child in root.MdiChildren)
@@ -202,8 +288,6 @@ namespace ApplianceManagement.Helpers
                     lbl.Font = HeaderFont;
                 else
                     lbl.Font = NormalFont;
-                if (lbl.ForeColor.R == 41 && lbl.ForeColor.G == 128) // old blue title
-                    lbl.ForeColor = ThemeColor;
             }
             else if (c is GroupBox gb)
             {
