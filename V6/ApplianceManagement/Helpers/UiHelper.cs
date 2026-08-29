@@ -4,24 +4,23 @@ using System.Windows.Forms;
 
 namespace ApplianceManagement.Helpers
 {
-    /// <summary>Professional accent palette — one distinct color family per form type.</summary>
     public static class FormAccent
     {
-        public static readonly Color Sale = Color.FromArgb(41, 128, 185);       // Professional blue
+        public static readonly Color Sale = Color.FromArgb(41, 128, 185);
         public static readonly Color SaleDark = Color.FromArgb(28, 96, 140);
-        public static readonly Color Purchase = Color.FromArgb(39, 174, 96);  // Emerald green
+        public static readonly Color Purchase = Color.FromArgb(39, 174, 96);
         public static readonly Color PurchaseDark = Color.FromArgb(28, 130, 72);
-        public static readonly Color SaleReturn = Color.FromArgb(230, 126, 34); // Warm orange
+        public static readonly Color SaleReturn = Color.FromArgb(230, 126, 34);
         public static readonly Color SaleReturnDark = Color.FromArgb(185, 100, 25);
-        public static readonly Color NewItem = Color.FromArgb(142, 68, 173);  // Purple
+        public static readonly Color NewItem = Color.FromArgb(142, 68, 173);
         public static readonly Color NewItemDark = Color.FromArgb(108, 52, 131);
-        public static readonly Color Inventory = Color.FromArgb(22, 160, 133); // Teal
+        public static readonly Color Inventory = Color.FromArgb(22, 160, 133);
         public static readonly Color InventoryDark = Color.FromArgb(17, 122, 101);
-        public static readonly Color Reports = Color.FromArgb(52, 73, 94);    // Slate
+        public static readonly Color Reports = Color.FromArgb(52, 73, 94);
         public static readonly Color ReportsDark = Color.FromArgb(33, 47, 61);
-        public static readonly Color Settings = Color.FromArgb(52, 152, 219); // Sky blue
+        public static readonly Color Settings = Color.FromArgb(52, 152, 219);
         public static readonly Color SettingsDark = Color.FromArgb(41, 128, 185);
-        public static readonly Color LowStock = Color.FromArgb(192, 57, 43);  // Crimson
+        public static readonly Color LowStock = Color.FromArgb(192, 57, 43);
         public static readonly Color LowStockDark = Color.FromArgb(150, 40, 30);
         public static readonly Color Login = Color.FromArgb(44, 62, 80);
     }
@@ -74,28 +73,11 @@ namespace ApplianceManagement.Helpers
             }
         }
 
-        /// <summary>
-        /// Colored title banner for each form — title + short description in professional palette.
-        /// Dock Top, height 52.
-        /// </summary>
         public static Panel CreateFormBanner(string title, string description, Color accent, Color accentDark)
         {
-            Panel banner = new Panel
-            {
-                Dock = DockStyle.Top,
-                Height = 52,
-                BackColor = accent
-            };
-            // Left accent stripe
-            Panel stripe = new Panel
-            {
-                Dock = DockStyle.Left,
-                Width = 6,
-                BackColor = accentDark
-            };
-            banner.Controls.Add(stripe);
-
-            Label lblTitle = new Label
+            Panel banner = new Panel { Dock = DockStyle.Top, Height = 52, BackColor = accent };
+            banner.Controls.Add(new Panel { Dock = DockStyle.Left, Width = 6, BackColor = accentDark });
+            banner.Controls.Add(new Label
             {
                 Text = title,
                 Font = new Font("Segoe UI", 13F, FontStyle.Bold),
@@ -103,8 +85,8 @@ namespace ApplianceManagement.Helpers
                 Location = new Point(18, 6),
                 AutoSize = true,
                 BackColor = Color.Transparent
-            };
-            Label lblDesc = new Label
+            });
+            banner.Controls.Add(new Label
             {
                 Text = description,
                 Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
@@ -112,9 +94,7 @@ namespace ApplianceManagement.Helpers
                 Location = new Point(18, 30),
                 AutoSize = true,
                 BackColor = Color.Transparent
-            };
-            banner.Controls.Add(lblTitle);
-            banner.Controls.Add(lblDesc);
+            });
             return banner;
         }
 
@@ -146,7 +126,6 @@ namespace ApplianceManagement.Helpers
             string theme = AppSettings.Get("Theme");
             if (string.IsNullOrEmpty(theme)) theme = "Blue";
             ApplyThemeName(theme);
-
             int size = 10;
             int.TryParse(AppSettings.Get("FontSize"), out size);
             if (size < 8) size = 10;
@@ -159,40 +138,25 @@ namespace ApplianceManagement.Helpers
             switch ((theme ?? "Blue").Trim())
             {
                 case "Green":
-                    ThemeColor = Color.FromArgb(39, 174, 96);
-                    ThemeDark = Color.FromArgb(30, 132, 73);
-                    ThemeLight = Color.FromArgb(171, 235, 198);
-                    ThemeAltRow = Color.FromArgb(232, 248, 238);
-                    ThemeSelection = Color.FromArgb(82, 190, 128);
-                    break;
+                    ThemeColor = Color.FromArgb(39, 174, 96); ThemeDark = Color.FromArgb(30, 132, 73);
+                    ThemeLight = Color.FromArgb(171, 235, 198); ThemeAltRow = Color.FromArgb(232, 248, 238);
+                    ThemeSelection = Color.FromArgb(82, 190, 128); break;
                 case "Dark":
-                    ThemeColor = Color.FromArgb(52, 73, 94);
-                    ThemeDark = Color.FromArgb(33, 47, 61);
-                    ThemeLight = Color.FromArgb(174, 182, 191);
-                    ThemeAltRow = Color.FromArgb(236, 240, 241);
-                    ThemeSelection = Color.FromArgb(93, 109, 126);
-                    break;
+                    ThemeColor = Color.FromArgb(52, 73, 94); ThemeDark = Color.FromArgb(33, 47, 61);
+                    ThemeLight = Color.FromArgb(174, 182, 191); ThemeAltRow = Color.FromArgb(236, 240, 241);
+                    ThemeSelection = Color.FromArgb(93, 109, 126); break;
                 case "Purple":
-                    ThemeColor = Color.FromArgb(142, 68, 173);
-                    ThemeDark = Color.FromArgb(108, 52, 131);
-                    ThemeLight = Color.FromArgb(215, 189, 226);
-                    ThemeAltRow = Color.FromArgb(245, 238, 248);
-                    ThemeSelection = Color.FromArgb(165, 105, 189);
-                    break;
+                    ThemeColor = Color.FromArgb(142, 68, 173); ThemeDark = Color.FromArgb(108, 52, 131);
+                    ThemeLight = Color.FromArgb(215, 189, 226); ThemeAltRow = Color.FromArgb(245, 238, 248);
+                    ThemeSelection = Color.FromArgb(165, 105, 189); break;
                 case "Teal":
-                    ThemeColor = Color.FromArgb(22, 160, 133);
-                    ThemeDark = Color.FromArgb(17, 122, 101);
-                    ThemeLight = Color.FromArgb(163, 228, 215);
-                    ThemeAltRow = Color.FromArgb(232, 248, 245);
-                    ThemeSelection = Color.FromArgb(69, 179, 157);
-                    break;
+                    ThemeColor = Color.FromArgb(22, 160, 133); ThemeDark = Color.FromArgb(17, 122, 101);
+                    ThemeLight = Color.FromArgb(163, 228, 215); ThemeAltRow = Color.FromArgb(232, 248, 245);
+                    ThemeSelection = Color.FromArgb(69, 179, 157); break;
                 default:
-                    ThemeColor = Color.FromArgb(41, 128, 185);
-                    ThemeDark = Color.FromArgb(30, 100, 150);
-                    ThemeLight = Color.FromArgb(174, 214, 241);
-                    ThemeAltRow = Color.FromArgb(235, 245, 255);
-                    ThemeSelection = Color.FromArgb(100, 160, 210);
-                    break;
+                    ThemeColor = Color.FromArgb(41, 128, 185); ThemeDark = Color.FromArgb(30, 100, 150);
+                    ThemeLight = Color.FromArgb(174, 214, 241); ThemeAltRow = Color.FromArgb(235, 245, 255);
+                    ThemeSelection = Color.FromArgb(100, 160, 210); break;
             }
             GridHeaderColor = ThemeColor;
             BgColor = Color.FromArgb(245, 247, 250);
@@ -216,17 +180,11 @@ namespace ApplianceManagement.Helpers
             try
             {
                 var parts = res.ToLowerInvariant().Replace(" ", "").Split('x');
-                if (parts.Length == 2)
-                {
-                    int.TryParse(parts[0], out w);
-                    int.TryParse(parts[1], out h);
-                }
+                if (parts.Length == 2) { int.TryParse(parts[0], out w); int.TryParse(parts[1], out h); }
             }
             catch { }
-            if (w < 800) w = 800;
-            if (h < 600) h = 600;
-            if (w > 1280) w = 1280;
-            if (h > 1024) h = 1024;
+            if (w < 800) w = 800; if (h < 600) h = 600;
+            if (w > 1280) w = 1280; if (h > 1024) h = 1024;
             return new Size(w, h);
         }
 
@@ -236,20 +194,14 @@ namespace ApplianceManagement.Helpers
             var sz = GetPreferredFormSize();
             form.MinimumSize = new Size(800, 600);
             form.MaximumSize = new Size(1280, 1024);
-            if (form.WindowState == FormWindowState.Normal)
-                form.Size = sz;
-            else
-            {
-                form.WindowState = FormWindowState.Normal;
-                form.Size = sz;
-            }
+            if (form.WindowState == FormWindowState.Normal) form.Size = sz;
+            else { form.WindowState = FormWindowState.Normal; form.Size = sz; }
         }
 
         public static void ApplyFormSizeToAllChildren(Form mdiParent)
         {
             if (mdiParent == null) return;
-            foreach (Form child in mdiParent.MdiChildren)
-                ApplyFormSize(child);
+            foreach (Form child in mdiParent.MdiChildren) ApplyFormSize(child);
         }
 
         public static void ApplyThemeLive(Form root)
@@ -259,67 +211,31 @@ namespace ApplianceManagement.Helpers
             root.BackColor = BgColor;
             ApplyToControlTree(root);
             if (root.IsMdiContainer)
-            {
-                foreach (Form child in root.MdiChildren)
-                {
-                    child.BackColor = BgColor;
-                    ApplyToControlTree(child);
-                }
-            }
+                foreach (Form child in root.MdiChildren) { child.BackColor = BgColor; ApplyToControlTree(child); }
         }
 
         private static void ApplyToControlTree(Control c)
         {
             if (c == null) return;
-
-            if (c is Button btn)
-                StyleButton(btn);
-            else if (c is TextBox txt)
-                StyleTextBox(txt);
-            else if (c is ComboBox cmb)
-                StyleComboBox(cmb);
-            else if (c is DataGridView dgv)
-                StyleGrid(dgv);
+            if (c is Button btn) StyleButton(btn);
+            else if (c is TextBox txt) StyleTextBox(txt);
+            else if (c is ComboBox cmb) StyleComboBox(cmb);
+            else if (c is DataGridView dgv) StyleGrid(dgv);
             else if (c is Label lbl)
             {
-                if (lbl.Font.Bold && lbl.Font.Size >= 12)
-                    lbl.Font = TitleFont;
-                else if (lbl.Font.Bold)
-                    lbl.Font = HeaderFont;
-                else
-                    lbl.Font = NormalFont;
+                if (lbl.Font.Bold && lbl.Font.Size >= 12) lbl.Font = TitleFont;
+                else if (lbl.Font.Bold) lbl.Font = HeaderFont;
+                else lbl.Font = NormalFont;
             }
-            else if (c is GroupBox gb)
-            {
-                gb.Font = HeaderFont;
-                gb.ForeColor = ThemeDark;
-            }
-            else if (c is CheckBox chk)
-                chk.Font = NormalFont;
-            else if (c is RadioButton rb)
-                rb.Font = NormalFont;
-            else if (c is DateTimePicker dtp)
-                StyleDatePicker(dtp);
-            else if (c is ListBox lb)
-                lb.Font = NormalFont;
-            else if (c is MenuStrip ms)
-            {
-                ms.BackColor = ThemeColor;
-                ms.ForeColor = Color.White;
-                ms.Font = NormalFont;
-            }
-            else if (c is StatusStrip ss)
-            {
-                ss.BackColor = ThemeDark;
-                ss.Font = SmallFont;
-            }
-            else if (c is ToolStrip ts && !(c is MenuStrip) && !(c is StatusStrip))
-            {
-                ts.Font = ButtonFont;
-            }
-
-            foreach (Control child in c.Controls)
-                ApplyToControlTree(child);
+            else if (c is GroupBox gb) { gb.Font = HeaderFont; gb.ForeColor = ThemeDark; }
+            else if (c is CheckBox chk) chk.Font = NormalFont;
+            else if (c is RadioButton rb) rb.Font = NormalFont;
+            else if (c is DateTimePicker dtp) StyleDatePicker(dtp);
+            else if (c is ListBox lb) lb.Font = NormalFont;
+            else if (c is MenuStrip ms) { ms.BackColor = ThemeColor; ms.ForeColor = Color.White; ms.Font = NormalFont; }
+            else if (c is StatusStrip ss) { ss.BackColor = ThemeDark; ss.Font = SmallFont; }
+            else if (c is ToolStrip ts && !(c is MenuStrip) && !(c is StatusStrip)) ts.Font = ButtonFont;
+            foreach (Control child in c.Controls) ApplyToControlTree(child);
         }
 
         public static void StyleButton(Button btn)
@@ -404,7 +320,8 @@ namespace ApplianceManagement.Helpers
                 MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) == DialogResult.Yes;
         }
 
-        public static void AttachF4Close(Form form)
+        /// <summary>F4 closes. confirmOnClose=true asks exit (transaction forms). False for history/reports.</summary>
+        public static void AttachF4Close(Form form, bool confirmOnClose = true)
         {
             form.KeyPreview = true;
             form.KeyDown += (s, e) =>
@@ -415,6 +332,11 @@ namespace ApplianceManagement.Helpers
                     form.Close();
                 }
             };
+            if (!confirmOnClose)
+            {
+                form.Tag = "NOSAVECONFIRM";
+                return;
+            }
             form.FormClosing += (s, e) =>
             {
                 if (e.CloseReason == CloseReason.UserClosing)
@@ -436,8 +358,7 @@ namespace ApplianceManagement.Helpers
 
         public static bool IsPrintAllowed()
         {
-            if (LicenseReader.Current != null)
-                return LicenseReader.Current.AllowPrint;
+            if (LicenseReader.Current != null) return LicenseReader.Current.AllowPrint;
             return true;
         }
 
