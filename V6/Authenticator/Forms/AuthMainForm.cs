@@ -22,7 +22,7 @@ namespace Authenticator.Forms
         private void InitializeComponent()
         {
             this.Text = "Appliance Management - Authenticator (Deploy + Admin Tools)";
-            this.Size = new Size(640, 680);
+            this.Size = new Size(640, 700);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;
@@ -39,9 +39,8 @@ namespace Authenticator.Forms
             };
             this.Controls.Add(title);
 
-            tabs = new TabControl { Location = new Point(15, 45), Size = new Size(600, 580) };
+            tabs = new TabControl { Location = new Point(15, 45), Size = new Size(600, 600) };
 
-            // ===== TAB 1: License =====
             var tabLic = new TabPage("License / Deploy");
             int y = 15;
             AddL(tabLic, "Store Name:", 15, y); txtStore = AddT(tabLic, 180, y, 380); y += 34;
@@ -79,33 +78,47 @@ namespace Authenticator.Forms
             tabLic.Controls.Add(lblStatus);
             tabs.TabPages.Add(tabLic);
 
-            // ===== TAB 2: Admin Tools (Manage Products / Modify invoices) =====
             var tabTools = new TabPage("Admin Tools (Client DB)");
             Label info = new Label
             {
-                Text = "Ye tools client ke database par chalte hain.\nPehle License tab mein Connection String set karein, phir yahan se manage karein.\nMain app mein ye options nahi hain.",
+                Text = "Ye tools client ke database par chalte hain.\nPehle License tab mein Connection String set karein.",
                 Font = new Font("Segoe UI", 9.5F),
                 Location = new Point(20, 20),
-                Size = new Size(540, 60)
+                Size = new Size(540, 50)
             };
             tabTools.Controls.Add(info);
 
-            Button b1 = MakeToolBtn("Manage Products (edit / disable)", 20, 100);
+            Button b1 = MakeToolBtn("Manage Products (edit / disable)", 20, 90);
             b1.Click += (s, e) => OpenProductTool();
             tabTools.Controls.Add(b1);
 
-            Button b2 = MakeToolBtn("Modify Sale (paid / remarks)", 20, 160);
+            Button b2 = MakeToolBtn("Modify Sale (paid / remarks)", 20, 145);
             b2.Click += (s, e) => OpenSaleModTool();
             tabTools.Controls.Add(b2);
 
-            Button b3 = MakeToolBtn("Modify Purchase (paid / remarks)", 20, 220);
+            Button b3 = MakeToolBtn("Modify Purchase (paid / remarks)", 20, 200);
             b3.Click += (s, e) => OpenPurchaseModTool();
             tabTools.Controls.Add(b3);
 
-            Button bTest = MakeToolBtn("Test Connection", 20, 300);
+            Button bTest = MakeToolBtn("Test Connection", 20, 270);
             bTest.BackColor = Color.FromArgb(52, 73, 94);
             bTest.Click += (s, e) => TestConn();
             tabTools.Controls.Add(bTest);
+
+            Button bReset = MakeToolBtn("Reset Client Data (sales / purchases / stock)", 20, 340);
+            bReset.BackColor = Color.FromArgb(192, 57, 43);
+            bReset.Click += (s, e) => ResetClientData();
+            tabTools.Controls.Add(bReset);
+
+            Label warn = new Label
+            {
+                Text = "Reset: pehle check karega ke data already hai. Haan par sales, purchases,\ninventory clear ho jayegi. Users / shop settings safe rehte hain.",
+                Font = new Font("Segoe UI", 8.5F),
+                ForeColor = Color.FromArgb(120, 40, 40),
+                Location = new Point(20, 400),
+                Size = new Size(540, 50)
+            };
+            tabTools.Controls.Add(warn);
 
             tabs.TabPages.Add(tabTools);
             this.Controls.Add(tabs);
@@ -156,33 +169,88 @@ namespace Authenticator.Forms
             catch (Exception ex) { MessageBox.Show("Failed: " + ex.Message); }
         }
 
-        private void OpenProductTool()
+        private void ResetClientData()
         {
             try
             {
-                using (var f = new AdminProductForm(Conn()))
-                    f.ShowDialog();
+                using (var c = new SqlConnection(Conn()))
+                {
+                    c.Open();
+                    int sales = Scalar(c, "SELECT COUNT(1) FROM SaleHeader");
+                    int purs = Scalar(c, "SELECT COUNT(1) FROM PurchaseHeader");
+                    int inv = Scalar(c, "SELECT COUNT(1) FROM InventoryTransaction");
+                    int prods = Scalar(c, "SELECT COUNT(1) FROM Products WHERE IsActive=1");
+
+                    if (sales + purs + inv == 0)
+                    {
+                        MessageBox.Show("No transactional data found. Nothing to reset.", "Reset", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        return;
+                    }
+
+                    string msg =
+                        "Data already exists in this database:\n\n" +
+                        "  Sales invoices     : " + sales + "\n" +
+                        "  Purchase invoices  : " + purs + "\n" +
+                        "  Inventory rows     : " + inv + "\n" +
+                        "  Active products    : " + prods + "\n\n" +
+                        "Reset / remove this transactional data?\n\n" +
+                        "YES = delete sales, purchases, inventory + set stock to 0\n" +
+                        "NO  = cancel (no change)";
+
+                    if (MessageBox.Show(msg, "Confirm Reset Data", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.Yes)
+                        return;
+
+                    if (MessageBox.Show("Final confirm: DELETE all sales & purchases?", "Final Confirm", MessageBoxButtons.YesNo, MessageBoxIcon.Stop, MessageBoxDefaultButton.Button2) != DialogResult.Yes)
+                        return;
+
+                    using (var tx = c.BeginTransaction())
+                    {
+                        Exec(c, tx, "DELETE FROM SaleDetail");
+                        Exec(c, tx, "DELETE FROM SaleHeader");
+                        Exec(c, tx, "DELETE FROM PurchaseDetail");
+                        Exec(c, tx, "DELETE FROM PurchaseHeader");
+                        Exec(c, tx, "DELETE FROM InventoryTransaction");
+                        Exec(c, tx, "UPDATE Products SET CurrentStock = 0");
+                        Exec(c, tx, "IF EXISTS (SELECT 1 FROM Settings WHERE SettingName='NextInvoiceNumber') UPDATE Settings SET SettingValue='1' WHERE SettingName='NextInvoiceNumber'");
+                        Exec(c, tx, "IF EXISTS (SELECT 1 FROM Settings WHERE SettingName='NextPurchaseInvoiceNumber') UPDATE Settings SET SettingValue='1' WHERE SettingName='NextPurchaseInvoiceNumber'");
+                        tx.Commit();
+                    }
+                    MessageBox.Show("Transactional data cleared. Users and products list kept.", "Reset Done");
+                }
             }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Reset failed: " + ex.Message);
+            }
+        }
+
+        private static int Scalar(SqlConnection c, string sql)
+        {
+            using (var cmd = new SqlCommand(sql, c))
+                return Convert.ToInt32(cmd.ExecuteScalar());
+        }
+
+        private static void Exec(SqlConnection c, SqlTransaction tx, string sql)
+        {
+            using (var cmd = new SqlCommand(sql, c, tx))
+                cmd.ExecuteNonQuery();
+        }
+
+        private void OpenProductTool()
+        {
+            try { using (var f = new AdminProductForm(Conn())) f.ShowDialog(); }
             catch (Exception ex) { MessageBox.Show(ex.Message); }
         }
 
         private void OpenSaleModTool()
         {
-            try
-            {
-                using (var f = new AdminSaleModifyForm(Conn()))
-                    f.ShowDialog();
-            }
+            try { using (var f = new AdminSaleModifyForm(Conn())) f.ShowDialog(); }
             catch (Exception ex) { MessageBox.Show(ex.Message); }
         }
 
         private void OpenPurchaseModTool()
         {
-            try
-            {
-                using (var f = new AdminPurchaseModifyForm(Conn()))
-                    f.ShowDialog();
-            }
+            try { using (var f = new AdminPurchaseModifyForm(Conn())) f.ShowDialog(); }
             catch (Exception ex) { MessageBox.Show(ex.Message); }
         }
 
@@ -255,13 +323,13 @@ namespace Authenticator.Forms
                 f.StartPosition = FormStartPosition.CenterParent;
                 f.FormBorderStyle = FormBorderStyle.FixedDialog;
                 f.MaximizeBox = false;
-                var t = new TextBox { Location = new Point(20, 20), Size = new Size(300, 26), PasswordChar = '●' };
+                var t = new TextBox { Location = new Point(20, 20), Size = new Size(300, 26), PasswordChar = '\u25cf' };
                 var b = new Button { Text = "Save", Location = new Point(20, 60), Size = new Size(100, 30) };
                 b.Click += (s, e) =>
                 {
                     if (string.IsNullOrWhiteSpace(t.Text)) { MessageBox.Show("Enter password."); return; }
                     AuthLoginForm.SetMasterPassword(t.Text.Trim());
-                    MessageBox.Show("Master password updated. Use it next time you open Authenticator.");
+                    MessageBox.Show("Master password updated.");
                     f.DialogResult = DialogResult.OK;
                     f.Close();
                 };
@@ -270,6 +338,5 @@ namespace Authenticator.Forms
                 f.ShowDialog(this);
             }
         }
-
     }
 }
