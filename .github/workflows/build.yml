@@ -1,0 +1,56 @@
+name: Build ApplianceX
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Setup NuGet
+        uses: NuGet/setup-nuget@v2
+
+      - name: Restore ApplianceManagement
+        run: nuget restore "V6/ApplianceManagement.sln"
+
+      - name: Build ApplianceManagement
+        run: msbuild "V6/ApplianceManagement.sln" /m /p:Configuration=Release /p:Platform="Any CPU"
+
+      - name: Restore Authenticator
+        run: nuget restore "V6/Authenticator.sln"
+
+      - name: Build Authenticator
+        run: msbuild "V6/Authenticator.sln" /m /p:Configuration=Release /p:Platform="Any CPU"
+
+      - name: Collect build output
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
+
+          Copy-Item `
+            "V6/ApplianceManagement/bin/Release" `
+            "artifacts/ApplianceManagement" `
+            -Recurse -Force
+
+          Copy-Item `
+            "V6/Authenticator/bin/Release" `
+            "artifacts/Authenticator" `
+            -Recurse -Force
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ApplianceX-Release
+          path: artifacts
+          if-no-files-found: error
