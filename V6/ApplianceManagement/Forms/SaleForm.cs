@@ -15,6 +15,7 @@ namespace ApplianceManagement.Forms
         private SaleRepository saleRepo = new SaleRepository();
         private List<SaleDetail> cart = new List<SaleDetail>();
         private Customer walkIn;
+        private Product selectedProduct;
         private TextBox txtSearch, txtQty, txtDiscount, txtDiscAmt, txtPaid, txtTotal, txtNet;
         private DataGridView dgv;
         private ListBox lstSuggest;
@@ -35,16 +36,7 @@ namespace ApplianceManagement.Forms
             this.BackColor = UiHelper.BgColor;
             this.KeyPreview = true;
             UiHelper.AttachF4Close(this);
-            this.KeyDown += (s, e) =>
-            {
-                if (e.KeyCode == Keys.F12) { txtDiscount.Focus(); txtDiscount.SelectAll(); }
-                if (e.KeyCode == Keys.F9) { ShowProductHistory(); e.Handled = true; }
-                if (e.KeyCode == Keys.F8 && dgv.SelectedRows.Count > 0)
-                {
-                    int i = dgv.SelectedRows[0].Index;
-                    if (i >= 0 && i < cart.Count) { cart.RemoveAt(i); RefreshGrid(); }
-                }
-            };
+            this.KeyDown += Form_KeyDown;
 
             Panel top = new Panel { Dock = DockStyle.Top, Height = 88, BackColor = Color.White };
             top.Controls.Add(new Label { Text = "Invoice  AUTO", Font = UiHelper.HeaderFont, ForeColor = UiHelper.ThemeDark, Location = new Point(16, 10), AutoSize = true });
@@ -54,55 +46,17 @@ namespace ApplianceManagement.Forms
             txtSearch = new TextBox { Location = new Point(70, 46), Size = new Size(320, 28) };
             UiHelper.StyleTextBox(txtSearch);
             txtSearch.TextChanged += (s, e) => ShowSuggestions();
-            txtSearch.KeyDown += (s, e) =>
-            {
-                if (e.KeyCode == Keys.Enter)
-                {
-                    e.SuppressKeyPress = true;
-                    if (lstSuggest.Visible && lstSuggest.SelectedItem != null) SelectSug();
-                    else
-                    {
-                        var p = productRepo.GetByBarcode(txtSearch.Text.Trim()) ?? productRepo.GetByCode(txtSearch.Text.Trim());
-                        if (p != null) { txtSearch.Tag = p; txtQty.Focus(); txtQty.SelectAll(); }
-                        else MessageBox.Show("Product not found.");
-                    }
-                }
-                if (e.KeyCode == Keys.Down && lstSuggest.Visible) { lstSuggest.Focus(); e.Handled = true; }
-                if (e.KeyCode == Keys.Escape) lstSuggest.Visible = false;
-                if (e.KeyCode == Keys.F9) { ShowProductHistory(); e.Handled = true; }
-            };
+            txtSearch.KeyDown += Search_KeyDown;
             top.Controls.Add(txtSearch);
             top.Controls.Add(new Label { Text = "Qty", Font = UiHelper.SmallFont, Location = new Point(410, 50), AutoSize = true });
             txtQty = new TextBox { Location = new Point(440, 46), Size = new Size(64, 28), Text = "1" };
             UiHelper.StyleTextBox(txtQty);
-            txtQty.KeyDown += (s, e) =>
-            {
-                if (e.KeyCode != Keys.Enter) return;
-                e.SuppressKeyPress = true;
-                if (!(txtSearch.Tag is Product p)) return;
-                int qty = 1; int.TryParse(txtQty.Text, out qty); if (qty < 1) qty = 1;
-                if (qty > p.CurrentStock) { MessageBox.Show("Insufficient stock. Available: " + p.CurrentStock); return; }
-                var ex = cart.Find(x => x.ProductID == p.ProductID);
-                if (ex != null)
-                {
-                    if (ex.Quantity + qty > p.CurrentStock) { MessageBox.Show("Insufficient stock."); return; }
-                    ex.Quantity += qty; ex.Amount = ex.Quantity * ex.SalePrice;
-                }
-                else cart.Add(new SaleDetail { ProductID = p.ProductID, ProductCode = p.ProductCode, ProductName = p.ProductName, Quantity = qty, SalePrice = p.SalePrice, Amount = qty * p.SalePrice });
-                RefreshGrid(); txtSearch.Clear(); txtSearch.Tag = null; txtQty.Text = "1"; lstSuggest.Visible = false; txtSearch.Focus();
-            };
+            txtQty.KeyDown += Qty_KeyDown;
             top.Controls.Add(txtQty);
-            top.Controls.Add(new Label { Text = "Enter add   F8 remove   F9 history   F12 discount", Font = UiHelper.SmallFont, ForeColor = Color.FromArgb(140, 150, 160), Location = new Point(520, 50), AutoSize = true });
+            top.Controls.Add(new Label { Text = "Enter add  F8 remove  F9 history  Up/Down grid  F12 disc", Font = UiHelper.SmallFont, ForeColor = Color.FromArgb(140, 150, 160), Location = new Point(520, 50), AutoSize = true });
             this.Controls.Add(top);
 
-            lstSuggest = new ListBox
-            {
-                Location = new Point(70, 86),
-                Size = new Size(420, 160),
-                Visible = false,
-                Font = UiHelper.NormalFont,
-                IntegralHeight = false
-            };
+            lstSuggest = new ListBox { Location = new Point(70, 86), Size = new Size(420, 160), Visible = false, Font = UiHelper.NormalFont, IntegralHeight = false };
             lstSuggest.Click += (s, e) => SelectSug();
             lstSuggest.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; SelectSug(); } };
             this.Controls.Add(lstSuggest);
@@ -111,25 +65,110 @@ namespace ApplianceManagement.Forms
 
             dgv = new DataGridView { Dock = DockStyle.Fill };
             UiHelper.StyleGrid(dgv);
+            dgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            dgv.MultiSelect = false;
             this.Controls.Add(dgv);
             dgv.BringToFront();
             lstSuggest.BringToFront();
         }
 
+        private void Form_KeyDown(object s, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.F12) { txtDiscount.Focus(); txtDiscount.SelectAll(); e.Handled = true; }
+            if (e.KeyCode == Keys.F9) { ShowProductHistory(); e.Handled = true; }
+            if (e.KeyCode == Keys.F8 && dgv.SelectedRows.Count > 0)
+            {
+                int i = dgv.SelectedRows[0].Index;
+                if (i >= 0 && i < cart.Count) { cart.RemoveAt(i); RefreshGrid(); }
+                e.Handled = true;
+            }
+            if ((e.KeyCode == Keys.Up || e.KeyCode == Keys.Down) && cart.Count > 0)
+            {
+                MoveGridSelection(e.KeyCode == Keys.Up ? -1 : 1);
+                e.Handled = true;
+            }
+        }
+
+        private void MoveGridSelection(int delta)
+        {
+            if (cart.Count == 0) return;
+            int idx = 0;
+            if (dgv.SelectedRows.Count > 0) idx = dgv.SelectedRows[0].Index;
+            idx += delta;
+            if (idx < 0) idx = 0;
+            if (idx >= cart.Count) idx = cart.Count - 1;
+            dgv.ClearSelection();
+            if (idx >= 0 && idx < dgv.Rows.Count)
+            {
+                dgv.Rows[idx].Selected = true;
+                dgv.CurrentCell = dgv.Rows[idx].Cells[0];
+                dgv.Focus();
+            }
+        }
+
+        private void Search_KeyDown(object s, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter)
+            {
+                e.SuppressKeyPress = true;
+                if (lstSuggest.Visible && lstSuggest.SelectedItem != null) SelectSug();
+                else
+                {
+                    var p = productRepo.GetByBarcode(txtSearch.Text.Trim()) ?? productRepo.GetByCode(txtSearch.Text.Trim());
+                    if (p != null) { SetSelected(p); txtQty.Focus(); txtQty.SelectAll(); }
+                    else MessageBox.Show("Product not found.");
+                }
+            }
+            if (e.KeyCode == Keys.Down && lstSuggest.Visible) { lstSuggest.Focus(); e.Handled = true; }
+            if (e.KeyCode == Keys.Escape) lstSuggest.Visible = false;
+            if (e.KeyCode == Keys.F9) { ShowProductHistory(); e.Handled = true; }
+        }
+
+        private void Qty_KeyDown(object s, KeyEventArgs e)
+        {
+            if (e.KeyCode != Keys.Enter) return;
+            e.SuppressKeyPress = true;
+            if (selectedProduct == null) return;
+            Product p = selectedProduct;
+            int qty = 1; int.TryParse(txtQty.Text, out qty); if (qty < 1) qty = 1;
+            if (qty > p.CurrentStock) { MessageBox.Show("Insufficient stock. Available: " + p.CurrentStock); return; }
+            decimal unitPrice = p.UnitSalePrice;
+            var ex = cart.Find(x => x.ProductID == p.ProductID);
+            if (ex != null)
+            {
+                if (ex.Quantity + qty > p.CurrentStock) { MessageBox.Show("Insufficient stock."); return; }
+                ex.Quantity += qty; ex.Amount = ex.Quantity * ex.SalePrice;
+            }
+            else cart.Add(new SaleDetail { ProductID = p.ProductID, ProductCode = p.ProductCode, ProductName = p.ProductName, Quantity = qty, SalePrice = unitPrice, Amount = qty * unitPrice });
+            RefreshGrid();
+            txtSearch.Clear(); selectedProduct = null; txtSearch.Tag = null; txtQty.Text = "1"; lstSuggest.Visible = false; txtSearch.Focus();
+        }
+
+        private void SetSelected(Product p)
+        {
+            selectedProduct = p;
+            txtSearch.Tag = p;
+            txtSearch.Text = p.ProductCode + " - " + p.ProductName;
+            lstSuggest.Visible = false;
+        }
+
         private void ShowProductHistory()
         {
-            Product p = txtSearch.Tag as Product;
+            Product p = selectedProduct;
+            if (p == null && txtSearch.Tag is Product t) p = t;
             if (p == null)
             {
                 string q = txtSearch.Text.Trim();
+                if (q.Contains(" - ")) q = q.Split(new[] { " - " }, StringSplitOptions.None)[0].Trim();
                 if (q.Length > 0)
                     p = productRepo.GetByBarcode(q) ?? productRepo.GetByCode(q);
             }
             if (p == null)
             {
-                MessageBox.Show("Select or search a product first, then press F9 for sale history.");
+                MessageBox.Show("Select or search a product first, then press F9.");
                 return;
             }
+            selectedProduct = p;
             using (var f = new ProductHistoryForm(p, true))
                 f.ShowDialog(this);
         }
@@ -138,6 +177,7 @@ namespace ApplianceManagement.Forms
         {
             string q = txtSearch.Text.Trim();
             if (q.Length < 2) { lstSuggest.Visible = false; return; }
+            // Don't clear selectedProduct while typing after select until text changes substantially
             var list = productRepo.Search(q);
             lstSuggest.DataSource = null;
             lstSuggest.DataSource = list;
@@ -197,8 +237,10 @@ namespace ApplianceManagement.Forms
         {
             if (lstSuggest.SelectedItem is Product p)
             {
-                txtSearch.Text = p.ProductCode + " - " + p.ProductName;
-                txtSearch.Tag = p; lstSuggest.Visible = false; txtQty.Text = "1"; txtQty.Focus(); txtQty.SelectAll();
+                SetSelected(p);
+                txtQty.Text = "1";
+                txtQty.Focus();
+                txtQty.SelectAll();
             }
         }
 
