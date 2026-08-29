@@ -8,7 +8,7 @@ using ApplianceManagement.Models;
 
 namespace ApplianceManagement.Forms
 {
-    /// <summary>Same UX as Sale — unit price = SalePrice/PackSize when pack > 1. Stock increases on save.</summary>
+    /// <summary>Same flow as Sale: Disc% → Discount → Net → Paid → remarks → confirm. Unit price like Sale.</summary>
     public partial class SaleReturnForm : Form
     {
         private ProductRepository productRepo = new ProductRepository();
@@ -19,6 +19,7 @@ namespace ApplianceManagement.Forms
         private DataGridView dgv;
         private ListBox lstSuggest;
         private bool calcBusy = false;
+        private string autoInvoice = "RET-AUTO";
 
         public SaleReturnForm()
         {
@@ -36,9 +37,10 @@ namespace ApplianceManagement.Forms
             this.KeyDown += Form_KeyDown;
 
             Panel top = new Panel { Dock = DockStyle.Top, Height = 88, BackColor = Color.White };
-            top.Controls.Add(new Label { Text = "RETURN  AUTO", Font = UiHelper.HeaderFont, ForeColor = FormAccent.SaleReturnDark, Location = new Point(16, 10), AutoSize = true });
-            top.Controls.Add(new Label { Text = DateTime.Now.ToString("dd MMM yyyy  HH:mm"), Font = UiHelper.NormalFont, ForeColor = Color.FromArgb(110, 122, 136), Location = new Point(200, 12), AutoSize = true });
-            top.Controls.Add(new Label { Text = "Stock will INCREASE", Font = UiHelper.NormalFont, ForeColor = FormAccent.Purchase, Location = new Point(430, 12), AutoSize = true });
+            top.Controls.Add(new Label { Text = "Invoice  " + autoInvoice, Font = UiHelper.HeaderFont, ForeColor = FormAccent.SaleReturnDark, Location = new Point(16, 10), AutoSize = true });
+            top.Controls.Add(new Label { Text = DateTime.Now.ToString("dd MMM yyyy  HH:mm"), Font = UiHelper.NormalFont, ForeColor = Color.FromArgb(110, 122, 136), Location = new Point(220, 12), AutoSize = true });
+            top.Controls.Add(new Label { Text = "Customer: Walk-in", Font = UiHelper.NormalFont, ForeColor = FormAccent.SaleReturn, Location = new Point(430, 12), AutoSize = true });
+            top.Controls.Add(new Label { Text = "Stock will INCREASE", Font = UiHelper.SmallFont, ForeColor = FormAccent.Purchase, Location = new Point(620, 14), AutoSize = true });
             top.Controls.Add(new Label { Text = "Search", Font = UiHelper.SmallFont, Location = new Point(16, 50), AutoSize = true });
             txtSearch = new TextBox { Location = new Point(70, 46), Size = new Size(320, 28) };
             UiHelper.StyleTextBox(txtSearch);
@@ -79,7 +81,6 @@ namespace ApplianceManagement.Forms
                 if (selectedProduct == null) return;
                 Product p = selectedProduct;
                 int qty = 1; int.TryParse(txtQty.Text, out qty); if (qty < 1) qty = 1;
-                // Same as Sale: unit price = pack price / pack size
                 decimal unitPrice = p.UnitSalePrice;
                 var ex = cart.Find(line => line.ProductID == p.ProductID);
                 if (ex != null) { ex.Quantity += qty; ex.Amount = ex.Quantity * ex.SalePrice; }
@@ -87,12 +88,11 @@ namespace ApplianceManagement.Forms
                 RefreshGrid(); txtSearch.Clear(); selectedProduct = null; txtQty.Text = "1"; lstSuggest.Visible = false; txtSearch.Focus();
             };
             top.Controls.Add(txtQty);
-
-            // Banner LAST so Dock.Top places it at the very top of the form
             this.Controls.Add(top);
+
             this.Controls.Add(UiHelper.CreateFormBanner(
                 "SALE RETURN",
-                "Customer returns  \u2022  Unit price like Sale (pack / size)  \u2022  Stock INCREASE  \u2022  F9 history",
+                "Same as Sale  \u2022  Unit = pack/size  \u2022  Disc% → Disc → Net → Paid → Remarks  \u2022  F9 history",
                 FormAccent.SaleReturn, FormAccent.SaleReturnDark));
 
             lstSuggest = new ListBox { Location = new Point(70, 140), Size = new Size(420, 160), Visible = false, Font = UiHelper.NormalFont, IntegralHeight = false };
@@ -104,13 +104,23 @@ namespace ApplianceManagement.Forms
             foot.Controls.Add(new Label { Text = "Total", Font = UiHelper.SmallFont, Location = new Point(fx, 10), AutoSize = true });
             txtTotal = Box(foot, fx, 32, 110); txtTotal.Text = "0.00"; fx += 126;
             foot.Controls.Add(new Label { Text = "Disc %", Font = UiHelper.SmallFont, Location = new Point(fx, 10), AutoSize = true });
-            txtDiscount = Box(foot, fx, 32, 70); txtDiscount.Text = "0"; txtDiscount.TextChanged += (s, e) => OnPct(); fx += 86;
+            txtDiscount = Box(foot, fx, 32, 70); txtDiscount.Text = "0";
+            txtDiscount.TextChanged += (s, e) => OnPct();
+            txtDiscount.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; txtDiscAmt.Focus(); txtDiscAmt.SelectAll(); } };
+            fx += 86;
             foot.Controls.Add(new Label { Text = "Discount", Font = UiHelper.SmallFont, Location = new Point(fx, 10), AutoSize = true });
-            txtDiscAmt = Box(foot, fx, 32, 110); txtDiscAmt.Text = "0.00"; txtDiscAmt.TextChanged += (s, e) => OnAmt(); fx += 126;
+            txtDiscAmt = Box(foot, fx, 32, 110); txtDiscAmt.Text = "0.00";
+            txtDiscAmt.TextChanged += (s, e) => OnAmt();
+            txtDiscAmt.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; txtNet.Focus(); txtNet.SelectAll(); } };
+            fx += 126;
             foot.Controls.Add(new Label { Text = "Net", Font = UiHelper.SmallFont, Location = new Point(fx, 10), AutoSize = true });
-            txtNet = Box(foot, fx, 32, 120); txtNet.Text = "0.00"; txtNet.ForeColor = FormAccent.SaleReturn; fx += 136;
+            txtNet = Box(foot, fx, 32, 120); txtNet.Text = "0.00"; txtNet.ForeColor = FormAccent.SaleReturn;
+            txtNet.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; txtPaid.Text = txtNet.Text; txtPaid.Focus(); txtPaid.SelectAll(); } };
+            fx += 136;
             foot.Controls.Add(new Label { Text = "Paid", Font = UiHelper.SmallFont, Location = new Point(fx, 10), AutoSize = true });
             txtPaid = Box(foot, fx, 32, 110); txtPaid.Text = "0.00";
+            txtPaid.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; Save(); } };
+
             Button btnSave = new Button { Text = "SAVE RETURN (F12)", Size = new Size(160, 36), Anchor = AnchorStyles.Top | AnchorStyles.Right };
             Button btnClose = new Button { Text = "CLOSE (F4)", Size = new Size(120, 36), Anchor = AnchorStyles.Top | AnchorStyles.Right };
             UiHelper.StyleAccentButton(btnSave, FormAccent.SaleReturn, FormAccent.SaleReturnDark);
@@ -153,7 +163,6 @@ namespace ApplianceManagement.Forms
             }
         }
 
-        /// <summary>Never set CurrentCell to a hidden column (SaleDetailID etc).</summary>
         private void SelectRowSafe(int idx)
         {
             if (dgv == null || idx < 0 || idx >= dgv.Rows.Count) return;
@@ -170,8 +179,7 @@ namespace ApplianceManagement.Forms
             }
             if (visible != null)
             {
-                try { dgv.CurrentCell = visible; }
-                catch { /* ignore if grid not ready */ }
+                try { dgv.CurrentCell = visible; } catch { }
             }
             try { dgv.Focus(); } catch { }
         }
@@ -237,17 +245,47 @@ namespace ApplianceManagement.Forms
             calcBusy = false;
         }
 
+        private string PromptRemarks()
+        {
+            using (var f = new Form())
+            {
+                f.Text = "Return reason / remarks";
+                f.Size = new Size(420, 180);
+                f.StartPosition = FormStartPosition.CenterParent;
+                f.FormBorderStyle = FormBorderStyle.FixedDialog;
+                f.MaximizeBox = false; f.MinimizeBox = false;
+                var lbl = new Label { Text = "Enter reason for this sale return:", Location = new Point(16, 16), AutoSize = true };
+                var txt = new TextBox { Location = new Point(16, 44), Size = new Size(370, 28) };
+                UiHelper.StyleTextBox(txt);
+                var ok = new Button { Text = "Continue", Location = new Point(16, 90), Size = new Size(100, 30), DialogResult = DialogResult.OK };
+                var cancel = new Button { Text = "Cancel", Location = new Point(130, 90), Size = new Size(100, 30), DialogResult = DialogResult.Cancel };
+                UiHelper.StyleAccentButton(ok, FormAccent.SaleReturn, FormAccent.SaleReturnDark);
+                f.Controls.AddRange(new Control[] { lbl, txt, ok, cancel });
+                f.AcceptButton = ok; f.CancelButton = cancel;
+                if (f.ShowDialog(this) != DialogResult.OK) return null;
+                return txt.Text.Trim();
+            }
+        }
+
         private void Save()
         {
             if (cart.Count == 0) { MessageBox.Show("Add products first."); return; }
-            if (MessageBox.Show("Save sale return? Stock will increase.", "Confirm", MessageBoxButtons.YesNo) != DialogResult.Yes) return;
+
+            string reason = PromptRemarks();
+            if (reason == null) return; // cancelled
+
+            if (MessageBox.Show("Save this sale return?\nStock will increase.\n\nReason: " + (string.IsNullOrEmpty(reason) ? "(none)" : reason),
+                "Confirm Save", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+                return;
+
             try
             {
                 foreach (var line in cart)
-                    saleRepo.SaveSaleReturn(line.ProductID, line.Quantity, "Return line");
-                MessageBox.Show("Return saved. Stock updated.");
+                    saleRepo.SaveSaleReturn(line.ProductID, line.Quantity, string.IsNullOrEmpty(reason) ? "Sale return" : reason);
+                MessageBox.Show("Return saved. Stock updated.\nInvoice: " + autoInvoice, "Success");
+                this.Tag = "NOSAVECONFIRM";
                 cart.Clear(); RefreshGrid();
-                txtSearch.Clear(); selectedProduct = null; txtPaid.Text = "0.00"; txtSearch.Focus();
+                txtSearch.Clear(); selectedProduct = null; txtPaid.Text = "0.00"; txtDiscount.Text = "0"; txtSearch.Focus();
             }
             catch (Exception ex) { MessageBox.Show(ex.Message); }
         }
