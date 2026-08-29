@@ -11,9 +11,15 @@ namespace ApplianceManagement.Models {
     public decimal? UnitCost { get; set; }
     public string Remarks { get; set; }
   }
+
+  /// <summary>Ledger movement types — always quantities in base units.</summary>
   public static class InventoryTransactionType {
     public const string Purchase = "PURCHASE";
+    public const string PurchaseReturn = "PURCHASE_RETURN";
     public const string Sale = "SALE";
     public const string SaleReturn = "SALE_RETURN";
+    public const string Opening = "OPENING";
+    public const string Adjustment = "ADJUSTMENT";
+    public const string Damage = "DAMAGE";
   }
 }
