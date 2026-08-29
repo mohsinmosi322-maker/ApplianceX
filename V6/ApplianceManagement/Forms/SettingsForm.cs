@@ -33,11 +33,16 @@ namespace ApplianceManagement.Forms
         private void InitializeComponent()
         {
             this.Text = "Settings";
-            this.Size = new Size(940, 700);
+            this.Size = new Size(940, 720);
             this.MinimumSize = new Size(800, 600);
             this.BackColor = UiHelper.BgColor;
             this.KeyPreview = true;
             UiHelper.AttachF4Close(this);
+
+            this.Controls.Add(UiHelper.CreateFormBanner(
+                "SETTINGS",
+                isAdmin ? "Admin: theme, limits, users, rights, backup" : "Appearance & add supplier",
+                FormAccent.Settings, FormAccent.SettingsDark));
 
             Panel top = new Panel { Dock = DockStyle.Top, Height = isAdmin ? 280 : 210, BackColor = UiHelper.BgColor, Padding = new Padding(10) };
 
@@ -80,7 +85,7 @@ namespace ApplianceManagement.Forms
                 }
                 UiHelper.ApplyThemeLive(this);
                 UiHelper.ApplyFormSize(this);
-                MessageBox.Show("Theme, font and form size applied.");
+                DialogHelpers.Info(this, "Theme, font and form size applied.");
             };
             gbTheme.Controls.Add(btnApply);
             top.Controls.Add(gbTheme);
@@ -100,7 +105,7 @@ namespace ApplianceManagement.Forms
                 txtSettingsPwd = new TextBox { Location = new Point(130, 98), Size = new Size(160, 26), PasswordChar = '*' };
                 UiHelper.StyleTextBox(txtSettingsPwd);
                 gbDisc.Controls.Add(txtSettingsPwd);
-                Button btnDisc = new Button { Text = "Save Limits", Location = new Point(130, 140), Size = new Size(140, 36) };
+                Button btnDisc = new Button { Text = "Save Limits", Location = new Point(130, 140), Size = new Size(120, 36) };
                 UiHelper.StyleButton(btnDisc);
                 btnDisc.Click += (s, e) =>
                 {
@@ -108,9 +113,18 @@ namespace ApplianceManagement.Forms
                     AppSettings.Set("MaxDiscountUser", txtMaxDiscUser.Text.Trim());
                     if (!string.IsNullOrWhiteSpace(txtSettingsPwd.Text))
                         AppSettings.Set("SettingsPassword", txtSettingsPwd.Text.Trim());
-                    MessageBox.Show("Saved.");
+                    DialogHelpers.Info(this, "Saved.");
                 };
                 gbDisc.Controls.Add(btnDisc);
+                Button btnBackup = new Button { Text = "Backup DB", Location = new Point(260, 140), Size = new Size(120, 36) };
+                UiHelper.StyleAccentButton(btnBackup, FormAccent.Settings, FormAccent.SettingsDark);
+                btnBackup.Click += (s, e) =>
+                {
+                    if (!DialogHelpers.Confirm(this, "Create a SQL Server backup of the current database?"))
+                        return;
+                    BackupHelper.BackupInteractive(this);
+                };
+                gbDisc.Controls.Add(btnBackup);
                 top.Controls.Add(gbDisc);
 
                 GroupBox gbRights = new GroupBox { Text = "User Rights (menu access)", Font = UiHelper.HeaderFont, ForeColor = UiHelper.ThemeDark, Location = new Point(15, 210), Size = new Size(855, 60) };
@@ -157,9 +171,9 @@ namespace ApplianceManagement.Forms
             UiHelper.StyleButton(btnAddSup);
             btnAddSup.Click += (s, e) =>
             {
-                if (string.IsNullOrWhiteSpace(txtSupName.Text)) { MessageBox.Show("Name required."); return; }
+                if (string.IsNullOrWhiteSpace(txtSupName.Text)) { DialogHelpers.Error(this, "Name required."); return; }
                 supplierRepo.Insert(new Supplier { SupplierName = txtSupName.Text.Trim(), Phone = txtSupPhone.Text.Trim() });
-                MessageBox.Show("Supplier added.");
+                DialogHelpers.Info(this, "Supplier added.");
                 txtSupName.Clear(); txtSupPhone.Clear();
                 LoadSuppliers();
             };
@@ -212,21 +226,22 @@ namespace ApplianceManagement.Forms
         {
             if (string.IsNullOrWhiteSpace(txtNewUser.Text) || string.IsNullOrWhiteSpace(txtNewPwd.Text))
             {
-                MessageBox.Show("Username and password required.");
+                DialogHelpers.Error(this, "Username and password required.");
                 return;
             }
             if (userRepo.ExistsUserName(txtNewUser.Text.Trim()))
             {
-                MessageBox.Show("Username already exists.");
+                DialogHelpers.Error(this, "Username already exists.");
                 return;
             }
+            if (!DialogHelpers.Confirm(this, "Create user " + txtNewUser.Text.Trim() + "?")) return;
             userRepo.Insert(new User
             {
                 UserName = txtNewUser.Text.Trim(),
                 FullName = string.IsNullOrWhiteSpace(txtNewFull.Text) ? txtNewUser.Text.Trim() : txtNewFull.Text.Trim(),
                 Role = cmbNewRole.SelectedItem != null ? cmbNewRole.SelectedItem.ToString() : "User"
             }, txtNewPwd.Text);
-            MessageBox.Show("User created.");
+            DialogHelpers.Info(this, "User created.");
             txtNewUser.Clear(); txtNewFull.Clear(); txtNewPwd.Clear();
             LoadUsersForRights();
             LoadUsersForManage();
@@ -236,7 +251,7 @@ namespace ApplianceManagement.Forms
         {
             if (cmbChgUser == null || cmbChgUser.SelectedItem == null || string.IsNullOrWhiteSpace(txtChgPwd.Text))
             {
-                MessageBox.Show("Select user and enter new password.");
+                DialogHelpers.Error(this, "Select user and enter new password.");
                 return;
             }
             string uname = cmbChgUser.SelectedItem.ToString();
@@ -244,8 +259,9 @@ namespace ApplianceManagement.Forms
             foreach (var u in userRepo.GetAll())
                 if (u.UserName == uname) { target = u; break; }
             if (target == null) return;
+            if (!DialogHelpers.Confirm(this, "Change password for " + uname + "?")) return;
             userRepo.ChangePassword(target.UserID, txtChgPwd.Text);
-            MessageBox.Show("Password updated for " + uname);
+            DialogHelpers.Info(this, "Password updated for " + uname);
             txtChgPwd.Clear();
         }
 
@@ -298,7 +314,7 @@ namespace ApplianceManagement.Forms
             if (chkReports.Checked) parts.Add("REPORTS");
             if (chkSettings.Checked) parts.Add("SETTINGS");
             AppSettings.SetUserPermissions(cmbUsers.SelectedItem.ToString(), string.Join(",", parts.ToArray()));
-            MessageBox.Show("Rights saved for " + cmbUsers.SelectedItem + ". User must re-login to apply menus.");
+            DialogHelpers.Info(this, "Rights saved for " + cmbUsers.SelectedItem + ". User must re-login to apply menus.");
         }
 
         private void LoadSuppliers()
