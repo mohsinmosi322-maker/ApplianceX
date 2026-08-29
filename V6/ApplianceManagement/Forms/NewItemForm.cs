@@ -4,13 +4,15 @@ using System.Windows.Forms;
 using ApplianceManagement.Data;
 using ApplianceManagement.Helpers;
 using ApplianceManagement.Models;
+using ApplianceManagement.Services;
 
 namespace ApplianceManagement.Forms
 {
     public partial class NewItemForm : Form
     {
-        private ProductRepository productRepo = new ProductRepository();
-        private CategoryRepository categoryRepo = new CategoryRepository();
+        private readonly ProductRepository productRepo = new ProductRepository();
+        private readonly CategoryRepository categoryRepo = new CategoryRepository();
+        private readonly ProductService _productService = new ProductService();
         private TextBox txtName, txtCode, txtBarcode, txtPurchase, txtSale, txtMinStock, txtPackSize;
         private ComboBox cmbCategory, cmbUom;
         private CheckBox chkCategory, chkEditExisting, chkUom;
@@ -23,13 +25,12 @@ namespace ApplianceManagement.Forms
             cmbCategory.DataSource = categoryRepo.GetAllActive();
             cmbCategory.DisplayMember = "CategoryName";
             cmbCategory.ValueMember = "CategoryID";
-            string next = productRepo.GetNextProductCode();
+            string next = _productService.NextCode();
             txtCode.Text = next; txtBarcode.Text = next;
             chkCategory.Checked = false;
             cmbCategory.Enabled = false;
             chkUom.Checked = false;
             cmbUom.Enabled = false;
-            // Pack size ALWAYS enabled so price division works without UOM
             txtPackSize.Enabled = true;
             txtPackSize.Text = "1";
             UpdateUnitPreview();
@@ -113,7 +114,6 @@ namespace ApplianceManagement.Forms
             card.Controls.Add(cmbUom);
             y += 42;
 
-            // Pack size ALWAYS on (not tied to UOM)
             AddL(card, "Pack size", 0, y);
             txtPackSize = AddT(card, 150, y, 100);
             txtPackSize.Text = "1";
@@ -171,7 +171,7 @@ namespace ApplianceManagement.Forms
             string code = txtCode.Text.Trim();
             if (string.IsNullOrEmpty(code)) return;
             var p = productRepo.GetByCode(code);
-            if (p == null) { MessageBox.Show("Product code not found."); editingProductId = null; return; }
+            if (p == null) { DialogHelpers.Error(this, "Product code not found."); editingProductId = null; return; }
             editingProductId = p.ProductID;
             txtName.Text = p.ProductName;
             txtBarcode.Text = p.Barcode ?? p.ProductCode;
@@ -198,7 +198,7 @@ namespace ApplianceManagement.Forms
             editingProductId = null;
             txtCode.ReadOnly = true;
             txtCode.BackColor = Color.FromArgb(245, 247, 250);
-            string next = productRepo.GetNextProductCode();
+            string next = _productService.NextCode();
             txtCode.Text = next; txtBarcode.Text = next;
             txtName.Clear(); txtPurchase.Clear(); txtSale.Clear(); txtMinStock.Text = "0";
             chkCategory.Checked = false; cmbCategory.Enabled = false;
@@ -215,14 +215,14 @@ namespace ApplianceManagement.Forms
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(txtName.Text)) { MessageBox.Show("Name required."); return; }
+                if (string.IsNullOrWhiteSpace(txtName.Text)) { DialogHelpers.Error(this, "Name required."); return; }
                 decimal pur = 0, sale = 0, pack = 1; int min = 0;
                 decimal.TryParse(txtPurchase.Text, out pur);
                 decimal.TryParse(txtSale.Text, out sale);
                 int.TryParse(txtMinStock.Text, out min);
                 if (!decimal.TryParse(txtPackSize.Text, out pack) || pack <= 0)
                 {
-                    MessageBox.Show("Pack size must be a number greater than 0.");
+                    DialogHelpers.Error(this, "Pack size must be a number greater than 0.");
                     txtPackSize.Focus();
                     return;
                 }
@@ -230,18 +230,19 @@ namespace ApplianceManagement.Forms
 
                 if (chkEditExisting.Checked && editingProductId.HasValue)
                 {
-                    productRepo.UpdateFull(editingProductId.Value, txtName.Text.Trim(), pur, sale, min, true, uom, pack);
-                    MessageBox.Show("Product updated.\nUnit sale price: " + Math.Round(sale / pack, 4).ToString("0.####"));
+                    if (!DialogHelpers.Confirm(this, "Update this product?")) return;
+                    _productService.Update(editingProductId.Value, txtName.Text.Trim(), pur, sale, min, true, uom, pack);
+                    DialogHelpers.Info(this, "Product updated.\nUnit sale price: " + Math.Round(sale / pack, 4).ToString("0.####"));
+                    this.Tag = "NOSAVECONFIRM";
                     chkEditExisting.Checked = false;
                     return;
                 }
 
-                if (productRepo.ExistsCode(txtCode.Text.Trim())) { MessageBox.Show("Code exists."); return; }
                 int catId = 1;
                 if (chkCategory.Checked && cmbCategory.SelectedValue != null) catId = (int)cmbCategory.SelectedValue;
                 else if (cmbCategory.Items.Count > 0) catId = ((Category)cmbCategory.Items[0]).CategoryID;
 
-                int newId = productRepo.Insert(new Product
+                var product = new Product
                 {
                     ProductCode = txtCode.Text.Trim(),
                     Barcode = string.IsNullOrWhiteSpace(txtBarcode.Text) ? txtCode.Text.Trim() : txtBarcode.Text.Trim(),
@@ -252,17 +253,19 @@ namespace ApplianceManagement.Forms
                     MinimumStock = min,
                     UnitOfMeasure = uom,
                     PackSize = pack
-                });
+                };
 
-                // Ensure PackSize written even if first INSERT path skipped columns
-                try { productRepo.UpdateFull(newId, txtName.Text.Trim(), pur, sale, min, true, uom, pack); }
+                if (!DialogHelpers.Confirm(this, "Save new product?")) return;
+                int newId = _productService.Create(product);
+                try { _productService.Update(newId, product.ProductName, pur, sale, min, true, uom, pack); }
                 catch { }
 
-                MessageBox.Show("Saved!\nUnit sale price: " + Math.Round(sale / pack, 4).ToString("0.####"));
+                DialogHelpers.Info(this, "Saved!\nUnit sale price: " + Math.Round(sale / pack, 4).ToString("0.####"));
+                this.Tag = "NOSAVECONFIRM";
                 ResetNewMode();
                 txtName.Focus();
             }
-            catch (Exception ex) { MessageBox.Show(ex.Message); }
+            catch (Exception ex) { DialogHelpers.Error(this, ex.Message); }
         }
     }
 }
