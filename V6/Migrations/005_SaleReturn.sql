@@ -1,6 +1,6 @@
 /*
   Sale Return linked to original invoice.
-  Safe to re-run.
+  Safe to re-run. REQUIRED before using Sale Return form.
 */
 USE APPLIANCE_DB;
 GO
@@ -44,5 +44,5 @@ IF NOT EXISTS (SELECT 1 FROM dbo.Settings WHERE SettingName = N'NextSaleReturnNu
   INSERT INTO dbo.Settings(SettingName, SettingValue) VALUES (N'NextSaleReturnNumber', N'1');
 GO
 
-PRINT '005_SaleReturn ready.';
+PRINT '005_SaleReturn ready — SaleReturnHeader + SaleReturnDetail created.';
 GO

@@ -23,6 +23,21 @@ namespace ApplianceManagement.Data
             return null;
         }
 
+        public Customer GetById(int id)
+        {
+            using (var conn = DbHelper.GetConnection())
+            {
+                conn.Open();
+                using (var cmd = DbHelper.CreateCommand("SELECT * FROM Customers WHERE CustomerID=@Id", conn))
+                {
+                    cmd.Parameters.AddWithValue("@Id", id);
+                    using (var r = cmd.ExecuteReader())
+                        if (r.Read()) return Map(r);
+                }
+            }
+            return null;
+        }
+
         public List<Customer> GetAllActive()
         {
             var list = new List<Customer>();
@@ -64,6 +79,23 @@ namespace ApplianceManagement.Data
             }
         }
 
+        public void Update(Customer c)
+        {
+            using (var conn = DbHelper.GetConnection())
+            {
+                conn.Open();
+                using (var cmd = DbHelper.CreateCommand(
+                    "UPDATE Customers SET CustomerName=@N, Phone=@P, Address=@A WHERE CustomerID=@Id", conn))
+                {
+                    cmd.Parameters.AddWithValue("@Id", c.CustomerID);
+                    cmd.Parameters.AddWithValue("@N", c.CustomerName);
+                    cmd.Parameters.AddWithValue("@P", (object)c.Phone ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@A", (object)c.Address ?? DBNull.Value);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
         private static Customer Map(SqlDataReader r)
         {
             return new Customer
@@ -72,9 +104,8 @@ namespace ApplianceManagement.Data
                 CustomerName = r["CustomerName"].ToString(),
                 Phone = r["Phone"] == DBNull.Value ? null : r["Phone"].ToString(),
                 Address = r["Address"] == DBNull.Value ? null : r["Address"].ToString(),
-                OpeningBalance = (decimal)r["OpeningBalance"],
-                IsActive = (bool)r["IsActive"],
-                CreatedDate = (DateTime)r["CreatedDate"]
+                OpeningBalance = r["OpeningBalance"] == DBNull.Value ? 0 : Convert.ToDecimal(r["OpeningBalance"]),
+                IsActive = r["IsActive"] != DBNull.Value && Convert.ToBoolean(r["IsActive"])
             };
         }
     }
