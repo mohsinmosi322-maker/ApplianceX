@@ -80,6 +80,11 @@ namespace ApplianceManagement.Forms
             mnuInv.DropDownItems.Add("Stock Position", null, (s, e) => OpenChild(new InventoryForm(), "INVENTORY"));
             mnuInv.DropDownItems.Add("Stock Operations", null, (s, e) => OpenChild(new StockOpsForm(), "INVENTORY"));
 
+            var mnuMasters = new ToolStripMenuItem("  Masters  ");
+            mnuMasters.DropDownItems.Add("Products", null, (s, e) => OpenChild(new NewItemForm(), "NEWITEM"));
+            mnuMasters.DropDownItems.Add("Customers", null, (s, e) => OpenChild(new CustomerMasterForm(), "SALE"));
+            mnuMasters.DropDownItems.Add("Suppliers", null, (s, e) => OpenChild(new SupplierMasterForm(), "PURCHASE"));
+
             var mnuAcct = new ToolStripMenuItem("  Accounts  ");
             mnuAcct.DropDownItems.Add("Customer Payment", null, (s, e) => OpenChild(new CustomerPaymentForm(), "SALE"));
             mnuAcct.DropDownItems.Add("Supplier Payment", null, (s, e) => OpenChild(new SupplierPaymentForm(), "PURCHASE"));
@@ -106,7 +111,7 @@ namespace ApplianceManagement.Forms
                     "\n\nF2 Sale   F3 Purchase   F4 Close   F9 History   F12 Save",
                     "About", MessageBoxButtons.OK, MessageBoxIcon.Information));
 
-            menuStrip.Items.AddRange(new ToolStripItem[] { mnuFile, mnuTrans, mnuInv, mnuAcct, mnuRep, mnuSet, mnuWindows, mnuHelp });
+            menuStrip.Items.AddRange(new ToolStripItem[] { mnuFile, mnuTrans, mnuInv, mnuMasters, mnuAcct, mnuRep, mnuSet, mnuWindows, mnuHelp });
             this.MainMenuStrip = menuStrip;
             this.Controls.Add(menuStrip);
 
@@ -125,40 +130,24 @@ namespace ApplianceManagement.Forms
 
         public bool PromptSettingsPassword()
         {
-            using (var f = new Form())
-            {
-                f.Text = "Settings Password";
-                f.Size = new Size(360, 160);
-                f.StartPosition = FormStartPosition.CenterParent;
-                f.FormBorderStyle = FormBorderStyle.FixedDialog;
-                f.MaximizeBox = false;
-                f.MinimizeBox = false;
-                var lbl = new Label { Text = "Enter password to open Settings:", Location = new Point(16, 16), AutoSize = true };
-                var txt = new TextBox { Location = new Point(16, 44), Size = new Size(310, 26), PasswordChar = '*' };
-                var ok = new Button { Text = "Unlock", Location = new Point(16, 84), Size = new Size(100, 28), DialogResult = DialogResult.OK };
-                var cancel = new Button { Text = "Cancel", Location = new Point(130, 84), Size = new Size(100, 28), DialogResult = DialogResult.Cancel };
-                f.Controls.AddRange(new Control[] { lbl, txt, ok, cancel });
-                f.AcceptButton = ok;
-                f.CancelButton = cancel;
-                if (f.ShowDialog(this) != DialogResult.OK) return false;
+            string pwd = DialogHelpers.PromptPassword(this, "Enter password to open Settings:", "Settings Password");
+            if (pwd == null) return false;
 
-                string pwd = txt.Text ?? "";
-                string settingsPwd = AppSettings.Get("SettingsPassword");
-                if (!string.IsNullOrEmpty(settingsPwd))
-                {
-                    if (pwd == settingsPwd) return true;
-                    MessageBox.Show("Incorrect settings password.");
-                    return false;
-                }
-                var repo = new Data.UserRepository();
-                var u = repo.Authenticate(CurrentUser.UserName, pwd);
-                if (u == null)
-                {
-                    MessageBox.Show("Incorrect password.");
-                    return false;
-                }
-                return true;
+            string settingsPwd = AppSettings.Get("SettingsPassword");
+            if (!string.IsNullOrEmpty(settingsPwd))
+            {
+                if (pwd == settingsPwd) return true;
+                DialogHelpers.Error(this, "Incorrect settings password.");
+                return false;
             }
+            var repo = new Data.UserRepository();
+            var u = repo.Authenticate(CurrentUser.UserName, pwd);
+            if (u == null)
+            {
+                DialogHelpers.Error(this, "Incorrect password.");
+                return false;
+            }
+            return true;
         }
 
         private void MainForm_Load(object sender, EventArgs e)
@@ -267,9 +256,10 @@ namespace ApplianceManagement.Forms
             string t = (menuText ?? "").Replace("\t", " ").Trim();
             if (t.StartsWith("Sale Return")) return "SALE";
             if (t.StartsWith("Sale")) return "SALE";
-            if (t.StartsWith("Customer Payment") || t.StartsWith("Customer Ledger")) return "SALE";
+            if (t.StartsWith("Customer")) return "SALE";
+            if (t.StartsWith("Products")) return "NEWITEM";
             if (t.StartsWith("Purchase") && !t.StartsWith("Purchase Report")) return "PURCHASE";
-            if (t.StartsWith("Supplier Payment") || t.StartsWith("Supplier Ledger")) return "PURCHASE";
+            if (t.StartsWith("Supplier")) return "PURCHASE";
             if (t.StartsWith("New Item")) return "NEWITEM";
             if (t.StartsWith("Stock")) return "INVENTORY";
             if (t.StartsWith("Low Stock")) return "REPORTS";
@@ -370,7 +360,7 @@ namespace ApplianceManagement.Forms
 
         private void DoLogout()
         {
-            if (MessageBox.Show("Logout?", "Confirm", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+            if (!DialogHelpers.Confirm(this, "Logout?")) return;
             foreach (Form f in this.MdiChildren)
                 if (f != homeHost) f.Close();
             AppSession.SignOut();
