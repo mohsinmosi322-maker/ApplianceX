@@ -16,6 +16,7 @@ namespace ApplianceManagement.Forms
         private HomeScreen homeScreen;
         private Form homeHost;
         private MdiClient mdiClient;
+        private int cascadeIndex = 0;
 
         public MainForm(User user)
         {
@@ -47,6 +48,7 @@ namespace ApplianceManagement.Forms
             this.FormClosing += MainForm_FormClosing;
             this.KeyPreview = true;
             this.MdiChildActivate += (s, e) => SyncHome();
+            this.Resize += (s, e) => { if (CountOtherChildren() == 0) ForceHomeFill(); };
             this.Text = UiHelper.AppName + "  \u2014  " + UiHelper.GetShopName();
             BuildMenu();
             this.Load += MainForm_Load;
@@ -165,10 +167,6 @@ namespace ApplianceManagement.Forms
             SetupHome();
         }
 
-        /// <summary>
-        /// Dashboard = borderless maximized MDI child (true wallpaper).
-        /// Other forms open on top; when they close, home stays maximized.
-        /// </summary>
         private void SetupHome()
         {
             homeScreen = new HomeScreen(CurrentUser);
@@ -183,14 +181,13 @@ namespace ApplianceManagement.Forms
             homeHost.BackColor = UiHelper.BgColor;
             homeHost.Controls.Add(homeScreen);
             homeHost.MdiParent = this;
-            homeHost.WindowState = FormWindowState.Maximized;
-            // Prevent user closing the wallpaper host
             homeHost.FormClosing += (s, e) =>
             {
                 if (e.CloseReason == CloseReason.UserClosing)
                     e.Cancel = true;
             };
             homeHost.Show();
+            ForceHomeFill();
         }
 
         private int CountOtherChildren()
@@ -201,13 +198,27 @@ namespace ApplianceManagement.Forms
             return n;
         }
 
+        /// <summary>Fill entire MdiClient so dashboard is never half-cut.</summary>
+        private void ForceHomeFill()
+        {
+            if (homeHost == null || mdiClient == null) return;
+            try
+            {
+                homeHost.WindowState = FormWindowState.Normal;
+                homeHost.Bounds = new Rectangle(0, 0, mdiClient.ClientSize.Width, mdiClient.ClientSize.Height);
+                homeHost.WindowState = FormWindowState.Maximized;
+                homeHost.SendToBack();
+            }
+            catch { }
+        }
+
         private void SyncHome()
         {
             if (homeHost == null || homeScreen == null) return;
             if (CountOtherChildren() == 0)
             {
-                if (homeHost.WindowState != FormWindowState.Maximized)
-                    homeHost.WindowState = FormWindowState.Maximized;
+                cascadeIndex = 0;
+                ForceHomeFill();
                 homeHost.Activate();
                 homeScreen.RefreshData();
             }
@@ -274,7 +285,7 @@ namespace ApplianceManagement.Forms
             }
             if (!any) mnuWindows.DropDownItems.Add("(No open windows)");
             mnuWindows.DropDownItems.Add(new ToolStripSeparator());
-            mnuWindows.DropDownItems.Add("Cascade", null, (s, ev) => this.LayoutMdi(MdiLayout.Cascade));
+            mnuWindows.DropDownItems.Add("Cascade", null, (s, ev) => CascadeOthers());
             mnuWindows.DropDownItems.Add("Tile Horizontal", null, (s, ev) => this.LayoutMdi(MdiLayout.TileHorizontal));
             mnuWindows.DropDownItems.Add("Close All", null, (s, ev) =>
             {
@@ -282,6 +293,19 @@ namespace ApplianceManagement.Forms
                     if (f != homeHost) f.Close();
                 SyncHome();
             });
+        }
+
+        private void CascadeOthers()
+        {
+            int i = 0;
+            foreach (Form f in this.MdiChildren)
+            {
+                if (f == homeHost) continue;
+                f.WindowState = FormWindowState.Normal;
+                f.Location = new Point(20 + i * 28, 20 + i * 28);
+                i++;
+            }
+            ForceHomeFill();
         }
 
         public void OpenChild(Form child, string permKey)
@@ -309,12 +333,24 @@ namespace ApplianceManagement.Forms
                 }
             }
 
+            // Keep dashboard maximized behind; open child normal + cascade offset
+            if (homeHost != null)
+            {
+                ForceHomeFill();
+                homeHost.SendToBack();
+            }
+
             child.MdiParent = this;
             UiHelper.ApplyFormSize(child);
             child.WindowState = FormWindowState.Normal;
+            int off = cascadeIndex % 10;
+            cascadeIndex++;
+            child.StartPosition = FormStartPosition.Manual;
+            child.Location = new Point(24 + off * 28, 24 + off * 28);
             child.FormClosed += (s, e) => SyncHome();
             child.Show();
             child.Activate();
+            child.BringToFront();
         }
 
         private void ShowShortcuts()

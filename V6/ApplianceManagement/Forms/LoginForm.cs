@@ -1,6 +1,5 @@
 using System;
 using System.Drawing;
-using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 using ApplianceManagement.Data;
 using ApplianceManagement.Helpers;
@@ -11,13 +10,25 @@ namespace ApplianceManagement.Forms
     {
         private TextBox txtUsername, txtPassword;
         private Button btnLogin;
+        private Label lblTitle;
 
         public LoginForm()
         {
+            // Load license early so SoftwareName is available for branding
+            try { LicenseReader.TryLoad(); } catch { }
             InitializeComponent();
             UiHelper.InitializeTheme();
+            ApplyLicenseBranding();
             UiHelper.FadeIn(this);
             this.Shown += (s, e) => txtUsername.Focus();
+        }
+
+        private void ApplyLicenseBranding()
+        {
+            string name = UiHelper.AppName;
+            if (string.IsNullOrWhiteSpace(name)) name = "APPLIANCE X";
+            if (lblTitle != null) lblTitle.Text = name.ToUpperInvariant();
+            this.Text = "Sign in — " + name;
         }
 
         private void InitializeComponent()
@@ -45,7 +56,7 @@ namespace ApplianceManagement.Forms
             Panel accent = new Panel { Dock = DockStyle.Top, Height = 6, BackColor = UiHelper.ThemeColor };
             card.Controls.Add(accent);
 
-            Label lblTitle = new Label
+            lblTitle = new Label
             {
                 Text = "APPLIANCE X",
                 Font = new Font("Segoe UI", 16F, FontStyle.Bold),
@@ -109,6 +120,7 @@ namespace ApplianceManagement.Forms
                         "License Required", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     return;
                 }
+                ApplyLicenseBranding();
                 if (!LicenseReader.IsValid())
                 {
                     MessageBox.Show(
