@@ -23,8 +23,9 @@ namespace ApplianceManagement.Forms
             BackColor = UiHelper.BgColor;
             KeyPreview = true;
             UiHelper.AttachF4Close(this);
+            KeyDown += (s, e) => { if (e.KeyCode == Keys.F12) { Save(); e.Handled = true; } };
 
-            Controls.Add(UiHelper.CreateFormBanner("SUPPLIER PAYMENT", "Record payment against payable",
+            Controls.Add(UiHelper.CreateFormBanner("SUPPLIER PAYMENT", "Record payment against payable · F12 save",
                 FormAccent.Purchase, FormAccent.PurchaseDark));
 
             var card = new Panel { Dock = DockStyle.Fill, Padding = new Padding(28), BackColor = Color.White };
@@ -45,14 +46,16 @@ namespace ApplianceManagement.Forms
             card.Controls.Add(new Label { Text = "Amount", Location = new Point(0, y), AutoSize = true });
             txtAmount = new TextBox { Location = new Point(120, y - 2), Size = new Size(160, 28) };
             UiHelper.StyleTextBox(txtAmount);
+            txtAmount.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; txtRemarks.Focus(); } };
             card.Controls.Add(txtAmount);
             y += 40;
             card.Controls.Add(new Label { Text = "Remarks", Location = new Point(0, y), AutoSize = true });
             txtRemarks = new TextBox { Location = new Point(120, y - 2), Size = new Size(320, 28) };
             UiHelper.StyleTextBox(txtRemarks);
+            txtRemarks.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; Save(); } };
             card.Controls.Add(txtRemarks);
             y += 50;
-            var btn = new Button { Text = "SAVE PAYMENT", Location = new Point(120, y), Size = new Size(160, 36) };
+            var btn = new Button { Text = "SAVE PAYMENT (F12)", Location = new Point(120, y), Size = new Size(180, 36) };
             UiHelper.StyleAccentButton(btn, FormAccent.Purchase, FormAccent.PurchaseDark);
             btn.Click += (s, e) => Save();
             card.Controls.Add(btn);
@@ -67,17 +70,35 @@ namespace ApplianceManagement.Forms
 
         private void Save()
         {
-            if (!(cmbSupplier.SelectedItem is Supplier s)) return;
-            decimal amt = 0; decimal.TryParse(txtAmount.Text, out amt);
+            if (!(cmbSupplier.SelectedItem is Supplier s))
+            {
+                DialogHelpers.Error(this, "Select a supplier.");
+                return;
+            }
+            decimal amt = 0;
+            decimal.TryParse(txtAmount.Text, out amt);
+            if (amt <= 0)
+            {
+                DialogHelpers.Error(this, "Enter a payment amount greater than zero.");
+                txtAmount.Focus();
+                return;
+            }
+            if (!DialogHelpers.Confirm(this, "Record payment of " + amt.ToString("0.00") + " to " + s.SupplierName + "?"))
+                return;
             try
             {
                 _acct.RecordPayment(s.SupplierID, amt, txtRemarks.Text.Trim());
-                MessageBox.Show("Payment recorded.");
+                DialogHelpers.Info(this, "Payment recorded.");
                 Tag = "NOSAVECONFIRM";
                 txtAmount.Clear();
+                txtRemarks.Clear();
                 RefreshBal();
             }
-            catch (Exception ex) { MessageBox.Show(ex.Message); }
+            catch (Exception ex)
+            {
+                AppLog.Error("Supplier payment", ex);
+                DialogHelpers.Error(this, ex.Message);
+            }
         }
     }
 }

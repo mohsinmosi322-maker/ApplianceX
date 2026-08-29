@@ -102,7 +102,7 @@ namespace ApplianceManagement.Forms
                 if (dgv.Columns.Contains("ProductID")) dgv.Columns["ProductID"].Visible = false;
                 Recalc();
             }
-            catch (Exception ex) { MessageBox.Show(ex.Message); }
+            catch (Exception ex) { DialogHelpers.Error(this, ex.Message); }
         }
 
         private void Recalc()
@@ -122,8 +122,8 @@ namespace ApplianceManagement.Forms
 
         private void Save()
         {
-            if (_purchaseId <= 0) { MessageBox.Show("Load invoice first."); return; }
-            if (string.IsNullOrWhiteSpace(txtReason.Text)) { MessageBox.Show("Reason required."); return; }
+            if (_purchaseId <= 0) { DialogHelpers.Error(this, "Load invoice first."); return; }
+            if (string.IsNullOrWhiteSpace(txtReason.Text)) { DialogHelpers.Error(this, "Reason required."); return; }
             if (!(dgv.DataSource is List<Row> rows)) return;
             Recalc();
             var details = new List<PurchaseReturnDetail>();
@@ -144,9 +144,9 @@ namespace ApplianceManagement.Forms
                     PackSize = r.PackSize
                 });
             }
-            if (details.Count == 0) { MessageBox.Show("Enter return qty."); return; }
+            if (details.Count == 0) { DialogHelpers.Error(this, "Enter return qty."); return; }
             decimal refund = 0; decimal.TryParse(txtRefund.Text, out refund);
-            if (MessageBox.Show("Save purchase return?", "Confirm", MessageBoxButtons.YesNo) != DialogResult.Yes) return;
+            if (!DialogHelpers.Confirm(this, "Save purchase return against " + _invoiceNo + "?\nRefund: " + refund.ToString("0.00"))) return;
             try
             {
                 var h = new PurchaseReturnHeader
@@ -160,12 +160,16 @@ namespace ApplianceManagement.Forms
                     Details = details
                 };
                 _service.Save(h);
-                MessageBox.Show("Saved.\nReturn No: " + h.ReturnNo);
+                DialogHelpers.Info(this, "Saved.\nReturn No: " + h.ReturnNo);
                 Tag = "NOSAVECONFIRM";
                 LoadInv();
                 txtReason.Clear();
             }
-            catch (Exception ex) { MessageBox.Show(ex.Message); }
+            catch (Exception ex)
+            {
+                AppLog.Error("Purchase return save", ex);
+                DialogHelpers.Error(this, ex.Message);
+            }
         }
 
         private class Row
