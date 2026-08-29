@@ -17,6 +17,9 @@ namespace ApplianceManagement.Forms
         private Form homeHost;
         private MdiClient mdiClient;
         private int cascadeIndex = 0;
+        private StatusStrip statusStrip;
+        private ToolStripStatusLabel lblUser, lblShop, lblClock;
+        private Timer clockTimer;
 
         public MainForm(User user)
         {
@@ -51,7 +54,36 @@ namespace ApplianceManagement.Forms
             this.Resize += (s, e) => { if (CountOtherChildren() == 0) ForceHomeFill(); };
             this.Text = UiHelper.AppName + "  \u2014  " + UiHelper.GetShopName();
             BuildMenu();
+            BuildStatusBar();
             this.Load += MainForm_Load;
+        }
+
+        private void BuildStatusBar()
+        {
+            statusStrip = new StatusStrip();
+            statusStrip.BackColor = UiHelper.ThemeDark;
+            statusStrip.ForeColor = Color.White;
+            statusStrip.SizingGrip = false;
+            lblUser = new ToolStripStatusLabel();
+            lblUser.ForeColor = Color.White;
+            lblUser.Text = "  User: " + (CurrentUser != null ? CurrentUser.UserName : "") +
+                "  (" + (CurrentUser != null ? CurrentUser.Role : "") + ")  ";
+            lblShop = new ToolStripStatusLabel();
+            lblShop.ForeColor = Color.White;
+            lblShop.Text = "  " + UiHelper.GetShopName() + "  ";
+            lblShop.Spring = true;
+            lblClock = new ToolStripStatusLabel();
+            lblClock.ForeColor = Color.White;
+            lblClock.Text = DateTime.Now.ToString("dd MMM yyyy  HH:mm:ss");
+            statusStrip.Items.AddRange(new ToolStripItem[] { lblUser, lblShop, lblClock });
+            this.Controls.Add(statusStrip);
+            clockTimer = new Timer { Interval = 1000 };
+            clockTimer.Tick += (s, e) =>
+            {
+                if (lblClock != null)
+                    lblClock.Text = DateTime.Now.ToString("dd MMM yyyy  HH:mm:ss");
+            };
+            clockTimer.Start();
         }
 
         private void BuildMenu()
@@ -84,6 +116,7 @@ namespace ApplianceManagement.Forms
             mnuMasters.DropDownItems.Add("Products", null, (s, e) => OpenChild(new NewItemForm(), "NEWITEM"));
             mnuMasters.DropDownItems.Add("Customers", null, (s, e) => OpenChild(new CustomerMasterForm(), "SALE"));
             mnuMasters.DropDownItems.Add("Suppliers", null, (s, e) => OpenChild(new SupplierMasterForm(), "PURCHASE"));
+            mnuMasters.DropDownItems.Add("Categories", null, (s, e) => OpenChild(new CategoryMasterForm(), "NEWITEM"));
 
             var mnuAcct = new ToolStripMenuItem("  Accounts  ");
             mnuAcct.DropDownItems.Add("Customer Payment", null, (s, e) => OpenChild(new CustomerPaymentForm(), "SALE"));
@@ -233,6 +266,8 @@ namespace ApplianceManagement.Forms
             if (mdiClient != null) mdiClient.BackColor = UiHelper.BgColor;
             if (homeScreen != null) homeScreen.RefreshBranding();
             if (homeHost != null) homeHost.BackColor = UiHelper.BgColor;
+            if (statusStrip != null) statusStrip.BackColor = UiHelper.ThemeDark;
+            if (lblShop != null) lblShop.Text = "  " + UiHelper.GetShopName() + "  ";
         }
 
         private void ApplyPermissions()
@@ -257,7 +292,7 @@ namespace ApplianceManagement.Forms
             if (t.StartsWith("Sale Return")) return "SALE";
             if (t.StartsWith("Sale")) return "SALE";
             if (t.StartsWith("Customer")) return "SALE";
-            if (t.StartsWith("Products")) return "NEWITEM";
+            if (t.StartsWith("Products") || t.StartsWith("Categories")) return "NEWITEM";
             if (t.StartsWith("Purchase") && !t.StartsWith("Purchase Report")) return "PURCHASE";
             if (t.StartsWith("Supplier")) return "PURCHASE";
             if (t.StartsWith("New Item")) return "NEWITEM";
