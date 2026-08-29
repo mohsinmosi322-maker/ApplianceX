@@ -1,15 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Data.SqlClient;
-using System.Linq;
 using ApplianceManagement.Helpers;
 using ApplianceManagement.Models;
 
 namespace ApplianceManagement.Services
 {
-    /// <summary>
-    /// Invoice-linked sale returns. Prevents over-return; posts inventory via InventoryService.
-    /// </summary>
     public class SaleReturnService
     {
         private readonly InventoryService _inv = new InventoryService();
@@ -110,7 +106,6 @@ namespace ApplianceManagement.Services
                 {
                     try
                     {
-                        // Re-check returnable under lock
                         foreach (var d in ret.Details)
                         {
                             if (d.OriginalSaleDetailID.HasValue)
@@ -173,6 +168,25 @@ namespace ApplianceManagement.Services
                                 remarks: "Sale return " + returnNo + " for invoice " + (ret.OriginalInvoiceNo ?? ""),
                                 when: ret.ReturnDate);
                         }
+
+                        // Credit customer (reduce receivable)
+                        try
+                        {
+                            using (var cmd = DbHelper.CreateCommand(
+                                "INSERT INTO CustomerLedger(CustomerID,EntryDate,EntryType,ReferenceID,ReferenceNo,Debit,Credit,Remarks,CreatedBy) " +
+                                "VALUES(@C,@Dt,'SALE_RETURN',@R,@No,0,@A,@Rem,@By)", conn, trans))
+                            {
+                                cmd.Parameters.AddWithValue("@C", ret.CustomerID);
+                                cmd.Parameters.AddWithValue("@Dt", ret.ReturnDate);
+                                cmd.Parameters.AddWithValue("@R", returnId);
+                                cmd.Parameters.AddWithValue("@No", returnNo);
+                                cmd.Parameters.AddWithValue("@A", ret.NetAmount);
+                                cmd.Parameters.AddWithValue("@Rem", ret.Remarks);
+                                cmd.Parameters.AddWithValue("@By", AppSession.UserId > 0 ? (object)AppSession.UserId : DBNull.Value);
+                                cmd.ExecuteNonQuery();
+                            }
+                        }
+                        catch (SqlException) { }
 
                         trans.Commit();
                         AppLog.Info("Sale return saved " + returnNo + " id=" + returnId);

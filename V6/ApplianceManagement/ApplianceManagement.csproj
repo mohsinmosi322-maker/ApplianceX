@@ -55,6 +55,8 @@
     <Compile Include="Forms\StockOpsForm.cs"><SubType>Form</SubType></Compile>
     <Compile Include="Forms\CustomerPaymentForm.cs"><SubType>Form</SubType></Compile>
     <Compile Include="Forms\SupplierPaymentForm.cs"><SubType>Form</SubType></Compile>
+    <Compile Include="Forms\CustomerLedgerForm.cs"><SubType>Form</SubType></Compile>
+    <Compile Include="Forms\SupplierLedgerForm.cs"><SubType>Form</SubType></Compile>
     <Compile Include="Forms\LowStockForm.cs"><SubType>Form</SubType></Compile>
     <Compile Include="Forms\ReportsForm.cs"><SubType>Form</SubType></Compile>
     <Compile Include="Forms\SettingsForm.cs"><SubType>Form</SubType></Compile>
