@@ -54,14 +54,7 @@ namespace ApplianceManagement.Forms
             top.Controls.Add(new Label { Text = "Search", Font = UiHelper.SmallFont, Location = new Point(16, 52), AutoSize = true });
             txtSearch = new TextBox { Location = new Point(70, 48), Size = new Size(320, 28) };
             UiHelper.StyleTextBox(txtSearch);
-            txtSearch.TextChanged += (s, e) =>
-            {
-                string q = txtSearch.Text.Trim();
-                if (q.Length < 2) { lstSuggest.Visible = false; return; }
-                var list = productRepo.Search(q);
-                lstSuggest.DataSource = null; lstSuggest.DataSource = list; lstSuggest.Visible = list.Count > 0;
-                if (list.Count > 0) lstSuggest.SelectedIndex = 0;
-            };
+            txtSearch.TextChanged += (s, e) => ShowSuggestions();
             txtSearch.KeyDown += (s, e) =>
             {
                 if (e.KeyCode == Keys.Enter)
@@ -75,12 +68,10 @@ namespace ApplianceManagement.Forms
                         else MessageBox.Show("Product not found.");
                     }
                 }
+                if (e.KeyCode == Keys.Down && lstSuggest.Visible) { lstSuggest.Focus(); e.Handled = true; }
+                if (e.KeyCode == Keys.Escape) lstSuggest.Visible = false;
             };
             top.Controls.Add(txtSearch);
-            lstSuggest = new ListBox { Location = new Point(70, 78), Size = new Size(320, 100), Visible = false };
-            lstSuggest.Click += (s, e) => SelectSug();
-            top.Controls.Add(lstSuggest);
-            lstSuggest.BringToFront();
             top.Controls.Add(new Label { Text = "Qty", Font = UiHelper.SmallFont, Location = new Point(410, 52), AutoSize = true });
             txtQty = new TextBox { Location = new Point(440, 48), Size = new Size(64, 28), Text = "1" };
             UiHelper.StyleTextBox(txtQty);
@@ -92,10 +83,23 @@ namespace ApplianceManagement.Forms
                 var ex = cart.Find(x => x.ProductID == p.ProductID);
                 if (ex != null) { ex.Quantity += qty; ex.Amount = ex.Quantity * ex.PurchasePrice; }
                 else cart.Add(new PurchaseDetail { ProductID = p.ProductID, ProductCode = p.ProductCode, ProductName = p.ProductName, Quantity = qty, PurchasePrice = p.PurchasePrice, Amount = qty * p.PurchasePrice });
-                RefreshGrid(); txtSearch.Clear(); txtSearch.Tag = null; txtQty.Text = "1"; txtSearch.Focus();
+                RefreshGrid(); txtSearch.Clear(); txtSearch.Tag = null; txtQty.Text = "1"; lstSuggest.Visible = false; txtSearch.Focus();
             };
             top.Controls.Add(txtQty);
             this.Controls.Add(top);
+
+            // ListBox on FORM (not top panel) so it is not clipped
+            lstSuggest = new ListBox
+            {
+                Location = new Point(70, 86),
+                Size = new Size(420, 160),
+                Visible = false,
+                Font = UiHelper.NormalFont,
+                IntegralHeight = false
+            };
+            lstSuggest.Click += (s, e) => SelectSug();
+            lstSuggest.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; SelectSug(); } };
+            this.Controls.Add(lstSuggest);
 
             this.Controls.Add(BuildTotalsFooter());
 
@@ -103,6 +107,19 @@ namespace ApplianceManagement.Forms
             UiHelper.StyleGrid(dgv);
             this.Controls.Add(dgv);
             dgv.BringToFront();
+            lstSuggest.BringToFront();
+        }
+
+        private void ShowSuggestions()
+        {
+            string q = txtSearch.Text.Trim();
+            if (q.Length < 2) { lstSuggest.Visible = false; return; }
+            var list = productRepo.Search(q);
+            lstSuggest.DataSource = null;
+            lstSuggest.DataSource = list;
+            lstSuggest.Visible = list.Count > 0;
+            if (list.Count > 0) lstSuggest.SelectedIndex = 0;
+            lstSuggest.BringToFront();
         }
 
         private Panel BuildTotalsFooter()
@@ -155,7 +172,14 @@ namespace ApplianceManagement.Forms
         private void SelectSug()
         {
             if (lstSuggest.SelectedItem is Product p)
-            { txtSearch.Text = p.ProductCode + " - " + p.ProductName; txtSearch.Tag = p; lstSuggest.Visible = false; txtQty.Text = "1"; txtQty.Focus(); txtQty.SelectAll(); }
+            {
+                txtSearch.Text = p.ProductCode + " - " + p.ProductName;
+                txtSearch.Tag = p;
+                lstSuggest.Visible = false;
+                txtQty.Text = "1";
+                txtQty.Focus();
+                txtQty.SelectAll();
+            }
         }
 
         private void RefreshGrid()
@@ -257,9 +281,11 @@ namespace ApplianceManagement.Forms
                 });
                 MessageBox.Show("Purchase saved!");
                 this.Tag = "NOSAVECONFIRM";
-                if (MainForm.Instance != null)
-                    MainForm.Instance.OpenChild(new PurchaseForm(), "PURCHASE");
-                this.Close();
+                cart.Clear();
+                RefreshGrid();
+                txtSearch.Clear();
+                txtPaid.Text = "0.00";
+                txtSearch.Focus();
             }
             catch (Exception ex) { MessageBox.Show("Error: " + ex.Message); }
         }
