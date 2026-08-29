@@ -69,21 +69,22 @@ namespace ApplianceManagement.Forms
 
             var mnuTrans = new ToolStripMenuItem("  Transactions  ");
             mnuTrans.DropDownItems.Add("Sale\tF2", null, (s, e) => OpenChild(new SaleForm(), "SALE"));
+            mnuTrans.DropDownItems.Add("Sale Return", null, (s, e) => OpenChild(new SaleReturnForm(), "SALE"));
             mnuTrans.DropDownItems.Add("Purchase\tF3", null, (s, e) => OpenChild(new PurchaseForm(), "PURCHASE"));
 
             var mnuInv = new ToolStripMenuItem("  Inventory  ");
             mnuInv.DropDownItems.Add("New Item", null, (s, e) => OpenChild(new NewItemForm(), "NEWITEM"));
             mnuInv.DropDownItems.Add("Stock Position", null, (s, e) => OpenChild(new InventoryForm(), "INVENTORY"));
-            mnuInv.DropDownItems.Add("Low Stock Report", null, (s, e) => OpenChild(new LowStockForm(), "INVENTORY"));
 
             var mnuRep = new ToolStripMenuItem("  Reports  ");
             mnuRep.DropDownItems.Add("Sales Report", null, (s, e) => OpenChild(new ReportsForm("SALES"), "REPORTS"));
             mnuRep.DropDownItems.Add("Purchase Report", null, (s, e) => OpenChild(new ReportsForm("PURCHASE"), "REPORTS"));
             mnuRep.DropDownItems.Add("Stock Report", null, (s, e) => OpenChild(new ReportsForm("STOCK"), "REPORTS"));
             mnuRep.DropDownItems.Add("Profit Report", null, (s, e) => OpenChild(new ReportsForm("PROFIT"), "REPORTS"));
+            mnuRep.DropDownItems.Add("Low Stock Report", null, (s, e) => OpenChild(new LowStockForm(), "REPORTS"));
 
             var mnuSet = new ToolStripMenuItem("  Settings  ");
-            mnuSet.DropDownItems.Add("Appearance & Limits", null, (s, e) => OpenChild(new SettingsForm(), "SETTINGS"));
+            mnuSet.DropDownItems.Add("Appearance & Limits", null, (s, e) => OpenSettingsProtected());
 
             mnuWindows = new ToolStripMenuItem("  Windows  ");
             mnuWindows.DropDownOpening += MnuWindows_DropDownOpening;
@@ -92,7 +93,7 @@ namespace ApplianceManagement.Forms
             mnuHelp.DropDownItems.Add("Shortcuts", null, (s, e) => ShowShortcuts());
             mnuHelp.DropDownItems.Add("About", null, (s, e) =>
                 MessageBox.Show(UiHelper.AppName + "  v" + UiHelper.AppVersion + "\n" + UiHelper.GetShopName() +
-                    "\n\nF2 Sale   F3 Purchase   F4 Close   F12 Save",
+                    "\n\nF2 Sale   F3 Purchase   F4 Close   F9 History   F12 Save",
                     "About", MessageBoxButtons.OK, MessageBoxIcon.Information));
 
             menuStrip.Items.AddRange(new ToolStripItem[] { mnuFile, mnuTrans, mnuInv, mnuRep, mnuSet, mnuWindows, mnuHelp });
@@ -104,6 +105,52 @@ namespace ApplianceManagement.Forms
                 if (e.KeyCode == Keys.F2) { OpenChild(new SaleForm(), "SALE"); e.Handled = true; }
                 if (e.KeyCode == Keys.F3) { OpenChild(new PurchaseForm(), "PURCHASE"); e.Handled = true; }
             };
+        }
+
+        private void OpenSettingsProtected()
+        {
+            if (!PromptSettingsPassword()) return;
+            OpenChild(new SettingsForm(), "SETTINGS");
+        }
+
+        /// <summary>Admin settings lock: current user password (or SettingsPassword if set).</summary>
+        public bool PromptSettingsPassword()
+        {
+            using (var f = new Form())
+            {
+                f.Text = "Settings Password";
+                f.Size = new Size(360, 160);
+                f.StartPosition = FormStartPosition.CenterParent;
+                f.FormBorderStyle = FormBorderStyle.FixedDialog;
+                f.MaximizeBox = false;
+                f.MinimizeBox = false;
+                var lbl = new Label { Text = "Enter password to open Settings:", Location = new Point(16, 16), AutoSize = true };
+                var txt = new TextBox { Location = new Point(16, 44), Size = new Size(310, 26), PasswordChar = '*' };
+                var ok = new Button { Text = "Unlock", Location = new Point(16, 84), Size = new Size(100, 28), DialogResult = DialogResult.OK };
+                var cancel = new Button { Text = "Cancel", Location = new Point(130, 84), Size = new Size(100, 28), DialogResult = DialogResult.Cancel };
+                f.Controls.AddRange(new Control[] { lbl, txt, ok, cancel });
+                f.AcceptButton = ok;
+                f.CancelButton = cancel;
+                if (f.ShowDialog(this) != DialogResult.OK) return false;
+
+                string pwd = txt.Text ?? "";
+                string settingsPwd = AppSettings.Get("SettingsPassword");
+                if (!string.IsNullOrEmpty(settingsPwd))
+                {
+                    if (pwd == settingsPwd) return true;
+                    MessageBox.Show("Incorrect settings password.");
+                    return false;
+                }
+                // Fall back: verify current user login password
+                var repo = new Data.UserRepository();
+                var u = repo.Authenticate(CurrentUser.UserName, pwd);
+                if (u == null)
+                {
+                    MessageBox.Show("Incorrect password.");
+                    return false;
+                }
+                return true;
+            }
         }
 
         private void MainForm_Load(object sender, EventArgs e)
@@ -138,17 +185,27 @@ namespace ApplianceManagement.Forms
             homeScreen.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
         }
 
+        /// <summary>
+        /// Home stays always Visible. When MDI children exist it sits behind them;
+        /// when none, it comes to front (no empty black client).
+        /// </summary>
         private void SyncHome()
         {
             if (homeScreen == null) return;
-            bool showDash = this.MdiChildren.Length == 0;
-            homeScreen.Visible = showDash;
-            if (showDash)
+            homeScreen.Visible = true;
+            PositionHomeOverMdi();
+            if (this.MdiChildren.Length == 0)
             {
-                PositionHomeOverMdi();
                 homeScreen.BringToFront();
                 menuStrip.BringToFront();
                 homeScreen.RefreshData();
+            }
+            else
+            {
+                // Keep dashboard as wallpaper behind open forms
+                homeScreen.SendToBack();
+                if (mdiClient != null) mdiClient.BringToFront();
+                menuStrip.BringToFront();
             }
         }
 
@@ -186,10 +243,12 @@ namespace ApplianceManagement.Forms
         private string GetPermKey(string menuText)
         {
             string t = (menuText ?? "").Replace("\t", " ").Trim();
+            if (t.StartsWith("Sale Return")) return "SALE";
             if (t.StartsWith("Sale")) return "SALE";
             if (t.StartsWith("Purchase") && !t.StartsWith("Purchase Report")) return "PURCHASE";
             if (t.StartsWith("New Item")) return "NEWITEM";
-            if (t.StartsWith("Stock") || t.StartsWith("Low Stock")) return "INVENTORY";
+            if (t.StartsWith("Stock")) return "INVENTORY";
+            if (t.StartsWith("Low Stock")) return "REPORTS";
             if (t.Contains("Report") || t.StartsWith("Reports") || t.StartsWith("Profit")) return "REPORTS";
             if (t.StartsWith("Settings") || t.StartsWith("Appearance")) return "SETTINGS";
             return "";
@@ -230,8 +289,7 @@ namespace ApplianceManagement.Forms
                 return;
             }
 
-            // Sale + Reports: multiple windows allowed. Purchase + rest: single instance, switch to existing.
-            bool allowMulti = child is SaleForm || child is ReportsForm;
+            bool allowMulti = child is SaleForm || child is ReportsForm || child is SaleReturnForm;
             if (!allowMulti)
             {
                 foreach (Form f in this.MdiChildren)
@@ -246,7 +304,15 @@ namespace ApplianceManagement.Forms
                 }
             }
 
-            if (homeScreen != null) homeScreen.Visible = false;
+            // Dashboard stays visible behind forms
+            if (homeScreen != null)
+            {
+                homeScreen.Visible = true;
+                homeScreen.SendToBack();
+            }
+            if (mdiClient != null) mdiClient.BringToFront();
+            menuStrip.BringToFront();
+
             child.MdiParent = this;
             UiHelper.ApplyFormSize(child);
             child.WindowState = FormWindowState.Normal;
@@ -257,7 +323,7 @@ namespace ApplianceManagement.Forms
         private void ShowShortcuts()
         {
             MessageBox.Show(
-                "F2    New Sale (multiple allowed)\nF3    Purchase (one window only)\nF4    Close window\nF8    Remove selected line (Sale)\nF12   Save / focus discount\nEnter  Confirm field",
+                "F2    New Sale (multiple)\nF3    Purchase (one window)\nF4    Close window\nF8    Remove selected line (Sale)\nF9    Product history (Sale/Purchase)\nF12   Save / focus discount\nEnter  Confirm field",
                 "Keyboard Shortcuts", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
