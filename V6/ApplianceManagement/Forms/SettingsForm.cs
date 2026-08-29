@@ -13,7 +13,8 @@ namespace ApplianceManagement.Forms
         private SupplierRepository supplierRepo = new SupplierRepository();
         private UserRepository userRepo = new UserRepository();
         private TextBox txtSupName, txtSupPhone, txtMaxDiscAdmin, txtMaxDiscUser, txtSettingsPwd;
-        private ComboBox cmbTheme, cmbFontSize, cmbResolution, cmbUsers;
+        private TextBox txtNewUser, txtNewFull, txtNewPwd, txtChgPwd;
+        private ComboBox cmbTheme, cmbFontSize, cmbResolution, cmbUsers, cmbNewRole, cmbChgUser;
         private DataGridView dgvSuppliers;
         private CheckBox chkSale, chkPurchase, chkNewItem, chkInventory, chkReports, chkSettings;
         private bool isAdmin;
@@ -26,14 +27,14 @@ namespace ApplianceManagement.Forms
             UiHelper.ApplyFormSize(this);
             LoadSuppliers();
             LoadValues();
-            if (isAdmin) LoadUsersForRights();
+            if (isAdmin) { LoadUsersForRights(); LoadUsersForManage(); }
         }
 
         private void InitializeComponent()
         {
             this.Text = "Settings";
-            this.Size = new Size(920, 620);
-            this.MinimumSize = new Size(800, 560);
+            this.Size = new Size(940, 700);
+            this.MinimumSize = new Size(800, 600);
             this.BackColor = UiHelper.BgColor;
             this.KeyPreview = true;
             UiHelper.AttachF4Close(this);
@@ -112,7 +113,6 @@ namespace ApplianceManagement.Forms
                 gbDisc.Controls.Add(btnDisc);
                 top.Controls.Add(gbDisc);
 
-                // User rights row
                 GroupBox gbRights = new GroupBox { Text = "User Rights (menu access)", Font = UiHelper.HeaderFont, ForeColor = UiHelper.ThemeDark, Location = new Point(15, 210), Size = new Size(855, 60) };
                 cmbUsers = new ComboBox { Location = new Point(12, 24), Size = new Size(160, 26), DropDownStyle = ComboBoxStyle.DropDownList };
                 UiHelper.StyleComboBox(cmbUsers);
@@ -131,7 +131,6 @@ namespace ApplianceManagement.Forms
             }
             else
             {
-                // User: only note that discount is admin-only
                 top.Controls.Add(new Label
                 {
                     Text = "Discount limits are managed by Admin.",
@@ -144,7 +143,7 @@ namespace ApplianceManagement.Forms
 
             this.Controls.Add(top);
 
-            Panel mid = new Panel { Dock = DockStyle.Top, Height = 120, BackColor = UiHelper.BgColor };
+            Panel mid = new Panel { Dock = DockStyle.Top, Height = isAdmin ? 200 : 120, BackColor = UiHelper.BgColor };
             GroupBox gbSup = new GroupBox { Text = "Add Supplier", Font = UiHelper.HeaderFont, ForeColor = UiHelper.ThemeDark, Location = new Point(15, 5), Size = new Size(420, 105) };
             gbSup.Controls.Add(new Label { Text = "Name:", Font = UiHelper.NormalFont, Location = new Point(15, 30), Size = new Size(60, 22) });
             txtSupName = new TextBox { Location = new Point(80, 28), Size = new Size(220, 26) };
@@ -166,12 +165,96 @@ namespace ApplianceManagement.Forms
             };
             gbSup.Controls.Add(btnAddSup);
             mid.Controls.Add(gbSup);
+
+            if (isAdmin)
+            {
+                GroupBox gbUser = new GroupBox { Text = "Create User / Change Password", Font = UiHelper.HeaderFont, ForeColor = UiHelper.ThemeDark, Location = new Point(450, 5), Size = new Size(430, 180) };
+                gbUser.Controls.Add(new Label { Text = "Username", Font = UiHelper.SmallFont, Location = new Point(12, 22), AutoSize = true });
+                txtNewUser = new TextBox { Location = new Point(90, 18), Size = new Size(120, 24) }; UiHelper.StyleTextBox(txtNewUser); gbUser.Controls.Add(txtNewUser);
+                gbUser.Controls.Add(new Label { Text = "Full name", Font = UiHelper.SmallFont, Location = new Point(220, 22), AutoSize = true });
+                txtNewFull = new TextBox { Location = new Point(290, 18), Size = new Size(120, 24) }; UiHelper.StyleTextBox(txtNewFull); gbUser.Controls.Add(txtNewFull);
+                gbUser.Controls.Add(new Label { Text = "Password", Font = UiHelper.SmallFont, Location = new Point(12, 52), AutoSize = true });
+                txtNewPwd = new TextBox { Location = new Point(90, 48), Size = new Size(120, 24), PasswordChar = '*' }; UiHelper.StyleTextBox(txtNewPwd); gbUser.Controls.Add(txtNewPwd);
+                gbUser.Controls.Add(new Label { Text = "Role", Font = UiHelper.SmallFont, Location = new Point(220, 52), AutoSize = true });
+                cmbNewRole = new ComboBox { Location = new Point(290, 48), Size = new Size(120, 24), DropDownStyle = ComboBoxStyle.DropDownList };
+                UiHelper.StyleComboBox(cmbNewRole);
+                cmbNewRole.Items.AddRange(new object[] { "User", "Admin" });
+                cmbNewRole.SelectedIndex = 0;
+                gbUser.Controls.Add(cmbNewRole);
+                Button btnCreate = new Button { Text = "Create User", Location = new Point(90, 80), Size = new Size(120, 28) };
+                UiHelper.StyleButton(btnCreate);
+                btnCreate.Click += (s, e) => CreateUser();
+                gbUser.Controls.Add(btnCreate);
+
+                gbUser.Controls.Add(new Label { Text = "Change password for:", Font = UiHelper.SmallFont, Location = new Point(12, 120), AutoSize = true });
+                cmbChgUser = new ComboBox { Location = new Point(140, 116), Size = new Size(120, 24), DropDownStyle = ComboBoxStyle.DropDownList };
+                UiHelper.StyleComboBox(cmbChgUser);
+                gbUser.Controls.Add(cmbChgUser);
+                txtChgPwd = new TextBox { Location = new Point(270, 116), Size = new Size(100, 24), PasswordChar = '*' };
+                UiHelper.StyleTextBox(txtChgPwd);
+                gbUser.Controls.Add(txtChgPwd);
+                Button btnChg = new Button { Text = "Set Pwd", Location = new Point(90, 146), Size = new Size(100, 26) };
+                UiHelper.StyleButton(btnChg);
+                btnChg.Click += (s, e) => ChangeUserPassword();
+                gbUser.Controls.Add(btnChg);
+                mid.Controls.Add(gbUser);
+            }
+
             this.Controls.Add(mid);
 
             dgvSuppliers = new DataGridView { Dock = DockStyle.Fill };
             UiHelper.StyleGrid(dgvSuppliers);
             this.Controls.Add(dgvSuppliers);
             this.Controls.SetChildIndex(dgvSuppliers, 0);
+        }
+
+        private void CreateUser()
+        {
+            if (string.IsNullOrWhiteSpace(txtNewUser.Text) || string.IsNullOrWhiteSpace(txtNewPwd.Text))
+            {
+                MessageBox.Show("Username and password required.");
+                return;
+            }
+            if (userRepo.ExistsUserName(txtNewUser.Text.Trim()))
+            {
+                MessageBox.Show("Username already exists.");
+                return;
+            }
+            userRepo.Insert(new User
+            {
+                UserName = txtNewUser.Text.Trim(),
+                FullName = string.IsNullOrWhiteSpace(txtNewFull.Text) ? txtNewUser.Text.Trim() : txtNewFull.Text.Trim(),
+                Role = cmbNewRole.SelectedItem != null ? cmbNewRole.SelectedItem.ToString() : "User"
+            }, txtNewPwd.Text);
+            MessageBox.Show("User created.");
+            txtNewUser.Clear(); txtNewFull.Clear(); txtNewPwd.Clear();
+            LoadUsersForRights();
+            LoadUsersForManage();
+        }
+
+        private void ChangeUserPassword()
+        {
+            if (cmbChgUser == null || cmbChgUser.SelectedItem == null || string.IsNullOrWhiteSpace(txtChgPwd.Text))
+            {
+                MessageBox.Show("Select user and enter new password.");
+                return;
+            }
+            string uname = cmbChgUser.SelectedItem.ToString();
+            User target = null;
+            foreach (var u in userRepo.GetAll())
+                if (u.UserName == uname) { target = u; break; }
+            if (target == null) return;
+            userRepo.ChangePassword(target.UserID, txtChgPwd.Text);
+            MessageBox.Show("Password updated for " + uname);
+            txtChgPwd.Clear();
+        }
+
+        private void LoadUsersForManage()
+        {
+            if (cmbChgUser == null) return;
+            var names = new List<string>();
+            foreach (var u in userRepo.GetAll()) names.Add(u.UserName);
+            cmbChgUser.DataSource = names;
         }
 
         private CheckBox MkChk(string t, int x, int y)
