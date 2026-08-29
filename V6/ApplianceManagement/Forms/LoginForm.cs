@@ -14,7 +14,6 @@ namespace ApplianceManagement.Forms
 
         public LoginForm()
         {
-            // Load license early so SoftwareName is available for branding
             try { LicenseReader.TryLoad(); } catch { }
             InitializeComponent();
             UiHelper.InitializeTheme();
@@ -141,6 +140,7 @@ namespace ApplianceManagement.Forms
                 if (user != null)
                 {
                     AppLog.Info("Login success: " + user.UserName);
+                    AppSession.SignIn(user);
                     this.Hide();
                     var main = new MainForm(user);
                     main.FormClosed += (s, args) => this.Close();
