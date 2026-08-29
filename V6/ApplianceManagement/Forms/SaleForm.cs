@@ -38,6 +38,7 @@ namespace ApplianceManagement.Forms
             this.KeyDown += (s, e) =>
             {
                 if (e.KeyCode == Keys.F12) { txtDiscount.Focus(); txtDiscount.SelectAll(); }
+                if (e.KeyCode == Keys.F9) { ShowProductHistory(); e.Handled = true; }
                 if (e.KeyCode == Keys.F8 && dgv.SelectedRows.Count > 0)
                 {
                     int i = dgv.SelectedRows[0].Index;
@@ -68,6 +69,7 @@ namespace ApplianceManagement.Forms
                 }
                 if (e.KeyCode == Keys.Down && lstSuggest.Visible) { lstSuggest.Focus(); e.Handled = true; }
                 if (e.KeyCode == Keys.Escape) lstSuggest.Visible = false;
+                if (e.KeyCode == Keys.F9) { ShowProductHistory(); e.Handled = true; }
             };
             top.Controls.Add(txtSearch);
             top.Controls.Add(new Label { Text = "Qty", Font = UiHelper.SmallFont, Location = new Point(410, 50), AutoSize = true });
@@ -90,7 +92,7 @@ namespace ApplianceManagement.Forms
                 RefreshGrid(); txtSearch.Clear(); txtSearch.Tag = null; txtQty.Text = "1"; lstSuggest.Visible = false; txtSearch.Focus();
             };
             top.Controls.Add(txtQty);
-            top.Controls.Add(new Label { Text = "Enter add   F8 remove line   F12 discount", Font = UiHelper.SmallFont, ForeColor = Color.FromArgb(140, 150, 160), Location = new Point(520, 50), AutoSize = true });
+            top.Controls.Add(new Label { Text = "Enter add   F8 remove   F9 history   F12 discount", Font = UiHelper.SmallFont, ForeColor = Color.FromArgb(140, 150, 160), Location = new Point(520, 50), AutoSize = true });
             this.Controls.Add(top);
 
             lstSuggest = new ListBox
@@ -112,6 +114,24 @@ namespace ApplianceManagement.Forms
             this.Controls.Add(dgv);
             dgv.BringToFront();
             lstSuggest.BringToFront();
+        }
+
+        private void ShowProductHistory()
+        {
+            Product p = txtSearch.Tag as Product;
+            if (p == null)
+            {
+                string q = txtSearch.Text.Trim();
+                if (q.Length > 0)
+                    p = productRepo.GetByBarcode(q) ?? productRepo.GetByCode(q);
+            }
+            if (p == null)
+            {
+                MessageBox.Show("Select or search a product first, then press F9 for sale history.");
+                return;
+            }
+            using (var f = new ProductHistoryForm(p, true))
+                f.ShowDialog(this);
         }
 
         private void ShowSuggestions()
