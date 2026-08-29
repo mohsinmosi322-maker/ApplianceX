@@ -28,8 +28,8 @@ namespace ApplianceManagement.Forms
 
             this.Controls.Add(UiHelper.CreateFormBanner(
                 type + " REPORT",
-                type == "PROFIT" ? "Revenue − COGS = Gross Profit" :
-                type == "SALES" ? "Green = Sale  ·  Red = Sale Return" : "Date range  ·  F4 close",
+                type == "PROFIT" ? "Revenue − COGS = Gross Profit  ·  Export CSV" :
+                type == "SALES" ? "Green = Sale  ·  Red = Sale Return  ·  Export CSV" : "Date range  ·  Export CSV  ·  F4 close",
                 FormAccent.Reports, FormAccent.ReportsDark));
 
             Panel top = new Panel { Dock = DockStyle.Top, Height = 56, BackColor = Color.White, Padding = new Padding(12, 10, 12, 8) };
@@ -41,10 +41,14 @@ namespace ApplianceManagement.Forms
             dtTo = new DateTimePicker { Location = new Point(228, 12), Size = new Size(130, 26), Value = DateTime.Today };
             UiHelper.StyleDatePicker(dtTo);
             top.Controls.Add(dtTo);
-            Button btnView = new Button { Text = "VIEW", Location = new Point(380, 10), Size = new Size(110, 34) };
+            Button btnView = new Button { Text = "VIEW", Location = new Point(380, 10), Size = new Size(100, 34) };
             UiHelper.StyleAccentButton(btnView, FormAccent.Reports, FormAccent.ReportsDark);
             btnView.Click += (s, e) => LoadReport();
             top.Controls.Add(btnView);
+            Button btnExport = new Button { Text = "EXPORT CSV", Location = new Point(490, 10), Size = new Size(120, 34) };
+            UiHelper.StyleAccentButton(btnExport, FormAccent.ReportsDark, FormAccent.Reports);
+            btnExport.Click += (s, e) => CsvExport.FromGrid(dgv, reportType + "_" + DateTime.Today.ToString("yyyyMMdd") + ".csv");
+            top.Controls.Add(btnExport);
             this.Controls.Add(top);
 
             Panel bottom = new Panel { Dock = DockStyle.Bottom, Height = 40, BackColor = Color.White };
