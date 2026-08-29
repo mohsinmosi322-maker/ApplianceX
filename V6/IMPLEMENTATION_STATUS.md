@@ -1,46 +1,39 @@
 # ApplianceX V6 — Implementation status
 
-Last updated: 2026-08-29 (continued implementation)
+**Last updated:** 2026-08-29
 
-## Complete for production day-to-day use
+## Production-ready (code on GitHub)
 
-### Core
-- Forms → Services → Repositories → SQL
-- AppSession; global UI/domain exception logging
-- InventoryTransaction ledger; PackSize / UOM model
+| Area | Status |
+|------|--------|
+| Architecture (Forms → Services → Repos) | Done |
+| Inventory ledger + PackSize/UOM | Done |
+| Sale / Purchase / Returns | Done |
+| Customer / Supplier accounts | Done |
+| Masters (product, customer, supplier, category) | Done |
+| Reports + Profit COGS + CSV | Done |
+| MDI dashboard, accents, status bar | Done |
+| Permissions, settings lock, PBKDF2 | Done |
+| connectionstring.txt + license + App.config | Done |
+| Global exception log + Log viewer | Done |
+| DB backup (Admin) | Done |
+| Sale/Purchase F8, F9, arrows | Done |
 
-### Transactions
-- Sale, Purchase, Sale Return (invoice-linked), Purchase Return
-- Stock ops (opening / adjustment / damage)
-- Customer & supplier payments + ledgers
+## Your machine only
 
-### Masters
-- Products (create/edit, pack size unit price preview)
-- Customers, Suppliers, Categories
+| Item | Notes |
+|------|--------|
+| SQL 2008 migrations | Run 002–006 |
+| Printers | BillPrinter layout per model |
+| Win7/10 DPI | Visual check |
+| Multi-user concurrency | Stress test |
+| UAT | See `UAT_CHECKLIST.md` |
 
-### Reports
-- Sales (green/red returns), Purchase, Stock, Profit (Revenue−COGS)
-- Low stock + CSV export on reports and low stock
+## Repo
 
-### UI / UX
-- MDI dashboard (ForceHomeFill), cascade children
-- Form accent banners, status bar (user/role/shop/clock)
-- DialogHelpers, keyboard POS shortcuts
-
-### Security / ops
-- PBKDF2 passwords, menu permissions, settings password gate
-- connectionstring.txt + license.dat + App.config
-- Login DB health indicator
-- Admin DB backup, application log viewer
-
-### Migrations (run in order)
-001 → 002 → 003 → 004 → 005 → 006
-
-## Not fully verifiable in this environment
-- Concurrent multi-user lock stress
-- Windows 7 vs 10 DPI matrix on physical machines
-- Every printer model for BillPrinter
-- Multi-branch / multi-company
-
-## GitHub
 https://github.com/mohsinmosi322-maker/ApplianceX
+
+```bat
+git pull
+dotnet build V6\ApplianceManagement
+```

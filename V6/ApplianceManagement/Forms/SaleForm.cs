@@ -134,7 +134,7 @@ namespace ApplianceManagement.Forms
                 {
                     var p = productRepo.GetByBarcode(txtSearch.Text.Trim()) ?? productRepo.GetByCode(txtSearch.Text.Trim());
                     if (p != null) { SetSelected(p); txtQty.Focus(); txtQty.SelectAll(); }
-                    else MessageBox.Show("Product not found.");
+                    else DialogHelpers.Error(this, "Product not found.");
                 }
             }
             if (e.KeyCode == Keys.Down && lstSuggest.Visible) { lstSuggest.Focus(); e.Handled = true; }
@@ -149,12 +149,12 @@ namespace ApplianceManagement.Forms
             if (selectedProduct == null) return;
             Product p = selectedProduct;
             int qty = 1; int.TryParse(txtQty.Text, out qty); if (qty < 1) qty = 1;
-            if (qty > p.CurrentStock) { MessageBox.Show("Insufficient stock. Available: " + p.CurrentStock); return; }
+            if (qty > p.CurrentStock) { DialogHelpers.Error(this, "Insufficient stock. Available: " + p.CurrentStock); return; }
             decimal unitPrice = PackMath.UnitSalePrice(p);
             var ex = cart.Find(line => line.ProductID == p.ProductID);
             if (ex != null)
             {
-                if (ex.Quantity + qty > p.CurrentStock) { MessageBox.Show("Insufficient stock."); return; }
+                if (ex.Quantity + qty > p.CurrentStock) { DialogHelpers.Error(this, "Insufficient stock."); return; }
                 ex.Quantity += qty; ex.Amount = ex.Quantity * ex.SalePrice;
             }
             else cart.Add(new SaleDetail { ProductID = p.ProductID, ProductCode = p.ProductCode, ProductName = p.ProductName, Quantity = qty, SalePrice = unitPrice, Amount = qty * unitPrice });
@@ -174,6 +174,12 @@ namespace ApplianceManagement.Forms
         {
             Product p = selectedProduct;
             if (p == null && txtSearch.Tag is Product t) p = t;
+            if (p == null && dgv.SelectedRows.Count > 0)
+            {
+                int i = dgv.SelectedRows[0].Index;
+                if (i >= 0 && i < cart.Count)
+                    p = productRepo.GetByCode(cart[i].ProductCode);
+            }
             if (p == null)
             {
                 string q = txtSearch.Text.Trim();
@@ -183,7 +189,7 @@ namespace ApplianceManagement.Forms
             }
             if (p == null)
             {
-                MessageBox.Show("Select or search a product first, then press F9.");
+                DialogHelpers.Error(this, "Select or search a product first, then press F9.");
                 return;
             }
             selectedProduct = p;
@@ -341,8 +347,8 @@ namespace ApplianceManagement.Forms
 
         private void Save()
         {
-            if (cart.Count == 0) { MessageBox.Show("Add products first."); return; }
-            if (walkIn == null) { MessageBox.Show("Walk-in Customer missing."); return; }
+            if (cart.Count == 0) { DialogHelpers.Error(this, "Add products first."); return; }
+            if (walkIn == null) { DialogHelpers.Error(this, "Walk-in Customer missing."); return; }
 
             decimal total = ReadTotal();
             decimal pct = 0, discAmt = 0, paid = 0, net = 0;
@@ -358,12 +364,12 @@ namespace ApplianceManagement.Forms
             decimal maxDisc = UiHelper.GetMaxDiscount(role);
             if (maxDisc > 0 && pct > maxDisc)
             {
-                MessageBox.Show("Maximum allowed discount is " + maxDisc.ToString("0.##") + "% for " + role + ".");
+                DialogHelpers.Error(this, "Maximum allowed discount is " + maxDisc.ToString("0.##") + "% for " + role + ".");
                 txtDiscount.Focus();
                 return;
             }
 
-            if (MessageBox.Show("Save this sale?", "Confirm", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button1) != DialogResult.Yes) return;
+            if (!DialogHelpers.Confirm(this, "Save this sale?")) return;
             try
             {
                 var sale = new SaleHeader
@@ -379,14 +385,14 @@ namespace ApplianceManagement.Forms
                     Details = new List<SaleDetail>(cart)
                 };
                 saleService.Save(sale);
-                MessageBox.Show("Sale saved successfully!\nInvoice: " + sale.InvoiceNo, "Success");
+                DialogHelpers.Info(this, "Sale saved successfully!\nInvoice: " + sale.InvoiceNo);
                 if (UiHelper.IsPrintAllowed())
                 {
                     try { BillPrinter.PrintSaleBill(sale); }
                     catch (Exception pex)
                     {
                         AppLog.Error("Print failed", pex);
-                        MessageBox.Show("Print failed: " + pex.Message);
+                        DialogHelpers.Error(this, "Print failed: " + pex.Message);
                     }
                 }
                 this.Tag = "NOSAVECONFIRM";
@@ -397,7 +403,7 @@ namespace ApplianceManagement.Forms
             catch (Exception ex)
             {
                 AppLog.Error("Sale save UI error", ex);
-                MessageBox.Show("Error: " + ex.Message);
+                DialogHelpers.Error(this, "Error: " + ex.Message);
             }
         }
     }
