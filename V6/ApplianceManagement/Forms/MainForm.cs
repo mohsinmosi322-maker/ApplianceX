@@ -83,6 +83,8 @@ namespace ApplianceManagement.Forms
             var mnuAcct = new ToolStripMenuItem("  Accounts  ");
             mnuAcct.DropDownItems.Add("Customer Payment", null, (s, e) => OpenChild(new CustomerPaymentForm(), "SALE"));
             mnuAcct.DropDownItems.Add("Supplier Payment", null, (s, e) => OpenChild(new SupplierPaymentForm(), "PURCHASE"));
+            mnuAcct.DropDownItems.Add("Customer Ledger", null, (s, e) => OpenChild(new CustomerLedgerForm(), "REPORTS"));
+            mnuAcct.DropDownItems.Add("Supplier Ledger", null, (s, e) => OpenChild(new SupplierLedgerForm(), "REPORTS"));
 
             var mnuRep = new ToolStripMenuItem("  Reports  ");
             mnuRep.DropDownItems.Add("Sales Report", null, (s, e) => OpenChild(new ReportsForm("SALES"), "REPORTS"));
@@ -249,7 +251,7 @@ namespace ApplianceManagement.Forms
             foreach (ToolStripMenuItem top in menuStrip.Items)
             {
                 string t = top.Text.Trim();
-                if (t == "File" || t == "Windows" || t == "Help" || t == "Accounts") continue;
+                if (t == "File" || t == "Windows" || t == "Help") continue;
                 foreach (ToolStripItem item in top.DropDownItems)
                 {
                     if (item is ToolStripSeparator) continue;
@@ -265,9 +267,9 @@ namespace ApplianceManagement.Forms
             string t = (menuText ?? "").Replace("\t", " ").Trim();
             if (t.StartsWith("Sale Return")) return "SALE";
             if (t.StartsWith("Sale")) return "SALE";
-            if (t.StartsWith("Customer Payment")) return "SALE";
+            if (t.StartsWith("Customer Payment") || t.StartsWith("Customer Ledger")) return "SALE";
             if (t.StartsWith("Purchase") && !t.StartsWith("Purchase Report")) return "PURCHASE";
-            if (t.StartsWith("Supplier Payment")) return "PURCHASE";
+            if (t.StartsWith("Supplier Payment") || t.StartsWith("Supplier Ledger")) return "PURCHASE";
             if (t.StartsWith("New Item")) return "NEWITEM";
             if (t.StartsWith("Stock")) return "INVENTORY";
             if (t.StartsWith("Low Stock")) return "REPORTS";
