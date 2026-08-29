@@ -88,6 +88,7 @@
     <Compile Include="Services\CustomerAccountService.cs" />
     <Compile Include="Services\SupplierAccountService.cs" />
     <Compile Include="Services\StockOpsService.cs" />
+    <Compile Include="Services\ReportService.cs" />
     <Compile Include="Data\UserRepository.cs" />
     <Compile Include="Data\ProductRepository.cs" />
     <Compile Include="Data\CustomerRepository.cs" />
@@ -100,6 +101,7 @@
     <Compile Include="Helpers\AppLog.cs" />
     <Compile Include="Helpers\AppSession.cs" />
     <Compile Include="Helpers\UiHelper.cs" />
+    <Compile Include="Helpers\DialogHelpers.cs" />
     <Compile Include="Helpers\BillPrinter.cs" />
     <Compile Include="Helpers\LicenseReader.cs" />
     <Compile Include="Helpers\SvgImage.cs" />
