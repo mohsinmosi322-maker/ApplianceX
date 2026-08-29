@@ -73,10 +73,16 @@ namespace ApplianceManagement.Forms
             mnuTrans.DropDownItems.Add("Sale\tF2", null, (s, e) => OpenChild(new SaleForm(), "SALE"));
             mnuTrans.DropDownItems.Add("Sale Return", null, (s, e) => OpenChild(new SaleReturnForm(), "SALE"));
             mnuTrans.DropDownItems.Add("Purchase\tF3", null, (s, e) => OpenChild(new PurchaseForm(), "PURCHASE"));
+            mnuTrans.DropDownItems.Add("Purchase Return", null, (s, e) => OpenChild(new PurchaseReturnForm(), "PURCHASE"));
 
             var mnuInv = new ToolStripMenuItem("  Inventory  ");
             mnuInv.DropDownItems.Add("New Item", null, (s, e) => OpenChild(new NewItemForm(), "NEWITEM"));
             mnuInv.DropDownItems.Add("Stock Position", null, (s, e) => OpenChild(new InventoryForm(), "INVENTORY"));
+            mnuInv.DropDownItems.Add("Stock Operations", null, (s, e) => OpenChild(new StockOpsForm(), "INVENTORY"));
+
+            var mnuAcct = new ToolStripMenuItem("  Accounts  ");
+            mnuAcct.DropDownItems.Add("Customer Payment", null, (s, e) => OpenChild(new CustomerPaymentForm(), "SALE"));
+            mnuAcct.DropDownItems.Add("Supplier Payment", null, (s, e) => OpenChild(new SupplierPaymentForm(), "PURCHASE"));
 
             var mnuRep = new ToolStripMenuItem("  Reports  ");
             mnuRep.DropDownItems.Add("Sales Report", null, (s, e) => OpenChild(new ReportsForm("SALES"), "REPORTS"));
@@ -98,7 +104,7 @@ namespace ApplianceManagement.Forms
                     "\n\nF2 Sale   F3 Purchase   F4 Close   F9 History   F12 Save",
                     "About", MessageBoxButtons.OK, MessageBoxIcon.Information));
 
-            menuStrip.Items.AddRange(new ToolStripItem[] { mnuFile, mnuTrans, mnuInv, mnuRep, mnuSet, mnuWindows, mnuHelp });
+            menuStrip.Items.AddRange(new ToolStripItem[] { mnuFile, mnuTrans, mnuInv, mnuAcct, mnuRep, mnuSet, mnuWindows, mnuHelp });
             this.MainMenuStrip = menuStrip;
             this.Controls.Add(menuStrip);
 
@@ -198,7 +204,6 @@ namespace ApplianceManagement.Forms
             return n;
         }
 
-        /// <summary>Fill entire MdiClient so dashboard is never half-cut.</summary>
         private void ForceHomeFill()
         {
             if (homeHost == null || mdiClient == null) return;
@@ -244,7 +249,7 @@ namespace ApplianceManagement.Forms
             foreach (ToolStripMenuItem top in menuStrip.Items)
             {
                 string t = top.Text.Trim();
-                if (t == "File" || t == "Windows" || t == "Help") continue;
+                if (t == "File" || t == "Windows" || t == "Help" || t == "Accounts") continue;
                 foreach (ToolStripItem item in top.DropDownItems)
                 {
                     if (item is ToolStripSeparator) continue;
@@ -260,7 +265,9 @@ namespace ApplianceManagement.Forms
             string t = (menuText ?? "").Replace("\t", " ").Trim();
             if (t.StartsWith("Sale Return")) return "SALE";
             if (t.StartsWith("Sale")) return "SALE";
+            if (t.StartsWith("Customer Payment")) return "SALE";
             if (t.StartsWith("Purchase") && !t.StartsWith("Purchase Report")) return "PURCHASE";
+            if (t.StartsWith("Supplier Payment")) return "PURCHASE";
             if (t.StartsWith("New Item")) return "NEWITEM";
             if (t.StartsWith("Stock")) return "INVENTORY";
             if (t.StartsWith("Low Stock")) return "REPORTS";
@@ -333,7 +340,6 @@ namespace ApplianceManagement.Forms
                 }
             }
 
-            // Keep dashboard maximized behind; open child normal + cascade offset
             if (homeHost != null)
             {
                 ForceHomeFill();
@@ -356,7 +362,7 @@ namespace ApplianceManagement.Forms
         private void ShowShortcuts()
         {
             MessageBox.Show(
-                "F2    New Sale\nF3    Purchase\nF4    Close window\nF8    Remove line (Sale)\nF9    Product history\nUp/Down  Move in grid\nF12   Discount / Save",
+                "F2    New Sale\nF3    Purchase\nF4    Close window\nF5    Refresh / Load invoice\nF8    Remove line\nF9    Product history\nF12   Discount / Save",
                 "Keyboard Shortcuts", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
@@ -365,6 +371,7 @@ namespace ApplianceManagement.Forms
             if (MessageBox.Show("Logout?", "Confirm", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
             foreach (Form f in this.MdiChildren)
                 if (f != homeHost) f.Close();
+            AppSession.SignOut();
             this.Hide();
             var login = new LoginForm();
             login.FormClosed += (s, e) => this.Close();
