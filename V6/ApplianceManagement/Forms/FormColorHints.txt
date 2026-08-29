@@ -1,0 +1,12 @@
+Form accent palette (professional):
+  SALE         Blue    #2980B9  Point of sale
+  PURCHASE     Green   #27AE60  Stock inbound from suppliers
+  SALE RETURN  Orange  #E67E22  Customer returns / stock increase
+  NEW ITEM     Purple  #8E44AD  Product master create / edit
+  INVENTORY    Teal    #16A085  Stock position
+  REPORTS      Slate   #34495E  Business reports
+  LOW STOCK    Crimson #C0392B  Alerts
+  SETTINGS     Sky     #3498DB  Configuration
+
+Use UiHelper.CreateFormBanner(title, description, FormAccent.X, FormAccent.XDark)
+Use UiHelper.StyleAccentButton / StyleGridWithAccent for matching chrome.
