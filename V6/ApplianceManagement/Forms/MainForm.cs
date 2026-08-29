@@ -14,6 +14,7 @@ namespace ApplianceManagement.Forms
         private MenuStrip menuStrip;
         private ToolStripMenuItem mnuWindows;
         private HomeScreen homeScreen;
+        private Form homeHost;
         private MdiClient mdiClient;
 
         public MainForm(User user)
@@ -49,7 +50,6 @@ namespace ApplianceManagement.Forms
             this.Text = UiHelper.AppName + "  \u2014  " + UiHelper.GetShopName();
             BuildMenu();
             this.Load += MainForm_Load;
-            this.Resize += (s, e) => PositionHomeOverMdi();
         }
 
         private void BuildMenu()
@@ -113,7 +113,6 @@ namespace ApplianceManagement.Forms
             OpenChild(new SettingsForm(), "SETTINGS");
         }
 
-        /// <summary>Admin settings lock: current user password (or SettingsPassword if set).</summary>
         public bool PromptSettingsPassword()
         {
             using (var f = new Form())
@@ -141,7 +140,6 @@ namespace ApplianceManagement.Forms
                     MessageBox.Show("Incorrect settings password.");
                     return false;
                 }
-                // Fall back: verify current user login password
                 var repo = new Data.UserRepository();
                 var u = repo.Authenticate(CurrentUser.UserName, pwd);
                 if (u == null)
@@ -167,45 +165,51 @@ namespace ApplianceManagement.Forms
             SetupHome();
         }
 
+        /// <summary>
+        /// Dashboard = borderless maximized MDI child (true wallpaper).
+        /// Other forms open on top; when they close, home stays maximized.
+        /// </summary>
         private void SetupHome()
         {
-            if (mdiClient == null) return;
             homeScreen = new HomeScreen(CurrentUser);
-            homeScreen.Visible = true;
-            this.Controls.Add(homeScreen);
-            PositionHomeOverMdi();
-            homeScreen.BringToFront();
-            menuStrip.BringToFront();
+            homeScreen.Dock = DockStyle.Fill;
+
+            homeHost = new Form();
+            homeHost.Text = "Dashboard";
+            homeHost.FormBorderStyle = FormBorderStyle.None;
+            homeHost.ControlBox = false;
+            homeHost.ShowIcon = false;
+            homeHost.ShowInTaskbar = false;
+            homeHost.BackColor = UiHelper.BgColor;
+            homeHost.Controls.Add(homeScreen);
+            homeHost.MdiParent = this;
+            homeHost.WindowState = FormWindowState.Maximized;
+            // Prevent user closing the wallpaper host
+            homeHost.FormClosing += (s, e) =>
+            {
+                if (e.CloseReason == CloseReason.UserClosing)
+                    e.Cancel = true;
+            };
+            homeHost.Show();
         }
 
-        private void PositionHomeOverMdi()
+        private int CountOtherChildren()
         {
-            if (homeScreen == null || mdiClient == null) return;
-            homeScreen.Bounds = mdiClient.Bounds;
-            homeScreen.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            int n = 0;
+            foreach (Form f in this.MdiChildren)
+                if (f != homeHost) n++;
+            return n;
         }
 
-        /// <summary>
-        /// Home stays always Visible. When MDI children exist it sits behind them;
-        /// when none, it comes to front (no empty black client).
-        /// </summary>
         private void SyncHome()
         {
-            if (homeScreen == null) return;
-            homeScreen.Visible = true;
-            PositionHomeOverMdi();
-            if (this.MdiChildren.Length == 0)
+            if (homeHost == null || homeScreen == null) return;
+            if (CountOtherChildren() == 0)
             {
-                homeScreen.BringToFront();
-                menuStrip.BringToFront();
+                if (homeHost.WindowState != FormWindowState.Maximized)
+                    homeHost.WindowState = FormWindowState.Maximized;
+                homeHost.Activate();
                 homeScreen.RefreshData();
-            }
-            else
-            {
-                // Keep dashboard as wallpaper behind open forms
-                homeScreen.SendToBack();
-                if (mdiClient != null) mdiClient.BringToFront();
-                menuStrip.BringToFront();
             }
         }
 
@@ -221,7 +225,7 @@ namespace ApplianceManagement.Forms
             }
             if (mdiClient != null) mdiClient.BackColor = UiHelper.BgColor;
             if (homeScreen != null) homeScreen.RefreshBranding();
-            PositionHomeOverMdi();
+            if (homeHost != null) homeHost.BackColor = UiHelper.BgColor;
         }
 
         private void ApplyPermissions()
@@ -257,25 +261,25 @@ namespace ApplianceManagement.Forms
         private void MnuWindows_DropDownOpening(object sender, EventArgs e)
         {
             mnuWindows.DropDownItems.Clear();
-            if (this.MdiChildren.Length == 0)
-            {
-                mnuWindows.DropDownItems.Add("(No open windows)");
-                return;
-            }
+            bool any = false;
             foreach (Form child in this.MdiChildren)
             {
+                if (child == homeHost) continue;
+                any = true;
                 var item = new ToolStripMenuItem(string.IsNullOrEmpty(child.Text) ? child.GetType().Name : child.Text);
                 item.Tag = child;
                 item.Click += (s, ev) => ((Form)((ToolStripMenuItem)s).Tag).Activate();
                 if (child == this.ActiveMdiChild) item.Checked = true;
                 mnuWindows.DropDownItems.Add(item);
             }
+            if (!any) mnuWindows.DropDownItems.Add("(No open windows)");
             mnuWindows.DropDownItems.Add(new ToolStripSeparator());
             mnuWindows.DropDownItems.Add("Cascade", null, (s, ev) => this.LayoutMdi(MdiLayout.Cascade));
             mnuWindows.DropDownItems.Add("Tile Horizontal", null, (s, ev) => this.LayoutMdi(MdiLayout.TileHorizontal));
             mnuWindows.DropDownItems.Add("Close All", null, (s, ev) =>
             {
-                foreach (Form f in this.MdiChildren) f.Close();
+                foreach (Form f in this.MdiChildren)
+                    if (f != homeHost) f.Close();
                 SyncHome();
             });
         }
@@ -294,6 +298,7 @@ namespace ApplianceManagement.Forms
             {
                 foreach (Form f in this.MdiChildren)
                 {
+                    if (f == homeHost) continue;
                     if (f.GetType() == child.GetType())
                     {
                         f.Activate();
@@ -304,33 +309,26 @@ namespace ApplianceManagement.Forms
                 }
             }
 
-            // Dashboard stays visible behind forms
-            if (homeScreen != null)
-            {
-                homeScreen.Visible = true;
-                homeScreen.SendToBack();
-            }
-            if (mdiClient != null) mdiClient.BringToFront();
-            menuStrip.BringToFront();
-
             child.MdiParent = this;
             UiHelper.ApplyFormSize(child);
             child.WindowState = FormWindowState.Normal;
             child.FormClosed += (s, e) => SyncHome();
             child.Show();
+            child.Activate();
         }
 
         private void ShowShortcuts()
         {
             MessageBox.Show(
-                "F2    New Sale (multiple)\nF3    Purchase (one window)\nF4    Close window\nF8    Remove selected line (Sale)\nF9    Product history (Sale/Purchase)\nF12   Save / focus discount\nEnter  Confirm field",
+                "F2    New Sale\nF3    Purchase\nF4    Close window\nF8    Remove line (Sale)\nF9    Product history\nUp/Down  Move in grid\nF12   Discount / Save",
                 "Keyboard Shortcuts", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         private void DoLogout()
         {
             if (MessageBox.Show("Logout?", "Confirm", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
-            foreach (Form f in this.MdiChildren) f.Close();
+            foreach (Form f in this.MdiChildren)
+                if (f != homeHost) f.Close();
             this.Hide();
             var login = new LoginForm();
             login.FormClosed += (s, e) => this.Close();

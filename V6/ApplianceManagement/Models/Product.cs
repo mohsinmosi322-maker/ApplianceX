@@ -13,7 +13,20 @@ namespace ApplianceManagement.Models {
     public bool IsActive { get; set; }
     public DateTime CreatedDate { get; set; }
     public int CurrentStock { get; set; }
+    /// <summary>e.g. Piece, Kilograms, Grams — empty = plain unit</summary>
+    public string UnitOfMeasure { get; set; }
+    /// <summary>Pack size; unit sale price = SalePrice / PackSize when PackSize &gt; 1</summary>
+    public decimal PackSize { get; set; }
     public decimal StockValue { get { return CurrentStock * PurchasePrice; } }
-    public override string ToString() { return ProductCode + " - " + ProductName + " (Stock:" + CurrentStock + ")"; }
+    public decimal UnitSalePrice {
+      get {
+        if (PackSize > 1m) return Math.Round(SalePrice / PackSize, 4);
+        return SalePrice;
+      }
+    }
+    public override string ToString() {
+      string u = string.IsNullOrEmpty(UnitOfMeasure) ? "" : (" /" + UnitOfMeasure);
+      return ProductCode + " - " + ProductName + u + " (Stock:" + CurrentStock + ")";
+    }
   }
 }
