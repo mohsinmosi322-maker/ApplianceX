@@ -12,6 +12,8 @@ namespace ApplianceManagement.Forms
         private readonly CustomerRepository _repo = new CustomerRepository();
         private DataGridView dgv;
         private TextBox txtName, txtPhone, txtAddress, txtOpening;
+        private Button btnSave;
+        private int _editId = 0;
 
         public CustomerMasterForm()
         {
@@ -20,8 +22,10 @@ namespace ApplianceManagement.Forms
             BackColor = UiHelper.BgColor;
             KeyPreview = true;
             UiHelper.AttachF4Close(this, false);
+            UiHelper.AttachEnterNavigation(this);
 
-            Controls.Add(UiHelper.CreateFormBanner("CUSTOMERS", "Master list  ·  Opening balance seeds receivable",
+            Controls.Add(UiHelper.CreateFormBanner("CUSTOMERS",
+                "Double-click row to edit  ·  Enter next field  ·  Opening balance seeds receivable",
                 FormAccent.Sale, FormAccent.SaleDark));
 
             var left = new Panel { Dock = DockStyle.Left, Width = 320, BackColor = Color.White, Padding = new Padding(16) };
@@ -44,23 +48,60 @@ namespace ApplianceManagement.Forms
             UiHelper.StyleTextBox(txtAddress);
             left.Controls.Add(txtAddress);
             y += 40;
-            left.Controls.Add(new Label { Text = "Opening balance", Location = new Point(0, y), AutoSize = true, Font = UiHelper.SmallFont });
+            left.Controls.Add(new Label { Text = "Opening balance (new only)", Location = new Point(0, y), AutoSize = true, Font = UiHelper.SmallFont });
             y += 20;
             txtOpening = new TextBox { Location = new Point(0, y), Size = new Size(140, 28), Text = "0" };
             UiHelper.StyleTextBox(txtOpening);
             left.Controls.Add(txtOpening);
             y += 48;
-            var btn = new Button { Text = "ADD CUSTOMER", Location = new Point(0, y), Size = new Size(160, 36) };
-            UiHelper.StyleAccentButton(btn, FormAccent.Sale, FormAccent.SaleDark);
-            btn.Click += (s, e) => Save();
-            left.Controls.Add(btn);
+            btnSave = new Button { Text = "ADD CUSTOMER", Location = new Point(0, y), Size = new Size(160, 36) };
+            UiHelper.StyleAccentButton(btnSave, FormAccent.Sale, FormAccent.SaleDark);
+            btnSave.Click += (s, e) => Save();
+            left.Controls.Add(btnSave);
+            y += 44;
+            var btnClear = new Button { Text = "NEW / CLEAR", Location = new Point(0, y), Size = new Size(160, 32) };
+            UiHelper.StyleAccentButton(btnClear, FormAccent.SaleDark, FormAccent.Sale);
+            btnClear.Click += (s, e) => ClearEdit();
+            left.Controls.Add(btnClear);
             Controls.Add(left);
 
             dgv = new DataGridView { Dock = DockStyle.Fill };
             UiHelper.StyleGridWithAccent(dgv, FormAccent.Sale);
+            dgv.ReadOnly = true;
+            dgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            dgv.MultiSelect = false;
+            dgv.CellDoubleClick += (s, e) =>
+            {
+                if (e.RowIndex < 0) return;
+                LoadRow(e.RowIndex);
+            };
             Controls.Add(dgv);
             dgv.BringToFront();
             RefreshGrid();
+        }
+
+        private void ClearEdit()
+        {
+            _editId = 0;
+            txtName.Clear(); txtPhone.Clear(); txtAddress.Clear(); txtOpening.Text = "0";
+            txtOpening.Enabled = true;
+            btnSave.Text = "ADD CUSTOMER";
+            txtName.Focus();
+        }
+
+        private void LoadRow(int rowIndex)
+        {
+            if (dgv.Rows[rowIndex].DataBoundItem is Customer c)
+            {
+                _editId = c.CustomerID;
+                txtName.Text = c.CustomerName ?? "";
+                txtPhone.Text = c.Phone ?? "";
+                txtAddress.Text = c.Address ?? "";
+                txtOpening.Text = c.OpeningBalance.ToString("0.##");
+                txtOpening.Enabled = false;
+                btnSave.Text = "UPDATE CUSTOMER";
+                txtName.Focus();
+            }
         }
 
         private void RefreshGrid()
@@ -80,6 +121,24 @@ namespace ApplianceManagement.Forms
                     DialogHelpers.Error(this, "Customer name is required.");
                     return;
                 }
+
+                if (_editId > 0)
+                {
+                    if (!DialogHelpers.Confirm(this, "Update customer " + txtName.Text.Trim() + "?")) return;
+                    _repo.Update(new Customer
+                    {
+                        CustomerID = _editId,
+                        CustomerName = txtName.Text.Trim(),
+                        Phone = string.IsNullOrWhiteSpace(txtPhone.Text) ? null : txtPhone.Text.Trim(),
+                        Address = string.IsNullOrWhiteSpace(txtAddress.Text) ? null : txtAddress.Text.Trim()
+                    });
+                    DialogHelpers.Info(this, "Customer updated.");
+                    Tag = "NOSAVECONFIRM";
+                    ClearEdit();
+                    RefreshGrid();
+                    return;
+                }
+
                 decimal open = 0;
                 decimal.TryParse(txtOpening.Text, out open);
                 if (!DialogHelpers.Confirm(this, "Add customer " + txtName.Text.Trim() + "?")) return;
@@ -96,7 +155,6 @@ namespace ApplianceManagement.Forms
                 {
                     try
                     {
-                        // Opening as debit (receivable) if positive
                         using (var conn = DbHelper.GetConnection())
                         {
                             conn.Open();
@@ -117,7 +175,7 @@ namespace ApplianceManagement.Forms
 
                 DialogHelpers.Info(this, "Customer saved.");
                 Tag = "NOSAVECONFIRM";
-                txtName.Clear(); txtPhone.Clear(); txtAddress.Clear(); txtOpening.Text = "0";
+                ClearEdit();
                 RefreshGrid();
             }
             catch (Exception ex) { DialogHelpers.Error(this, ex.Message); }
