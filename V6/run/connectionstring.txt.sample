@@ -1,0 +1,8 @@
+# Copy this file next to ApplianceManagement.exe as connectionstring.txt
+# First non-comment line is used as the SQL connection string.
+#
+# Windows Auth example:
+# Server=.\SQLEXPRESS;Database=ApplianceX;Trusted_Connection=True;
+#
+# SQL Auth example:
+Server=.\SQLEXPRESS;Database=ApplianceX;User Id=sa;Password=YourPassword;

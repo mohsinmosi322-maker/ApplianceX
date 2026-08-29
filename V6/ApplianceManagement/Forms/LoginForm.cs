@@ -10,7 +10,7 @@ namespace ApplianceManagement.Forms
     {
         private TextBox txtUsername, txtPassword;
         private Button btnLogin;
-        private Label lblTitle;
+        private Label lblTitle, lblDbStatus;
 
         public LoginForm()
         {
@@ -19,7 +19,11 @@ namespace ApplianceManagement.Forms
             UiHelper.InitializeTheme();
             ApplyLicenseBranding();
             UiHelper.FadeIn(this);
-            this.Shown += (s, e) => txtUsername.Focus();
+            this.Shown += (s, e) =>
+            {
+                CheckDb();
+                txtUsername.Focus();
+            };
         }
 
         private void ApplyLicenseBranding()
@@ -30,10 +34,27 @@ namespace ApplianceManagement.Forms
             this.Text = "Sign in — " + name;
         }
 
+        private void CheckDb()
+        {
+            if (lblDbStatus == null) return;
+            string err;
+            if (DbHelper.TryOpen(out err))
+            {
+                lblDbStatus.Text = "Database: connected";
+                lblDbStatus.ForeColor = Color.FromArgb(27, 94, 32);
+            }
+            else
+            {
+                lblDbStatus.Text = "Database: not reachable";
+                lblDbStatus.ForeColor = Color.FromArgb(183, 28, 28);
+                AppLog.Warn("DB check failed: " + err);
+            }
+        }
+
         private void InitializeComponent()
         {
             this.BackColor = UiHelper.ThemeDark;
-            this.ClientSize = new Size(460, 420);
+            this.ClientSize = new Size(460, 440);
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;
             this.StartPosition = FormStartPosition.CenterScreen;
@@ -44,7 +65,7 @@ namespace ApplianceManagement.Forms
             {
                 BackColor = Color.White,
                 Location = new Point(40, 36),
-                Size = new Size(380, 340)
+                Size = new Size(380, 360)
             };
             card.Paint += (s, e) =>
             {
@@ -94,17 +115,27 @@ namespace ApplianceManagement.Forms
             UiHelper.StyleButton(btnLogin);
             btnLogin.Click += (s, e) => DoLogin();
 
-            Label hint = new Label
+            lblDbStatus = new Label
             {
-                Text = "License file required next to the application.",
+                Text = "Database: checking…",
                 Font = UiHelper.SmallFont,
                 ForeColor = Color.FromArgb(140, 150, 160),
-                Location = new Point(20, 300),
+                Location = new Point(20, 295),
                 Size = new Size(340, 20),
                 TextAlign = ContentAlignment.MiddleCenter
             };
 
-            card.Controls.AddRange(new Control[] { lblTitle, lblSub, lblUser, txtUsername, lblPass, txtPassword, btnLogin, hint });
+            Label hint = new Label
+            {
+                Text = "license.dat or connectionstring.txt next to the app",
+                Font = UiHelper.SmallFont,
+                ForeColor = Color.FromArgb(140, 150, 160),
+                Location = new Point(20, 318),
+                Size = new Size(340, 20),
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+
+            card.Controls.AddRange(new Control[] { lblTitle, lblSub, lblUser, txtUsername, lblPass, txtPassword, btnLogin, lblDbStatus, hint });
             this.Controls.Add(card);
         }
 
@@ -114,18 +145,28 @@ namespace ApplianceManagement.Forms
             {
                 if (!LicenseReader.TryLoad())
                 {
-                    MessageBox.Show(
-                        "license.dat not found.\n\nPlace a valid license next to the application.",
-                        "License Required", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    return;
+                    // Allow continue if connectionstring.txt exists (dev / offline setup)
+                    string err;
+                    if (!DbHelper.TryOpen(out err))
+                    {
+                        MessageBox.Show(
+                            "license.dat not found and database is not reachable.\n\n" +
+                            "Place license.dat or connectionstring.txt next to the application.\n\n" + err,
+                            "License / Connection", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        return;
+                    }
+                    AppLog.Warn("Login without license.dat — using connectionstring.txt / App.config");
                 }
-                ApplyLicenseBranding();
-                if (!LicenseReader.IsValid())
+                else
                 {
-                    MessageBox.Show(
-                        "License expired on " + LicenseReader.Current.ExpiryDate.ToString("dd/MM/yyyy") + ".",
-                        "License Expired", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    return;
+                    ApplyLicenseBranding();
+                    if (!LicenseReader.IsValid())
+                    {
+                        MessageBox.Show(
+                            "License expired on " + LicenseReader.Current.ExpiryDate.ToString("dd/MM/yyyy") + ".",
+                            "License Expired", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        return;
+                    }
                 }
 
                 if (string.IsNullOrWhiteSpace(txtUsername.Text) || string.IsNullOrWhiteSpace(txtPassword.Text))
@@ -136,6 +177,7 @@ namespace ApplianceManagement.Forms
                     return;
                 }
 
+                btnLogin.Enabled = false;
                 var user = new UserRepository().Authenticate(txtUsername.Text.Trim(), txtPassword.Text);
                 if (user != null)
                 {
@@ -158,6 +200,11 @@ namespace ApplianceManagement.Forms
             {
                 AppLog.Error("Login / DB error", ex);
                 MessageBox.Show("Unable to connect to database.\n\n" + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                CheckDb();
+            }
+            finally
+            {
+                btnLogin.Enabled = true;
             }
         }
     }
