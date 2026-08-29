@@ -70,10 +70,12 @@
     <Compile Include="Models\PurchaseDetail.cs" />
     <Compile Include="Models\InventoryTransaction.cs" />
     <Compile Include="Models\HistoryRows.cs" />
+    <Compile Include="Models\SaleReturn.cs" />
     <Compile Include="Services\PackMath.cs" />
     <Compile Include="Services\InventoryService.cs" />
     <Compile Include="Services\TransactionTotals.cs" />
     <Compile Include="Services\SaleService.cs" />
+    <Compile Include="Services\SaleReturnService.cs" />
     <Compile Include="Services\PurchaseService.cs" />
     <Compile Include="Data\UserRepository.cs" />
     <Compile Include="Data\ProductRepository.cs" />
