@@ -8,7 +8,7 @@ using ApplianceManagement.Models;
 
 namespace ApplianceManagement.Forms
 {
-    /// <summary>Same UX as Sale (search, cart, discount footer) but increases stock on save.</summary>
+    /// <summary>Same UX as Sale — unit price = SalePrice/PackSize when pack > 1. Stock increases on save.</summary>
     public partial class SaleReturnForm : Form
     {
         private ProductRepository productRepo = new ProductRepository();
@@ -33,30 +33,7 @@ namespace ApplianceManagement.Forms
             this.BackColor = UiHelper.BgColor;
             this.KeyPreview = true;
             UiHelper.AttachF4Close(this);
-            this.KeyDown += (s, e) =>
-            {
-                if (e.KeyCode == Keys.F12) { txtDiscount.Focus(); txtDiscount.SelectAll(); }
-                if (e.KeyCode == Keys.F9) { ShowHistory(); e.Handled = true; }
-                if (e.KeyCode == Keys.F8 && dgv.SelectedRows.Count > 0)
-                {
-                    int i = dgv.SelectedRows[0].Index;
-                    if (i >= 0 && i < cart.Count) { cart.RemoveAt(i); RefreshGrid(); }
-                }
-                if ((e.KeyCode == Keys.Up || e.KeyCode == Keys.Down) && cart.Count > 0)
-                {
-                    int idx = dgv.SelectedRows.Count > 0 ? dgv.SelectedRows[0].Index : 0;
-                    idx += e.KeyCode == Keys.Up ? -1 : 1;
-                    if (idx < 0) idx = 0; if (idx >= cart.Count) idx = cart.Count - 1;
-                    dgv.ClearSelection();
-                    if (idx < dgv.Rows.Count) { dgv.Rows[idx].Selected = true; dgv.CurrentCell = dgv.Rows[idx].Cells[0]; }
-                    e.Handled = true;
-                }
-            };
-
-            this.Controls.Add(UiHelper.CreateFormBanner(
-                "SALE RETURN",
-                "Customer returns  \u2022  Stock will INCREASE  \u2022  Discount & paid  \u2022  F9 history",
-                FormAccent.SaleReturn, FormAccent.SaleReturnDark));
+            this.KeyDown += Form_KeyDown;
 
             Panel top = new Panel { Dock = DockStyle.Top, Height = 88, BackColor = Color.White };
             top.Controls.Add(new Label { Text = "RETURN  AUTO", Font = UiHelper.HeaderFont, ForeColor = FormAccent.SaleReturnDark, Location = new Point(16, 10), AutoSize = true });
@@ -102,15 +79,21 @@ namespace ApplianceManagement.Forms
                 if (selectedProduct == null) return;
                 Product p = selectedProduct;
                 int qty = 1; int.TryParse(txtQty.Text, out qty); if (qty < 1) qty = 1;
+                // Same as Sale: unit price = pack price / pack size
                 decimal unitPrice = p.UnitSalePrice;
-                // use 'line' not 'x' — avoids CS0136 with footer int x below
                 var ex = cart.Find(line => line.ProductID == p.ProductID);
                 if (ex != null) { ex.Quantity += qty; ex.Amount = ex.Quantity * ex.SalePrice; }
                 else cart.Add(new SaleDetail { ProductID = p.ProductID, ProductCode = p.ProductCode, ProductName = p.ProductName, Quantity = qty, SalePrice = unitPrice, Amount = qty * unitPrice });
                 RefreshGrid(); txtSearch.Clear(); selectedProduct = null; txtQty.Text = "1"; lstSuggest.Visible = false; txtSearch.Focus();
             };
             top.Controls.Add(txtQty);
+
+            // Banner LAST so Dock.Top places it at the very top of the form
             this.Controls.Add(top);
+            this.Controls.Add(UiHelper.CreateFormBanner(
+                "SALE RETURN",
+                "Customer returns  \u2022  Unit price like Sale (pack / size)  \u2022  Stock INCREASE  \u2022  F9 history",
+                FormAccent.SaleReturn, FormAccent.SaleReturnDark));
 
             lstSuggest = new ListBox { Location = new Point(70, 140), Size = new Size(420, 160), Visible = false, Font = UiHelper.NormalFont, IntegralHeight = false };
             lstSuggest.Click += (s, e) => SelectSug();
@@ -147,6 +130,50 @@ namespace ApplianceManagement.Forms
             this.Controls.Add(dgv);
             dgv.BringToFront();
             lstSuggest.BringToFront();
+        }
+
+        private void Form_KeyDown(object s, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.F12) { txtDiscount.Focus(); txtDiscount.SelectAll(); e.Handled = true; }
+            if (e.KeyCode == Keys.F9) { ShowHistory(); e.Handled = true; }
+            if (e.KeyCode == Keys.F8 && dgv.SelectedRows.Count > 0)
+            {
+                int i = dgv.SelectedRows[0].Index;
+                if (i >= 0 && i < cart.Count) { cart.RemoveAt(i); RefreshGrid(); }
+                e.Handled = true;
+            }
+            if ((e.KeyCode == Keys.Up || e.KeyCode == Keys.Down) && cart.Count > 0)
+            {
+                int idx = dgv.SelectedRows.Count > 0 ? dgv.SelectedRows[0].Index : 0;
+                idx += e.KeyCode == Keys.Up ? -1 : 1;
+                if (idx < 0) idx = 0;
+                if (idx >= cart.Count) idx = cart.Count - 1;
+                SelectRowSafe(idx);
+                e.Handled = true;
+            }
+        }
+
+        /// <summary>Never set CurrentCell to a hidden column (SaleDetailID etc).</summary>
+        private void SelectRowSafe(int idx)
+        {
+            if (dgv == null || idx < 0 || idx >= dgv.Rows.Count) return;
+            dgv.ClearSelection();
+            dgv.Rows[idx].Selected = true;
+            DataGridViewCell visible = null;
+            foreach (DataGridViewCell c in dgv.Rows[idx].Cells)
+            {
+                if (c.OwningColumn != null && c.OwningColumn.Visible)
+                {
+                    visible = c;
+                    break;
+                }
+            }
+            if (visible != null)
+            {
+                try { dgv.CurrentCell = visible; }
+                catch { /* ignore if grid not ready */ }
+            }
+            try { dgv.Focus(); } catch { }
         }
 
         private TextBox Box(Control p, int posX, int y, int w)
