@@ -10,10 +10,8 @@ namespace ApplianceManagement.Data
     public class PurchaseRepository
     {
         private readonly InventoryService _inv = new InventoryService();
+        private readonly SupplierAccountService _acct = new SupplierAccountService();
 
-        /// <summary>
-        /// Line Quantity = packs. Ledger QuantityIn = packs × PackSize (base units).
-        /// </summary>
         public int SavePurchase(PurchaseHeader purchase)
         {
             using (var conn = DbHelper.GetConnection())
@@ -65,7 +63,6 @@ namespace ApplianceManagement.Data
                                 cmd.ExecuteNonQuery();
                             }
 
-                            // Keep product last purchase unit cost for COGS display
                             try
                             {
                                 using (var cmd = DbHelper.CreateCommand(
@@ -88,6 +85,27 @@ namespace ApplianceManagement.Data
                                 unitCost: unitCost,
                                 remarks: "Purchase: " + invoiceNo + " packs=" + packs + " packSize=" + packSize,
                                 when: purchase.PurchaseDate);
+                        }
+
+                        _acct.PostPurchase(conn, trans, purchase.SupplierID, purchaseId, invoiceNo, purchase.NetAmount);
+                        if (purchase.PaidAmount > 0)
+                        {
+                            try
+                            {
+                                using (var cmd = DbHelper.CreateCommand(
+                                    "INSERT INTO SupplierLedger(SupplierID,EntryDate,EntryType,ReferenceID,ReferenceNo,Debit,Credit,Remarks,CreatedBy) " +
+                                    "VALUES(@S,@Dt,'PAYMENT',@R,@No,@A,0,'Purchase payment',@By)", conn, trans))
+                                {
+                                    cmd.Parameters.AddWithValue("@S", purchase.SupplierID);
+                                    cmd.Parameters.AddWithValue("@Dt", purchase.PurchaseDate);
+                                    cmd.Parameters.AddWithValue("@R", purchaseId);
+                                    cmd.Parameters.AddWithValue("@No", invoiceNo);
+                                    cmd.Parameters.AddWithValue("@A", purchase.PaidAmount);
+                                    cmd.Parameters.AddWithValue("@By", AppSession.UserId > 0 ? (object)AppSession.UserId : DBNull.Value);
+                                    cmd.ExecuteNonQuery();
+                                }
+                            }
+                            catch (SqlException) { }
                         }
 
                         trans.Commit();

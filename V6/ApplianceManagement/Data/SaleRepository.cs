@@ -10,6 +10,7 @@ namespace ApplianceManagement.Data
     public class SaleRepository
     {
         private readonly InventoryService _inv = new InventoryService();
+        private readonly CustomerAccountService _acct = new CustomerAccountService();
 
         public int SaveSale(SaleHeader sale)
         {
@@ -59,6 +60,28 @@ namespace ApplianceManagement.Data
                                 unitCost: unitCost,
                                 remarks: "Sale: " + invoiceNo,
                                 when: sale.SaleDate);
+                        }
+
+                        // Customer ledger: full net as receivable, then payment credit if any
+                        _acct.PostSale(conn, trans, sale.CustomerID, saleId, invoiceNo, sale.NetAmount);
+                        if (sale.PaidAmount > 0)
+                        {
+                            try
+                            {
+                                using (var cmd = DbHelper.CreateCommand(
+                                    "INSERT INTO CustomerLedger(CustomerID,EntryDate,EntryType,ReferenceID,ReferenceNo,Debit,Credit,Remarks,CreatedBy) " +
+                                    "VALUES(@C,@Dt,'PAYMENT',@R,@No,0,@A,'Sale payment',@By)", conn, trans))
+                                {
+                                    cmd.Parameters.AddWithValue("@C", sale.CustomerID);
+                                    cmd.Parameters.AddWithValue("@Dt", sale.SaleDate);
+                                    cmd.Parameters.AddWithValue("@R", saleId);
+                                    cmd.Parameters.AddWithValue("@No", invoiceNo);
+                                    cmd.Parameters.AddWithValue("@A", sale.PaidAmount);
+                                    cmd.Parameters.AddWithValue("@By", AppSession.UserId > 0 ? (object)AppSession.UserId : DBNull.Value);
+                                    cmd.ExecuteNonQuery();
+                                }
+                            }
+                            catch (SqlException) { }
                         }
 
                         trans.Commit();
