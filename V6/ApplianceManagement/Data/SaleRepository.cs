@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data.SqlClient;
 using ApplianceManagement.Helpers;
 using ApplianceManagement.Models;
+using ApplianceManagement.Forms;
 
 namespace ApplianceManagement.Data
 {
@@ -111,6 +112,91 @@ namespace ApplianceManagement.Data
             }
         }
 
+        public void SaveSaleReturn(int productId, int qty, string reason)
+        {
+            using (var conn = DbHelper.GetConnection())
+            {
+                conn.Open();
+                using (var trans = conn.BeginTransaction())
+                {
+                    try
+                    {
+                        decimal unitCost = 0;
+                        using (var cmd = DbHelper.CreateCommand("SELECT PurchasePrice FROM Products WHERE ProductID=@P", conn, trans))
+                        {
+                            cmd.Parameters.AddWithValue("@P", productId);
+                            var o = cmd.ExecuteScalar();
+                            if (o == null) throw new InvalidOperationException("Product not found.");
+                            unitCost = Convert.ToDecimal(o);
+                        }
+
+                        try
+                        {
+                            using (var cmd = DbHelper.CreateCommand(
+                                "UPDATE Products SET CurrentStock = ISNULL(CurrentStock,0) + @Q WHERE ProductID=@P", conn, trans))
+                            {
+                                cmd.Parameters.AddWithValue("@Q", qty);
+                                cmd.Parameters.AddWithValue("@P", productId);
+                                cmd.ExecuteNonQuery();
+                            }
+                        }
+                        catch (SqlException) { /* no CurrentStock column */ }
+
+                        using (var cmd = DbHelper.CreateCommand(
+                            "INSERT INTO InventoryTransaction(TransactionDate,ProductID,TransactionType,ReferenceID,QuantityIn,QuantityOut,UnitCost,Remarks) " +
+                            "VALUES(@Dt,@P,@T,NULL,@Q,0,@C,@Rem)", conn, trans))
+                        {
+                            cmd.Parameters.AddWithValue("@Dt", DateTime.Now);
+                            cmd.Parameters.AddWithValue("@P", productId);
+                            cmd.Parameters.AddWithValue("@T", InventoryTransactionType.SaleReturn);
+                            cmd.Parameters.AddWithValue("@Q", qty);
+                            cmd.Parameters.AddWithValue("@C", unitCost);
+                            cmd.Parameters.AddWithValue("@Rem", string.IsNullOrEmpty(reason) ? "Sale return" : reason);
+                            cmd.ExecuteNonQuery();
+                        }
+
+                        trans.Commit();
+                        AppLog.Info("Sale return product=" + productId + " qty=" + qty);
+                    }
+                    catch (Exception ex)
+                    {
+                        try { trans.Rollback(); } catch { }
+                        AppLog.Error("SaveSaleReturn failed", ex);
+                        throw;
+                    }
+                }
+            }
+        }
+
+        public List<ProductSaleHistoryRow> GetProductSaleHistory(int productId)
+        {
+            var list = new List<ProductSaleHistoryRow>();
+            using (var conn = DbHelper.GetConnection())
+            {
+                conn.Open();
+                using (var cmd = DbHelper.CreateCommand(
+                    "SELECT h.SaleDate, h.InvoiceNo, c.CustomerName, d.Quantity, d.SalePrice, d.Amount " +
+                    "FROM SaleDetail d INNER JOIN SaleHeader h ON d.SaleID=h.SaleID " +
+                    "INNER JOIN Customers c ON h.CustomerID=c.CustomerID " +
+                    "WHERE d.ProductID=@P ORDER BY h.SaleDate DESC", conn))
+                {
+                    cmd.Parameters.AddWithValue("@P", productId);
+                    using (var r = cmd.ExecuteReader())
+                        while (r.Read())
+                            list.Add(new ProductSaleHistoryRow
+                            {
+                                Date = (DateTime)r["SaleDate"],
+                                Invoice = r["InvoiceNo"].ToString(),
+                                Customer = r["CustomerName"].ToString(),
+                                Qty = Convert.ToInt32(r["Quantity"]),
+                                Price = Convert.ToDecimal(r["SalePrice"]),
+                                Amount = Convert.ToDecimal(r["Amount"])
+                            });
+                }
+            }
+            return list;
+        }
+
         private static bool TryReadPhysicalStock(SqlConnection conn, SqlTransaction trans, int productId, out int stock, out decimal unitCost)
         {
             stock = 0;
@@ -133,7 +219,7 @@ namespace ApplianceManagement.Data
             }
             catch (SqlException)
             {
-                return false; // column missing — use ledger path
+                return false;
             }
         }
 
