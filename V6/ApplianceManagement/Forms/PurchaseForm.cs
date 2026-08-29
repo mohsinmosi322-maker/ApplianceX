@@ -5,18 +5,18 @@ using System.Windows.Forms;
 using ApplianceManagement.Data;
 using ApplianceManagement.Helpers;
 using ApplianceManagement.Models;
+using ApplianceManagement.Services;
 
 namespace ApplianceManagement.Forms
 {
     /// <summary>
-    /// Purchase mirrors Sale UX.
-    /// Qty = number of PACKS. Stock increases by packs × PackSize (units).
-    /// Line price = full pack PurchasePrice (not divided).
+    /// Qty = PACKS. Stock += packs × PackSize. Line price = full pack PurchasePrice.
     /// </summary>
     public partial class PurchaseForm : Form
     {
         private ProductRepository productRepo = new ProductRepository();
         private SupplierRepository supplierRepo = new SupplierRepository();
+        private PurchaseService purchaseService = new PurchaseService();
         private PurchaseRepository purchaseRepo = new PurchaseRepository();
         private List<PurchaseDetail> cart = new List<PurchaseDetail>();
         private Supplier selectedSupplier;
@@ -81,7 +81,6 @@ namespace ApplianceManagement.Forms
             });
             this.Controls.Add(top);
 
-            // Banner last → docks at top of form
             this.Controls.Add(UiHelper.CreateFormBanner(
                 "PURCHASE",
                 "Qty = packs  ·  Stock += packs × pack size  ·  Full pack price  ·  F9 history",
@@ -152,7 +151,6 @@ namespace ApplianceManagement.Forms
             int.TryParse(txtQty.Text, out packs);
             if (packs < 1) packs = 1;
 
-            // Full pack price (not unit)
             decimal packPrice = p.PurchasePrice;
             var ex = cart.Find(line => line.ProductID == p.ProductID);
             if (ex != null)
@@ -390,7 +388,7 @@ namespace ApplianceManagement.Forms
                     BalanceAmount = net - paid,
                     Details = cart
                 };
-                purchaseRepo.SavePurchase(header);
+                purchaseService.Save(header);
                 MessageBox.Show("Purchase saved!\nInvoice: " + header.InvoiceNo, "Success");
                 this.Tag = "NOSAVECONFIRM";
                 cart.Clear();
