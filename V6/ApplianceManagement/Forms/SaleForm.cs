@@ -5,6 +5,7 @@ using System.Windows.Forms;
 using ApplianceManagement.Data;
 using ApplianceManagement.Helpers;
 using ApplianceManagement.Models;
+using ApplianceManagement.Services;
 
 namespace ApplianceManagement.Forms
 {
@@ -12,6 +13,7 @@ namespace ApplianceManagement.Forms
     {
         private ProductRepository productRepo = new ProductRepository();
         private CustomerRepository customerRepo = new CustomerRepository();
+        private SaleService saleService = new SaleService();
         private SaleRepository saleRepo = new SaleRepository();
         private List<SaleDetail> cart = new List<SaleDetail>();
         private Customer walkIn;
@@ -56,7 +58,6 @@ namespace ApplianceManagement.Forms
             top.Controls.Add(new Label { Text = "Enter add  F8 remove  F9 history  Up/Down grid  F12 disc", Font = UiHelper.SmallFont, ForeColor = Color.FromArgb(140, 150, 160), Location = new Point(520, 50), AutoSize = true });
             this.Controls.Add(top);
 
-            // Banner last so Dock.Top puts it at the very top
             this.Controls.Add(UiHelper.CreateFormBanner(
                 "SALE",
                 "Point of sale  \u2022  Unit = pack price / pack size  \u2022  Discount & payment  \u2022  F9 history",
@@ -149,8 +150,7 @@ namespace ApplianceManagement.Forms
             Product p = selectedProduct;
             int qty = 1; int.TryParse(txtQty.Text, out qty); if (qty < 1) qty = 1;
             if (qty > p.CurrentStock) { MessageBox.Show("Insufficient stock. Available: " + p.CurrentStock); return; }
-            // Sale: unit price = pack sale price / pack size
-            decimal unitPrice = p.UnitSalePrice;
+            decimal unitPrice = PackMath.UnitSalePrice(p);
             var ex = cart.Find(line => line.ProductID == p.ProductID);
             if (ex != null)
             {
@@ -378,7 +378,7 @@ namespace ApplianceManagement.Forms
                     BalanceAmount = net - paid,
                     Details = new List<SaleDetail>(cart)
                 };
-                saleRepo.SaveSale(sale);
+                saleService.Save(sale);
                 MessageBox.Show("Sale saved successfully!\nInvoice: " + sale.InvoiceNo, "Success");
                 if (UiHelper.IsPrintAllowed())
                 {
