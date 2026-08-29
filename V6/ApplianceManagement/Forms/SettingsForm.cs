@@ -10,12 +10,10 @@ namespace ApplianceManagement.Forms
 {
     public partial class SettingsForm : Form
     {
-        private SupplierRepository supplierRepo = new SupplierRepository();
         private UserRepository userRepo = new UserRepository();
-        private TextBox txtSupName, txtSupPhone, txtMaxDiscAdmin, txtMaxDiscUser, txtSettingsPwd;
+        private TextBox txtMaxDiscAdmin, txtMaxDiscUser, txtSettingsPwd;
         private TextBox txtNewUser, txtNewFull, txtNewPwd, txtChgPwd;
         private ComboBox cmbTheme, cmbFontSize, cmbResolution, cmbUsers, cmbNewRole, cmbChgUser;
-        private DataGridView dgvSuppliers;
         private CheckBox chkSale, chkPurchase, chkNewItem, chkInventory, chkReports, chkSettings;
         private bool isAdmin;
 
@@ -25,7 +23,6 @@ namespace ApplianceManagement.Forms
                       string.Equals(MainForm.Instance.CurrentUser.Role, "Admin", StringComparison.OrdinalIgnoreCase);
             InitializeComponent();
             UiHelper.ApplyFormSize(this);
-            LoadSuppliers();
             LoadValues();
             if (isAdmin) { LoadUsersForRights(); LoadUsersForManage(); }
         }
@@ -33,18 +30,20 @@ namespace ApplianceManagement.Forms
         private void InitializeComponent()
         {
             this.Text = "Settings";
-            this.Size = new Size(940, 720);
-            this.MinimumSize = new Size(800, 600);
+            this.Size = new Size(940, 640);
+            this.MinimumSize = new Size(800, 520);
             this.BackColor = UiHelper.BgColor;
             this.KeyPreview = true;
             UiHelper.AttachF4Close(this);
 
             this.Controls.Add(UiHelper.CreateFormBanner(
                 "SETTINGS",
-                isAdmin ? "Admin: theme, limits, users, rights, backup" : "Appearance & add supplier",
+                isAdmin
+                    ? "Appearance · discount limits · users · menu rights · backup  ·  Suppliers: Masters menu"
+                    : "Appearance only  ·  Suppliers: Masters → Suppliers",
                 FormAccent.Settings, FormAccent.SettingsDark));
 
-            Panel top = new Panel { Dock = DockStyle.Top, Height = isAdmin ? 280 : 210, BackColor = UiHelper.BgColor, Padding = new Padding(10) };
+            Panel top = new Panel { Dock = DockStyle.Top, Height = isAdmin ? 300 : 210, BackColor = UiHelper.BgColor, Padding = new Padding(10) };
 
             GroupBox gbTheme = new GroupBox { Text = "Appearance (live)", Font = UiHelper.HeaderFont, ForeColor = UiHelper.ThemeDark, Location = new Point(15, 10), Size = new Size(420, 190) };
             gbTheme.Controls.Add(new Label { Text = "Theme:", Font = UiHelper.NormalFont, Location = new Point(15, 30), Size = new Size(90, 22) });
@@ -127,27 +126,26 @@ namespace ApplianceManagement.Forms
                 gbDisc.Controls.Add(btnBackup);
                 top.Controls.Add(gbDisc);
 
-                GroupBox gbRights = new GroupBox { Text = "User Rights (menu access)", Font = UiHelper.HeaderFont, ForeColor = UiHelper.ThemeDark, Location = new Point(15, 210), Size = new Size(855, 60) };
-                cmbUsers = new ComboBox { Location = new Point(12, 24), Size = new Size(160, 26), DropDownStyle = ComboBoxStyle.DropDownList };
+                GroupBox gbRights = new GroupBox { Text = "User Rights (menu access)", Font = UiHelper.HeaderFont, ForeColor = UiHelper.ThemeDark, Location = new Point(15, 210), Size = new Size(855, 70) };
+                cmbUsers = new ComboBox { Location = new Point(12, 28), Size = new Size(160, 26), DropDownStyle = ComboBoxStyle.DropDownList };
                 UiHelper.StyleComboBox(cmbUsers);
                 cmbUsers.SelectedIndexChanged += (s, e) => LoadPermChecks();
                 gbRights.Controls.Add(cmbUsers);
-                chkSale = MkChk("Sale", 185, 24); chkPurchase = MkChk("Purchase", 255, 24);
-                chkNewItem = MkChk("New Item", 350, 24); chkInventory = MkChk("Inventory", 445, 24);
-                chkReports = MkChk("Reports", 545, 24); chkSettings = MkChk("Settings", 640, 24);
+                chkSale = MkChk("Sale", 185, 30); chkPurchase = MkChk("Purchase", 255, 30);
+                chkNewItem = MkChk("New Item", 350, 30); chkInventory = MkChk("Inventory", 445, 30);
+                chkReports = MkChk("Reports", 545, 30); chkSettings = MkChk("Settings", 640, 30);
                 gbRights.Controls.AddRange(new Control[] { chkSale, chkPurchase, chkNewItem, chkInventory, chkReports, chkSettings });
-                Button btnPerm = new Button { Text = "Save Rights", Location = new Point(740, 20), Size = new Size(100, 30) };
+                Button btnPerm = new Button { Text = "Save Rights", Location = new Point(740, 24), Size = new Size(100, 32) };
                 UiHelper.StyleButton(btnPerm);
                 btnPerm.Click += (s, e) => SavePerms();
                 gbRights.Controls.Add(btnPerm);
                 top.Controls.Add(gbRights);
-                top.Height = 280;
             }
             else
             {
                 top.Controls.Add(new Label
                 {
-                    Text = "Discount limits are managed by Admin.",
+                    Text = "Discount limits and users are managed by Admin.\nSuppliers: Masters → Suppliers",
                     Font = UiHelper.SmallFont,
                     ForeColor = Color.Gray,
                     Location = new Point(450, 40),
@@ -157,69 +155,48 @@ namespace ApplianceManagement.Forms
 
             this.Controls.Add(top);
 
-            Panel mid = new Panel { Dock = DockStyle.Top, Height = isAdmin ? 200 : 120, BackColor = UiHelper.BgColor };
-            GroupBox gbSup = new GroupBox { Text = "Add Supplier", Font = UiHelper.HeaderFont, ForeColor = UiHelper.ThemeDark, Location = new Point(15, 5), Size = new Size(420, 105) };
-            gbSup.Controls.Add(new Label { Text = "Name:", Font = UiHelper.NormalFont, Location = new Point(15, 30), Size = new Size(60, 22) });
-            txtSupName = new TextBox { Location = new Point(80, 28), Size = new Size(220, 26) };
-            UiHelper.StyleTextBox(txtSupName);
-            gbSup.Controls.Add(txtSupName);
-            gbSup.Controls.Add(new Label { Text = "Phone:", Font = UiHelper.NormalFont, Location = new Point(15, 65), Size = new Size(60, 22) });
-            txtSupPhone = new TextBox { Location = new Point(80, 63), Size = new Size(150, 26) };
-            UiHelper.StyleTextBox(txtSupPhone);
-            gbSup.Controls.Add(txtSupPhone);
-            Button btnAddSup = new Button { Text = "Add", Location = new Point(250, 60), Size = new Size(100, 30) };
-            UiHelper.StyleButton(btnAddSup);
-            btnAddSup.Click += (s, e) =>
-            {
-                if (string.IsNullOrWhiteSpace(txtSupName.Text)) { DialogHelpers.Error(this, "Name required."); return; }
-                supplierRepo.Insert(new Supplier { SupplierName = txtSupName.Text.Trim(), Phone = txtSupPhone.Text.Trim() });
-                DialogHelpers.Info(this, "Supplier added.");
-                txtSupName.Clear(); txtSupPhone.Clear();
-                LoadSuppliers();
-            };
-            gbSup.Controls.Add(btnAddSup);
-            mid.Controls.Add(gbSup);
-
             if (isAdmin)
             {
-                GroupBox gbUser = new GroupBox { Text = "Create User / Change Password", Font = UiHelper.HeaderFont, ForeColor = UiHelper.ThemeDark, Location = new Point(450, 5), Size = new Size(430, 180) };
-                gbUser.Controls.Add(new Label { Text = "Username", Font = UiHelper.SmallFont, Location = new Point(12, 22), AutoSize = true });
-                txtNewUser = new TextBox { Location = new Point(90, 18), Size = new Size(120, 24) }; UiHelper.StyleTextBox(txtNewUser); gbUser.Controls.Add(txtNewUser);
-                gbUser.Controls.Add(new Label { Text = "Full name", Font = UiHelper.SmallFont, Location = new Point(220, 22), AutoSize = true });
-                txtNewFull = new TextBox { Location = new Point(290, 18), Size = new Size(120, 24) }; UiHelper.StyleTextBox(txtNewFull); gbUser.Controls.Add(txtNewFull);
-                gbUser.Controls.Add(new Label { Text = "Password", Font = UiHelper.SmallFont, Location = new Point(12, 52), AutoSize = true });
-                txtNewPwd = new TextBox { Location = new Point(90, 48), Size = new Size(120, 24), PasswordChar = '*' }; UiHelper.StyleTextBox(txtNewPwd); gbUser.Controls.Add(txtNewPwd);
-                gbUser.Controls.Add(new Label { Text = "Role", Font = UiHelper.SmallFont, Location = new Point(220, 52), AutoSize = true });
-                cmbNewRole = new ComboBox { Location = new Point(290, 48), Size = new Size(120, 24), DropDownStyle = ComboBoxStyle.DropDownList };
+                Panel mid = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(16) };
+                GroupBox gbUser = new GroupBox
+                {
+                    Text = "Create User / Change Password",
+                    Font = UiHelper.HeaderFont,
+                    ForeColor = UiHelper.ThemeDark,
+                    Dock = DockStyle.Top,
+                    Height = 200
+                };
+                gbUser.Controls.Add(new Label { Text = "Username", Font = UiHelper.SmallFont, Location = new Point(16, 28), AutoSize = true });
+                txtNewUser = new TextBox { Location = new Point(100, 24), Size = new Size(140, 26) }; UiHelper.StyleTextBox(txtNewUser); gbUser.Controls.Add(txtNewUser);
+                gbUser.Controls.Add(new Label { Text = "Full name", Font = UiHelper.SmallFont, Location = new Point(260, 28), AutoSize = true });
+                txtNewFull = new TextBox { Location = new Point(330, 24), Size = new Size(160, 26) }; UiHelper.StyleTextBox(txtNewFull); gbUser.Controls.Add(txtNewFull);
+                gbUser.Controls.Add(new Label { Text = "Password", Font = UiHelper.SmallFont, Location = new Point(16, 62), AutoSize = true });
+                txtNewPwd = new TextBox { Location = new Point(100, 58), Size = new Size(140, 26), PasswordChar = '*' }; UiHelper.StyleTextBox(txtNewPwd); gbUser.Controls.Add(txtNewPwd);
+                gbUser.Controls.Add(new Label { Text = "Role", Font = UiHelper.SmallFont, Location = new Point(260, 62), AutoSize = true });
+                cmbNewRole = new ComboBox { Location = new Point(330, 58), Size = new Size(160, 26), DropDownStyle = ComboBoxStyle.DropDownList };
                 UiHelper.StyleComboBox(cmbNewRole);
                 cmbNewRole.Items.AddRange(new object[] { "User", "Admin" });
                 cmbNewRole.SelectedIndex = 0;
                 gbUser.Controls.Add(cmbNewRole);
-                Button btnCreate = new Button { Text = "Create User", Location = new Point(90, 80), Size = new Size(120, 28) };
+                Button btnCreate = new Button { Text = "Create User", Location = new Point(100, 96), Size = new Size(140, 34) };
                 UiHelper.StyleButton(btnCreate);
                 btnCreate.Click += (s, e) => CreateUser();
                 gbUser.Controls.Add(btnCreate);
 
-                gbUser.Controls.Add(new Label { Text = "Change password for:", Font = UiHelper.SmallFont, Location = new Point(12, 120), AutoSize = true });
-                cmbChgUser = new ComboBox { Location = new Point(140, 116), Size = new Size(120, 24), DropDownStyle = ComboBoxStyle.DropDownList };
+                gbUser.Controls.Add(new Label { Text = "Change password for:", Font = UiHelper.SmallFont, Location = new Point(16, 148), AutoSize = true });
+                cmbChgUser = new ComboBox { Location = new Point(150, 144), Size = new Size(140, 26), DropDownStyle = ComboBoxStyle.DropDownList };
                 UiHelper.StyleComboBox(cmbChgUser);
                 gbUser.Controls.Add(cmbChgUser);
-                txtChgPwd = new TextBox { Location = new Point(270, 116), Size = new Size(100, 24), PasswordChar = '*' };
+                txtChgPwd = new TextBox { Location = new Point(300, 144), Size = new Size(120, 26), PasswordChar = '*' };
                 UiHelper.StyleTextBox(txtChgPwd);
                 gbUser.Controls.Add(txtChgPwd);
-                Button btnChg = new Button { Text = "Set Pwd", Location = new Point(90, 146), Size = new Size(100, 26) };
+                Button btnChg = new Button { Text = "Set Pwd", Location = new Point(430, 142), Size = new Size(100, 30) };
                 UiHelper.StyleButton(btnChg);
                 btnChg.Click += (s, e) => ChangeUserPassword();
                 gbUser.Controls.Add(btnChg);
                 mid.Controls.Add(gbUser);
+                this.Controls.Add(mid);
             }
-
-            this.Controls.Add(mid);
-
-            dgvSuppliers = new DataGridView { Dock = DockStyle.Fill };
-            UiHelper.StyleGrid(dgvSuppliers);
-            this.Controls.Add(dgvSuppliers);
-            this.Controls.SetChildIndex(dgvSuppliers, 0);
         }
 
         private void CreateUser()
@@ -315,14 +292,6 @@ namespace ApplianceManagement.Forms
             if (chkSettings.Checked) parts.Add("SETTINGS");
             AppSettings.SetUserPermissions(cmbUsers.SelectedItem.ToString(), string.Join(",", parts.ToArray()));
             DialogHelpers.Info(this, "Rights saved for " + cmbUsers.SelectedItem + ". User must re-login to apply menus.");
-        }
-
-        private void LoadSuppliers()
-        {
-            dgvSuppliers.DataSource = null;
-            dgvSuppliers.DataSource = supplierRepo.GetAllActive();
-            foreach (var h in new[] { "SupplierID", "IsActive", "OpeningBalance", "CreatedDate", "Address" })
-                if (dgvSuppliers.Columns.Contains(h)) dgvSuppliers.Columns[h].Visible = false;
         }
 
         private void LoadValues()
