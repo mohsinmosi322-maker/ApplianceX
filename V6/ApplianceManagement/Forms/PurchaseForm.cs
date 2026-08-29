@@ -15,6 +15,7 @@ namespace ApplianceManagement.Forms
         private PurchaseRepository purchaseRepo = new PurchaseRepository();
         private List<PurchaseDetail> cart = new List<PurchaseDetail>();
         private Supplier selectedSupplier;
+        private Product selectedProduct;
         private TextBox txtSearch, txtQty, txtDiscount, txtDiscAmt, txtPaid, txtTotal, txtNet;
         private ComboBox cmbSupplier;
         private DataGridView dgv;
@@ -44,8 +45,13 @@ namespace ApplianceManagement.Forms
                 if (e.KeyCode == Keys.F9) { ShowProductHistory(); e.Handled = true; }
             };
 
+            this.Controls.Add(UiHelper.CreateFormBanner(
+                "PURCHASE",
+                "Stock inbound from suppliers  \u2022  Select supplier  \u2022  Discount & paid  \u2022  F9 history",
+                FormAccent.Purchase, FormAccent.PurchaseDark));
+
             Panel top = new Panel { Dock = DockStyle.Top, Height = 88, BackColor = Color.White };
-            top.Controls.Add(new Label { Text = "Invoice  AUTO", Font = UiHelper.HeaderFont, ForeColor = UiHelper.ThemeDark, Location = new Point(16, 12), AutoSize = true });
+            top.Controls.Add(new Label { Text = "Invoice  AUTO", Font = UiHelper.HeaderFont, ForeColor = FormAccent.PurchaseDark, Location = new Point(16, 12), AutoSize = true });
             top.Controls.Add(new Label { Text = DateTime.Now.ToString("dd MMM yyyy  HH:mm"), Font = UiHelper.NormalFont, ForeColor = Color.FromArgb(110, 122, 136), Location = new Point(200, 14), AutoSize = true });
             top.Controls.Add(new Label { Text = "Supplier", Font = UiHelper.SmallFont, Location = new Point(430, 14), AutoSize = true });
             cmbSupplier = new ComboBox { Location = new Point(490, 10), Size = new Size(260, 26), DropDownStyle = ComboBoxStyle.DropDownList };
@@ -65,7 +71,7 @@ namespace ApplianceManagement.Forms
                     else
                     {
                         var p = productRepo.GetByBarcode(txtSearch.Text.Trim()) ?? productRepo.GetByCode(txtSearch.Text.Trim());
-                        if (p != null) { txtSearch.Tag = p; txtQty.Focus(); txtQty.SelectAll(); }
+                        if (p != null) { selectedProduct = p; txtSearch.Tag = p; txtQty.Focus(); txtQty.SelectAll(); }
                         else MessageBox.Show("Product not found.");
                     }
                 }
@@ -80,24 +86,18 @@ namespace ApplianceManagement.Forms
             txtQty.KeyDown += (s, e) =>
             {
                 if (e.KeyCode != Keys.Enter) return; e.SuppressKeyPress = true;
-                if (!(txtSearch.Tag is Product p)) return;
+                Product p = selectedProduct ?? (txtSearch.Tag as Product);
+                if (p == null) return;
                 int qty = 1; int.TryParse(txtQty.Text, out qty); if (qty < 1) qty = 1;
                 var ex = cart.Find(x => x.ProductID == p.ProductID);
                 if (ex != null) { ex.Quantity += qty; ex.Amount = ex.Quantity * ex.PurchasePrice; }
                 else cart.Add(new PurchaseDetail { ProductID = p.ProductID, ProductCode = p.ProductCode, ProductName = p.ProductName, Quantity = qty, PurchasePrice = p.PurchasePrice, Amount = qty * p.PurchasePrice });
-                RefreshGrid(); txtSearch.Clear(); txtSearch.Tag = null; txtQty.Text = "1"; lstSuggest.Visible = false; txtSearch.Focus();
+                RefreshGrid(); txtSearch.Clear(); txtSearch.Tag = null; selectedProduct = null; txtQty.Text = "1"; lstSuggest.Visible = false; txtSearch.Focus();
             };
             top.Controls.Add(txtQty);
             this.Controls.Add(top);
 
-            lstSuggest = new ListBox
-            {
-                Location = new Point(70, 86),
-                Size = new Size(420, 160),
-                Visible = false,
-                Font = UiHelper.NormalFont,
-                IntegralHeight = false
-            };
+            lstSuggest = new ListBox { Location = new Point(70, 140), Size = new Size(420, 160), Visible = false, Font = UiHelper.NormalFont, IntegralHeight = false };
             lstSuggest.Click += (s, e) => SelectSug();
             lstSuggest.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; SelectSug(); } };
             this.Controls.Add(lstSuggest);
@@ -105,7 +105,7 @@ namespace ApplianceManagement.Forms
             this.Controls.Add(BuildTotalsFooter());
 
             dgv = new DataGridView { Dock = DockStyle.Fill };
-            UiHelper.StyleGrid(dgv);
+            UiHelper.StyleGridWithAccent(dgv, FormAccent.Purchase);
             this.Controls.Add(dgv);
             dgv.BringToFront();
             lstSuggest.BringToFront();
@@ -113,10 +113,11 @@ namespace ApplianceManagement.Forms
 
         private void ShowProductHistory()
         {
-            Product p = txtSearch.Tag as Product;
+            Product p = selectedProduct ?? (txtSearch.Tag as Product);
             if (p == null)
             {
                 string q = txtSearch.Text.Trim();
+                if (q.Contains(" - ")) q = q.Split(new[] { " - " }, StringSplitOptions.None)[0].Trim();
                 if (q.Length > 0)
                     p = productRepo.GetByBarcode(q) ?? productRepo.GetByCode(q);
             }
@@ -125,6 +126,7 @@ namespace ApplianceManagement.Forms
                 MessageBox.Show("Select or search a product first, then press F9 for purchase history.");
                 return;
             }
+            selectedProduct = p;
             using (var f = new ProductHistoryForm(p, false))
                 f.ShowDialog(this);
         }
@@ -143,7 +145,7 @@ namespace ApplianceManagement.Forms
 
         private Panel BuildTotalsFooter()
         {
-            Panel foot = new Panel { Dock = DockStyle.Bottom, Height = 78, BackColor = Color.White };
+            Panel foot = new Panel { Dock = DockStyle.Bottom, Height = 78, BackColor = Color.FromArgb(232, 248, 238) };
             int x = 16;
             AddFootLabel(foot, "Total", x, 10); txtTotal = AddFootBox(foot, x, 32, 110, "0.00"); txtTotal.TextChanged += (s, e) => OnTotalChanged();
             txtTotal.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; txtDiscount.Focus(); txtDiscount.SelectAll(); } };
@@ -154,7 +156,7 @@ namespace ApplianceManagement.Forms
             AddFootLabel(foot, "Discount", x, 10); txtDiscAmt = AddFootBox(foot, x, 32, 110, "0.00"); txtDiscAmt.TextChanged += (s, e) => OnAmtChanged();
             txtDiscAmt.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; txtNet.Focus(); txtNet.SelectAll(); } };
             x += 126;
-            AddFootLabel(foot, "Net", x, 10); txtNet = AddFootBox(foot, x, 32, 120, "0.00"); txtNet.ForeColor = UiHelper.ThemeColor;
+            AddFootLabel(foot, "Net", x, 10); txtNet = AddFootBox(foot, x, 32, 120, "0.00"); txtNet.ForeColor = FormAccent.Purchase;
             txtNet.TextChanged += (s, e) => OnNetChanged();
             txtNet.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; txtPaid.Text = txtNet.Text; txtPaid.Focus(); txtPaid.SelectAll(); } };
             x += 136;
@@ -163,7 +165,8 @@ namespace ApplianceManagement.Forms
 
             Button btnSave = new Button { Text = "SAVE (F12)", Size = new Size(130, 36), Anchor = AnchorStyles.Top | AnchorStyles.Right };
             Button btnClose = new Button { Text = "CLOSE (F4)", Size = new Size(130, 36), Anchor = AnchorStyles.Top | AnchorStyles.Right };
-            UiHelper.StyleButton(btnSave); UiHelper.StyleButton(btnClose);
+            UiHelper.StyleAccentButton(btnSave, FormAccent.Purchase, FormAccent.PurchaseDark);
+            UiHelper.StyleAccentButton(btnClose, FormAccent.PurchaseDark, FormAccent.Purchase);
             btnSave.Click += (s, e) => Save();
             btnClose.Click += (s, e) => this.Close();
             foot.Controls.Add(btnSave); foot.Controls.Add(btnClose);
@@ -192,6 +195,7 @@ namespace ApplianceManagement.Forms
         {
             if (lstSuggest.SelectedItem is Product p)
             {
+                selectedProduct = p;
                 txtSearch.Text = p.ProductCode + " - " + p.ProductName;
                 txtSearch.Tag = p;
                 lstSuggest.Visible = false;
