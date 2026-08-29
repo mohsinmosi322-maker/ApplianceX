@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
 using ApplianceManagement.Data;
@@ -19,53 +20,87 @@ namespace ApplianceManagement.Forms
         public CustomerPaymentForm()
         {
             Text = "Customer Payment";
-            Size = new Size(520, 360);
+            Size = new Size(640, 420);
             BackColor = UiHelper.BgColor;
             KeyPreview = true;
             UiHelper.AttachF4Close(this);
+            UiHelper.AttachEnterNavigation(this);
             KeyDown += (s, e) => { if (e.KeyCode == Keys.F12) { Save(); e.Handled = true; } };
 
-            Controls.Add(UiHelper.CreateFormBanner("CUSTOMER PAYMENT", "Record payment against receivable · F12 save",
+            Controls.Add(UiHelper.CreateFormBanner("CUSTOMER PAYMENT",
+                "Select customer  ·  Record payment against receivable  ·  F12 save",
                 FormAccent.Sale, FormAccent.SaleDark));
 
-            var card = new Panel { Dock = DockStyle.Fill, Padding = new Padding(28), BackColor = Color.White };
+            var card = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Padding = new Padding(32, 24, 32, 24),
+                BackColor = Color.White
+            };
             Controls.Add(card);
+            card.BringToFront();
 
-            int y = 16;
-            card.Controls.Add(new Label { Text = "Customer", Location = new Point(0, y), AutoSize = true });
-            cmbCustomer = new ComboBox { Location = new Point(120, y - 2), Size = new Size(320, 28), DropDownStyle = ComboBoxStyle.DropDownList };
-            cmbCustomer.DataSource = _cust.GetAllActive();
-            cmbCustomer.DisplayMember = "CustomerName";
-            cmbCustomer.SelectedIndexChanged += (s, e) => RefreshBal();
+            int y = 12;
+            card.Controls.Add(new Label { Text = "Customer *", Location = new Point(0, y), AutoSize = true, Font = UiHelper.SmallFont });
+            y += 22;
+            cmbCustomer = new ComboBox
+            {
+                Location = new Point(0, y),
+                Size = new Size(420, 28),
+                DropDownStyle = ComboBoxStyle.DropDownList
+            };
             UiHelper.StyleComboBox(cmbCustomer);
+            cmbCustomer.DisplayMember = "CustomerName";
+            cmbCustomer.ValueMember = "CustomerID";
+            var list = _cust.GetAllActive() ?? new List<Customer>();
+            cmbCustomer.DataSource = list;
+            cmbCustomer.SelectedIndexChanged += (s, e) => RefreshBal();
             card.Controls.Add(cmbCustomer);
             y += 40;
-            lblBalance = new Label { Text = "Balance: —", Location = new Point(120, y), AutoSize = true, Font = UiHelper.HeaderFont, ForeColor = FormAccent.Sale };
+
+            lblBalance = new Label
+            {
+                Text = "Balance (receivable): —",
+                Location = new Point(0, y),
+                AutoSize = true,
+                Font = UiHelper.HeaderFont,
+                ForeColor = FormAccent.Sale
+            };
             card.Controls.Add(lblBalance);
             y += 40;
-            card.Controls.Add(new Label { Text = "Amount", Location = new Point(0, y), AutoSize = true });
-            txtAmount = new TextBox { Location = new Point(120, y - 2), Size = new Size(160, 28) };
+
+            card.Controls.Add(new Label { Text = "Amount *", Location = new Point(0, y), AutoSize = true, Font = UiHelper.SmallFont });
+            y += 22;
+            txtAmount = new TextBox { Location = new Point(0, y), Size = new Size(180, 28) };
             UiHelper.StyleTextBox(txtAmount);
-            txtAmount.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; txtRemarks.Focus(); } };
             card.Controls.Add(txtAmount);
             y += 40;
-            card.Controls.Add(new Label { Text = "Remarks", Location = new Point(0, y), AutoSize = true });
-            txtRemarks = new TextBox { Location = new Point(120, y - 2), Size = new Size(320, 28) };
+
+            card.Controls.Add(new Label { Text = "Remarks", Location = new Point(0, y), AutoSize = true, Font = UiHelper.SmallFont });
+            y += 22;
+            txtRemarks = new TextBox { Location = new Point(0, y), Size = new Size(420, 28) };
             UiHelper.StyleTextBox(txtRemarks);
-            txtRemarks.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; Save(); } };
             card.Controls.Add(txtRemarks);
             y += 50;
-            var btn = new Button { Text = "SAVE PAYMENT (F12)", Location = new Point(120, y), Size = new Size(180, 36) };
+
+            var btn = new Button { Text = "SAVE PAYMENT (F12)", Location = new Point(0, y), Size = new Size(200, 38) };
             UiHelper.StyleAccentButton(btn, FormAccent.Sale, FormAccent.SaleDark);
             btn.Click += (s, e) => Save();
             card.Controls.Add(btn);
-            RefreshBal();
+
+            if (list.Count == 0)
+                lblBalance.Text = "No customers found — add from Masters → Customers";
+            else
+                RefreshBal();
         }
 
         private void RefreshBal()
         {
             if (cmbCustomer.SelectedItem is Customer c)
-                lblBalance.Text = "Balance (receivable): " + _acct.GetBalance(c.CustomerID).ToString("0.00");
+                lblBalance.Text = "Balance (receivable): " + _acct.GetBalance(c.CustomerID).ToString("N2") +
+                                  "    ·    " + c.CustomerName;
+            else
+                lblBalance.Text = "Balance (receivable): —";
         }
 
         private void Save()

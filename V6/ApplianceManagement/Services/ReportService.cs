@@ -20,7 +20,8 @@ namespace ApplianceManagement.Services
     public class ReportService
     {
         /// <summary>
-        /// Gross profit = Sales revenue − COGS (UnitCost × qty from sale lines).
+        /// Gross profit = revenue − COGS.
+        /// COGS always uses pack-aware unit cost: PurchasePrice / PackSize (never full pack price × unit qty).
         /// </summary>
         public List<ProfitRow> GetProfit(DateTime from, DateTime to)
         {
@@ -30,70 +31,37 @@ namespace ApplianceManagement.Services
                 conn.Open();
                 string sql =
                     "SELECT h.SaleDate, h.InvoiceNo, p.ProductCode, p.ProductName, d.Quantity, d.Amount, " +
-                    "ISNULL(d.UnitCost, ISNULL(p.PurchasePrice,0)) AS UnitCost " +
+                    "ISNULL(p.PurchasePrice,0) AS PurchasePrice, ISNULL(p.PackSize,1) AS PackSize " +
                     "FROM SaleDetail d " +
                     "INNER JOIN SaleHeader h ON d.SaleID = h.SaleID " +
                     "INNER JOIN Products p ON d.ProductID = p.ProductID " +
                     "WHERE CAST(h.SaleDate AS DATE) BETWEEN @F AND @T " +
                     "ORDER BY h.SaleDate DESC";
-                try
+                using (var cmd = DbHelper.CreateCommand(sql, conn))
                 {
-                    using (var cmd = DbHelper.CreateCommand(sql, conn))
-                    {
-                        cmd.Parameters.AddWithValue("@F", from.Date);
-                        cmd.Parameters.AddWithValue("@T", to.Date);
-                        using (var r = cmd.ExecuteReader())
-                            while (r.Read())
+                    cmd.Parameters.AddWithValue("@F", from.Date);
+                    cmd.Parameters.AddWithValue("@T", to.Date);
+                    using (var r = cmd.ExecuteReader())
+                        while (r.Read())
+                        {
+                            int qty = Convert.ToInt32(r["Quantity"]);
+                            decimal amount = Convert.ToDecimal(r["Amount"]);
+                            decimal packPrice = Convert.ToDecimal(r["PurchasePrice"]);
+                            decimal packSize = Convert.ToDecimal(r["PackSize"]);
+                            decimal unitCost = PackMath.UnitCost(packPrice, packSize);
+                            decimal cogs = Math.Round(unitCost * qty, 2);
+                            list.Add(new ProfitRow
                             {
-                                int qty = Convert.ToInt32(r["Quantity"]);
-                                decimal amount = Convert.ToDecimal(r["Amount"]);
-                                decimal unitCost = Convert.ToDecimal(r["UnitCost"]);
-                                decimal cogs = Math.Round(unitCost * qty, 2);
-                                list.Add(new ProfitRow
-                                {
-                                    SaleDate = (DateTime)r["SaleDate"],
-                                    InvoiceNo = r["InvoiceNo"].ToString(),
-                                    ProductCode = r["ProductCode"].ToString(),
-                                    ProductName = r["ProductName"].ToString(),
-                                    Qty = qty,
-                                    SaleAmount = amount,
-                                    Cogs = cogs,
-                                    GrossProfit = Math.Round(amount - cogs, 2)
-                                });
-                            }
-                    }
-                }
-                catch (SqlException)
-                {
-                    // UnitCost column missing — fallback without it
-                    using (var cmd = DbHelper.CreateCommand(
-                        "SELECT h.SaleDate, h.InvoiceNo, p.ProductCode, p.ProductName, d.Quantity, d.Amount, p.PurchasePrice " +
-                        "FROM SaleDetail d INNER JOIN SaleHeader h ON d.SaleID=h.SaleID " +
-                        "INNER JOIN Products p ON d.ProductID=p.ProductID " +
-                        "WHERE CAST(h.SaleDate AS DATE) BETWEEN @F AND @T ORDER BY h.SaleDate DESC", conn))
-                    {
-                        cmd.Parameters.AddWithValue("@F", from.Date);
-                        cmd.Parameters.AddWithValue("@T", to.Date);
-                        using (var r = cmd.ExecuteReader())
-                            while (r.Read())
-                            {
-                                int qty = Convert.ToInt32(r["Quantity"]);
-                                decimal amount = Convert.ToDecimal(r["Amount"]);
-                                decimal unitCost = Convert.ToDecimal(r["PurchasePrice"]);
-                                decimal cogs = Math.Round(unitCost * qty, 2);
-                                list.Add(new ProfitRow
-                                {
-                                    SaleDate = (DateTime)r["SaleDate"],
-                                    InvoiceNo = r["InvoiceNo"].ToString(),
-                                    ProductCode = r["ProductCode"].ToString(),
-                                    ProductName = r["ProductName"].ToString(),
-                                    Qty = qty,
-                                    SaleAmount = amount,
-                                    Cogs = cogs,
-                                    GrossProfit = Math.Round(amount - cogs, 2)
-                                });
-                            }
-                    }
+                                SaleDate = (DateTime)r["SaleDate"],
+                                InvoiceNo = r["InvoiceNo"].ToString(),
+                                ProductCode = r["ProductCode"].ToString(),
+                                ProductName = r["ProductName"].ToString(),
+                                Qty = qty,
+                                SaleAmount = amount,
+                                Cogs = cogs,
+                                GrossProfit = Math.Round(amount - cogs, 2)
+                            });
+                        }
                 }
             }
             return list;
