@@ -133,8 +133,8 @@ namespace ApplianceManagement.Forms
             dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "ProductName", DataPropertyName = "ProductName", HeaderText = "Description", FillWeight = 45 });
             dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "ProductCode", DataPropertyName = "ProductCode", HeaderText = "Code", FillWeight = 12 });
             dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "Quantity", DataPropertyName = "Quantity", HeaderText = "Quantity", FillWeight = 12 });
-            dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "SalePrice", DataPropertyName = "SalePrice", HeaderText = "Sale Price", DefaultCellStyle = { Format = "N2" }, FillWeight = 15 });
-            dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "Amount", DataPropertyName = "Amount", HeaderText = "Amount", DefaultCellStyle = { Format = "N2" }, FillWeight = 15 });
+            dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "SalePrice", DataPropertyName = "SalePrice", HeaderText = "Sale Price", FillWeight = 15 });
+            dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "Amount", DataPropertyName = "Amount", HeaderText = "Amount", FillWeight = 15 });
             Controls.Add(dgv);
             Controls.SetChildIndex(dgv, 0);
 
@@ -340,7 +340,7 @@ namespace ApplianceManagement.Forms
                 DialogHelpers.Error(this, "Insufficient stock. Available: " + p.CurrentStock);
                 return;
             }
-            decimal unitPrice = PackMath.UnitSalePrice(p);
+            decimal unitPrice = p.UnitSalePrice;
             var ex = cart.Find(line => line.ProductID == p.ProductID);
             if (ex != null)
             {
