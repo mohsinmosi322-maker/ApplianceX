@@ -126,6 +126,29 @@ namespace ApplianceManagement.Forms
             clock.Start();
         }
 
+        /// <summary>Called from Settings after theme/font change — refresh shell branding.</summary>
+        public void RefreshBranding()
+        {
+            try
+            {
+                this.Text = UiHelper.AppName + " — " + UiHelper.GetShopName();
+                if (menuStrip != null)
+                {
+                    menuStrip.BackColor = UiHelper.ThemeColor;
+                    menuStrip.Renderer = new ToolStripProfessionalRenderer(new MenuColorTable());
+                }
+                if (statusStrip != null)
+                    statusStrip.BackColor = UiHelper.ThemeDark;
+                if (lblStore != null)
+                    lblStore.Text = UiHelper.GetShopName();
+                if (lblUser != null && CurrentUser != null)
+                    lblUser.Text = "User: " + CurrentUser.UserName + " (" + CurrentUser.Role + ")";
+                if (homeScreen != null && !homeScreen.IsDisposed)
+                    homeScreen.RefreshBranding();
+            }
+            catch { }
+        }
+
         private void OpenSettingsProtected()
         {
             if (CurrentUser == null || !string.Equals(CurrentUser.Role, "Admin", StringComparison.OrdinalIgnoreCase))
