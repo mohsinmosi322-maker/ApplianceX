@@ -134,6 +134,16 @@ namespace ApplianceManagement.Forms
 
             var mnuSet = new ToolStripMenuItem("  Settings  ");
             mnuSet.DropDownItems.Add("Appearance & Limits", null, (s, e) => OpenSettingsProtected());
+            mnuSet.DropDownItems.Add("Users (CRUD)", null, (s, e) =>
+            {
+                if (CurrentUser == null || !string.Equals(CurrentUser.Role, "Admin", StringComparison.OrdinalIgnoreCase))
+                {
+                    MessageBox.Show("Only Admin can manage users.", "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+                if (!PromptSettingsPassword()) return;
+                OpenChild(new UserMasterForm(), "SETTINGS");
+            });
 
             mnuWindows = new ToolStripMenuItem("  Windows  ");
             mnuWindows.DropDownOpening += MnuWindows_DropDownOpening;
@@ -301,7 +311,7 @@ namespace ApplianceManagement.Forms
             if (t.StartsWith("Stock")) return "INVENTORY";
             if (t.StartsWith("Low Stock")) return "REPORTS";
             if (t.Contains("Report") || t.StartsWith("Reports") || t.StartsWith("Profit")) return "REPORTS";
-            if (t.StartsWith("Settings") || t.StartsWith("Appearance")) return "SETTINGS";
+            if (t.StartsWith("Settings") || t.StartsWith("Appearance") || t.StartsWith("Users")) return "SETTINGS";
             return "";
         }
 
