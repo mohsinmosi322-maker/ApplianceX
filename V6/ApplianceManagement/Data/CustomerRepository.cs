@@ -38,6 +38,27 @@ namespace ApplianceManagement.Data
             return null;
         }
 
+        public List<Customer> Search(string q)
+        {
+            q = (q ?? "").Trim();
+            var list = new List<Customer>();
+            using (var conn = DbHelper.GetConnection())
+            {
+                conn.Open();
+                string sql = string.IsNullOrEmpty(q)
+                    ? "SELECT TOP 50 * FROM Customers WHERE IsActive=1 ORDER BY CustomerName"
+                    : "SELECT TOP 50 * FROM Customers WHERE IsActive=1 AND (CustomerName LIKE @Q OR ISNULL(Phone,'') LIKE @Q) ORDER BY CustomerName";
+                using (var cmd = DbHelper.CreateCommand(sql, conn))
+                {
+                    if (!string.IsNullOrEmpty(q))
+                        cmd.Parameters.AddWithValue("@Q", "%" + q + "%");
+                    using (var r = cmd.ExecuteReader())
+                        while (r.Read()) list.Add(Map(r));
+                }
+            }
+            return list;
+        }
+
         public List<Customer> GetAllActive()
         {
             var list = new List<Customer>();
@@ -96,7 +117,6 @@ namespace ApplianceManagement.Data
             }
         }
 
-        /// <summary>Soft-delete. Walk-in customer cannot be deactivated.</summary>
         public void SetActive(int id, bool active)
         {
             var c = GetById(id);
