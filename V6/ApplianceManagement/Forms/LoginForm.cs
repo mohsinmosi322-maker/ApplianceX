@@ -14,7 +14,15 @@ namespace ApplianceManagement.Forms
 
         public LoginForm()
         {
-            try { LicenseReader.TryLoad(); } catch { }
+            // Must already be loaded in Program.Main — re-check for safety
+            if (!LicenseReader.TryLoad() || !LicenseReader.IsValid())
+            {
+                MessageBox.Show(
+                    "Valid license.dat is required to run this software.\n\nPath:\n" + LicenseReader.LicensePath,
+                    "License Required", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Load += (s, e) => { Close(); };
+            }
+
             InitializeComponent();
             UiHelper.InitializeTheme();
             ApplyLicenseBranding();
@@ -127,7 +135,7 @@ namespace ApplianceManagement.Forms
 
             Label hint = new Label
             {
-                Text = "license.dat or connectionstring.txt next to the app",
+                Text = "Requires license.dat next to the application",
                 Font = UiHelper.SmallFont,
                 ForeColor = Color.FromArgb(140, 150, 160),
                 Location = new Point(20, 318),
@@ -143,31 +151,14 @@ namespace ApplianceManagement.Forms
         {
             try
             {
-                if (!LicenseReader.TryLoad())
+                if (!LicenseReader.TryLoad() || !LicenseReader.IsValid())
                 {
-                    // Allow continue if connectionstring.txt exists (dev / offline setup)
-                    string err;
-                    if (!DbHelper.TryOpen(out err))
-                    {
-                        MessageBox.Show(
-                            "license.dat not found and database is not reachable.\n\n" +
-                            "Place license.dat or connectionstring.txt next to the application.\n\n" + err,
-                            "License / Connection", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                        return;
-                    }
-                    AppLog.Warn("Login without license.dat — using connectionstring.txt / App.config");
+                    MessageBox.Show(
+                        "Valid license.dat is required.\n\n" + LicenseReader.LicensePath,
+                        "License Required", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
                 }
-                else
-                {
-                    ApplyLicenseBranding();
-                    if (!LicenseReader.IsValid())
-                    {
-                        MessageBox.Show(
-                            "License expired on " + LicenseReader.Current.ExpiryDate.ToString("dd/MM/yyyy") + ".",
-                            "License Expired", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                        return;
-                    }
-                }
+                ApplyLicenseBranding();
 
                 if (string.IsNullOrWhiteSpace(txtUsername.Text) || string.IsNullOrWhiteSpace(txtPassword.Text))
                 {

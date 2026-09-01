@@ -101,16 +101,17 @@ namespace ApplianceManagement.Forms
             mnuFile.DropDownItems.Add(new ToolStripSeparator());
             mnuFile.DropDownItems.Add("Exit", null, (s, e) => this.Close());
 
+            // Sale / Purchase / Returns — same access pattern
             var mnuTrans = new ToolStripMenuItem("  Transactions  ");
             mnuTrans.DropDownItems.Add("Sale\tF2", null, (s, e) => OpenChild(new SaleForm(), "SALE"));
             mnuTrans.DropDownItems.Add("Sale Return", null, (s, e) => OpenChild(new SaleReturnForm(), "SALE"));
+            mnuTrans.DropDownItems.Add(new ToolStripSeparator());
             mnuTrans.DropDownItems.Add("Purchase\tF3", null, (s, e) => OpenChild(new PurchaseForm(), "PURCHASE"));
             mnuTrans.DropDownItems.Add("Purchase Return", null, (s, e) => OpenChild(new PurchaseReturnForm(), "PURCHASE"));
 
+            // Inventory: only stock position (New Item + Stock Ops removed)
             var mnuInv = new ToolStripMenuItem("  Inventory  ");
-            mnuInv.DropDownItems.Add("New / Edit Item", null, (s, e) => OpenChild(new NewItemForm(), "NEWITEM"));
             mnuInv.DropDownItems.Add("Stock Position", null, (s, e) => OpenChild(new InventoryForm(), "INVENTORY"));
-            mnuInv.DropDownItems.Add("Stock Operations", null, (s, e) => OpenChild(new StockOpsForm(), "INVENTORY"));
 
             var mnuMasters = new ToolStripMenuItem("  Masters  ");
             mnuMasters.DropDownItems.Add("Products (list / edit)", null, (s, e) => OpenChild(new ProductManageForm(), "NEWITEM"));
