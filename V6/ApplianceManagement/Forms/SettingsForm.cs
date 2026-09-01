@@ -43,33 +43,79 @@ namespace ApplianceManagement.Forms
                     : "Appearance only",
                 FormAccent.Settings, FormAccent.SettingsDark));
 
-            Panel top = new Panel { Dock = DockStyle.Top, Height = isAdmin ? 300 : 210, BackColor = UiHelper.BgColor, Padding = new Padding(10) };
+            Panel top = new Panel { Dock = DockStyle.Top, Height = isAdmin ? 360 : 270, BackColor = UiHelper.BgColor, Padding = new Padding(10) };
 
-            GroupBox gbTheme = new GroupBox { Text = "Theme Manager (live)", Font = UiHelper.HeaderFont, ForeColor = UiHelper.ThemeDark, Location = new Point(15, 10), Size = new Size(420, 190) };
-            gbTheme.Controls.Add(new Label { Text = "Theme:", Font = UiHelper.NormalFont, Location = new Point(15, 30), Size = new Size(90, 22) });
-            cmbTheme = new ComboBox { Location = new Point(120, 28), Size = new Size(220, 26), DropDownStyle = ComboBoxStyle.DropDownList };
+            GroupBox gbTheme = new GroupBox { Text = "Theme Manager (live)", Font = UiHelper.HeaderFont, ForeColor = UiHelper.ThemeDark, Location = new Point(15, 10), Size = new Size(420, 250) };
+            gbTheme.Controls.Add(new Label
+            {
+                Text = "Select POS theme (4 professional themes):",
+                Font = UiHelper.SmallFont,
+                ForeColor = Color.Gray,
+                Location = new Point(15, 22),
+                AutoSize = true
+            });
+
+            cmbTheme = new ComboBox
+            {
+                Location = new Point(15, 44),
+                Size = new Size(250, 28),
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Font = UiHelper.NormalFont
+            };
             UiHelper.StyleComboBox(cmbTheme);
-            cmbTheme.Items.AddRange(UiHelper.ThemeNames);
-            cmbTheme.SelectedItem = UiHelper.DefaultTheme;
+            cmbTheme.Items.Clear();
+            cmbTheme.Items.Add("Professional Navy");
+            cmbTheme.Items.Add("Modern State".Replace("State", "Slate"));
+            cmbTheme.Items.Add("Executive Blue");
+            cmbTheme.Items.Add("Clean Gray");
+            cmbTheme.SelectedIndex = 0;
             gbTheme.Controls.Add(cmbTheme);
 
-            gbTheme.Controls.Add(new Label { Text = "Font Size:", Font = UiHelper.NormalFont, Location = new Point(15, 65), Size = new Size(90, 22) });
-            cmbFontSize = new ComboBox { Location = new Point(120, 63), Size = new Size(100, 26), DropDownStyle = ComboBoxStyle.DropDownList };
+            var lstThemes = new ListBox
+            {
+                Location = new Point(15, 78),
+                Size = new Size(250, 72),
+                Font = UiHelper.NormalFont,
+                IntegralHeight = true
+            };
+            lstThemes.Items.Add("Professional Navy (default)");
+            lstThemes.Items.Add("Modern Slate");
+            lstThemes.Items.Add("Executive Blue");
+            lstThemes.Items.Add("Clean Gray");
+            lstThemes.SelectedIndex = 0;
+            lstThemes.SelectedIndexChanged += (s, e) =>
+            {
+                if (lstThemes.SelectedIndex < 0) return;
+                if (lstThemes.SelectedIndex < cmbTheme.Items.Count)
+                    cmbTheme.SelectedIndex = lstThemes.SelectedIndex;
+            };
+            cmbTheme.SelectedIndexChanged += (s, e) =>
+            {
+                if (cmbTheme.SelectedIndex >= 0 && cmbTheme.SelectedIndex < lstThemes.Items.Count)
+                    lstThemes.SelectedIndex = cmbTheme.SelectedIndex;
+            };
+            gbTheme.Controls.Add(lstThemes);
+
+            gbTheme.Controls.Add(new Label { Text = "Font Size:", Font = UiHelper.NormalFont, Location = new Point(280, 44), Size = new Size(90, 22) });
+            cmbFontSize = new ComboBox { Location = new Point(280, 68), Size = new Size(100, 26), DropDownStyle = ComboBoxStyle.DropDownList };
             UiHelper.StyleComboBox(cmbFontSize);
-            cmbFontSize.Items.AddRange(new object[] { "9", "10", "11", "12", "14" });
+            cmbFontSize.Items.Add("9");
+            cmbFontSize.Items.Add("10");
+            cmbFontSize.Items.Add("11");
+            cmbFontSize.Items.Add("12");
+            cmbFontSize.Items.Add("14");
             cmbFontSize.SelectedItem = "10";
             gbTheme.Controls.Add(cmbFontSize);
 
-            gbTheme.Controls.Add(new Label { Text = "Form Size:", Font = UiHelper.NormalFont, Location = new Point(15, 100), Size = new Size(90, 22) });
-            cmbResolution = new ComboBox { Location = new Point(120, 98), Size = new Size(180, 26), DropDownStyle = ComboBoxStyle.DropDownList };
+            gbTheme.Controls.Add(new Label { Text = "Form Size:", Font = UiHelper.NormalFont, Location = new Point(280, 100), Size = new Size(90, 22) });
+            cmbResolution = new ComboBox { Location = new Point(280, 124), Size = new Size(120, 26), DropDownStyle = ComboBoxStyle.DropDownList };
             UiHelper.StyleComboBox(cmbResolution);
-            cmbResolution.Items.AddRange(new object[] {
-                "800 x 600", "1024 x 768", "1152 x 864", "1280 x 720", "1280 x 800", "1280 x 960", "1280 x 1024"
-            });
+            foreach (var r in new[] { "800 x 600", "1024 x 768", "1152 x 864", "1280 x 720", "1280 x 800", "1280 x 960", "1280 x 1024" })
+                cmbResolution.Items.Add(r);
             cmbResolution.SelectedItem = "1024 x 768";
             gbTheme.Controls.Add(cmbResolution);
 
-            Button btnApply = new Button { Text = "Apply Live", Location = new Point(120, 140), Size = new Size(140, 36) };
+            Button btnApply = new Button { Text = "Apply Live", Location = new Point(15, 160), Size = new Size(160, 36) };
             UiHelper.StyleButton(btnApply);
             btnApply.Click += (s, e) =>
             {
@@ -127,7 +173,7 @@ namespace ApplianceManagement.Forms
                 gbDisc.Controls.Add(btnBackup);
                 top.Controls.Add(gbDisc);
 
-                GroupBox gbRights = new GroupBox { Text = "User Rights (menu access)", Font = UiHelper.HeaderFont, ForeColor = UiHelper.ThemeDark, Location = new Point(15, 210), Size = new Size(855, 70) };
+                GroupBox gbRights = new GroupBox { Text = "User Rights (menu access)", Font = UiHelper.HeaderFont, ForeColor = UiHelper.ThemeDark, Location = new Point(15, 270), Size = new Size(855, 70) };
                 cmbUsers = new ComboBox { Location = new Point(12, 28), Size = new Size(160, 26), DropDownStyle = ComboBoxStyle.DropDownList };
                 UiHelper.StyleComboBox(cmbUsers);
                 cmbUsers.SelectedIndexChanged += (s, e) => LoadPermChecks();
@@ -298,8 +344,13 @@ namespace ApplianceManagement.Forms
         private void LoadValues()
         {
             string t = UiHelper.NormalizeThemeName(AppSettings.Get("Theme"));
-            if (cmbTheme.Items.Contains(t)) cmbTheme.SelectedItem = t;
-            else cmbTheme.SelectedItem = UiHelper.DefaultTheme;
+            int ti = -1;
+            for (int i = 0; i < cmbTheme.Items.Count; i++)
+            {
+                if (string.Equals(cmbTheme.Items[i].ToString(), t, StringComparison.OrdinalIgnoreCase))
+                { ti = i; break; }
+            }
+            cmbTheme.SelectedIndex = ti >= 0 ? ti : 0;
             string f = AppSettings.Get("FontSize");
             if (!string.IsNullOrEmpty(f) && cmbFontSize.Items.Contains(f)) cmbFontSize.SelectedItem = f;
             string r = AppSettings.Get("FormResolution");
