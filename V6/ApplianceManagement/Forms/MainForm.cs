@@ -17,7 +17,7 @@ namespace ApplianceManagement.Forms
         private StatusStrip statusStrip;
         private ToolStripStatusLabel lblUser, lblStore, lblClock;
         private HomeScreen homeScreen;
-        private Form homeHost; // MDI host for dashboard (Panel cannot be added to MdiClient)
+        private Form homeHost;
         private Timer syncHomeTimer;
         private ToolStripMenuItem mnuWindows;
 
@@ -36,14 +36,14 @@ namespace ApplianceManagement.Forms
             this.IsMdiContainer = true;
             this.Text = UiHelper.AppName + " — " + UiHelper.GetShopName();
             this.WindowState = FormWindowState.Maximized;
-            this.BackColor = Color.FromArgb(236, 240, 241);
+            this.BackColor = UiHelper.BgColor;
             this.KeyPreview = true;
 
             menuStrip = new MenuStrip();
             menuStrip.BackColor = UiHelper.ThemeColor;
             menuStrip.ForeColor = Color.White;
             menuStrip.Font = new Font("Segoe UI", 10F, FontStyle.Regular);
-            menuStrip.Renderer = new ToolStripProfessionalRenderer(new MenuColorTable());
+            menuStrip.Renderer = new ThemeMenuRenderer();
 
             var mnuFile = new ToolStripMenuItem("  File  ");
             mnuFile.DropDownItems.Add("Logout", null, (s, e) => DoLogout());
@@ -107,6 +107,20 @@ namespace ApplianceManagement.Forms
             });
 
             menuStrip.Items.AddRange(new ToolStripItem[] { mnuFile, mnuTrans, mnuInv, mnuMasters, mnuAcct, mnuRep, mnuSet, mnuWindows, mnuHelp });
+            foreach (ToolStripItem ti in menuStrip.Items)
+            {
+                ti.ForeColor = Color.White;
+                var mi = ti as ToolStripMenuItem;
+                if (mi != null)
+                {
+                    foreach (ToolStripItem sub in mi.DropDownItems)
+                    {
+                        if (sub is ToolStripSeparator) continue;
+                        sub.ForeColor = Color.FromArgb(0x1F, 0x29, 0x37);
+                        sub.BackColor = Color.White;
+                    }
+                }
+            }
             MainMenuStrip = menuStrip;
             Controls.Add(menuStrip);
 
@@ -136,7 +150,10 @@ namespace ApplianceManagement.Forms
                 if (menuStrip != null)
                 {
                     menuStrip.BackColor = UiHelper.ThemeColor;
-                    menuStrip.Renderer = new ToolStripProfessionalRenderer(new MenuColorTable());
+                    menuStrip.ForeColor = Color.White;
+                    menuStrip.Renderer = new ThemeMenuRenderer();
+                    foreach (ToolStripItem ti in menuStrip.Items)
+                        ti.ForeColor = Color.White;
                 }
                 if (statusStrip != null)
                     statusStrip.BackColor = UiHelper.ThemeDark;
@@ -176,10 +193,9 @@ namespace ApplianceManagement.Forms
             foreach (Control c in this.Controls)
             {
                 if (c is MdiClient mdi)
-                    mdi.BackColor = Color.FromArgb(236, 240, 241);
+                    mdi.BackColor = UiHelper.BgColor;
             }
 
-            // MdiClient only accepts MDI-child Forms — host dashboard Panel inside a borderless MDI child.
             homeHost = new Form
             {
                 Text = "Dashboard",
@@ -189,7 +205,7 @@ namespace ApplianceManagement.Forms
                 MinimizeBox = false,
                 ShowInTaskbar = false,
                 WindowState = FormWindowState.Maximized,
-                BackColor = Color.FromArgb(236, 240, 241)
+                BackColor = UiHelper.BgColor
             };
             homeScreen = new HomeScreen(CurrentUser) { Dock = DockStyle.Fill };
             homeHost.Controls.Add(homeScreen);
@@ -233,6 +249,7 @@ namespace ApplianceManagement.Forms
                 any = true;
                 var item = new ToolStripMenuItem(f.Text);
                 Form target = f;
+                item.ForeColor = Color.FromArgb(0x1F, 0x29, 0x37);
                 item.Click += (s, ev) => { target.Activate(); };
                 mnuWindows.DropDownItems.Add(item);
             }
@@ -267,9 +284,7 @@ namespace ApplianceManagement.Forms
             this.Hide();
             using (var login = new LoginForm())
             {
-                if (login.ShowDialog() == DialogResult.OK)
-                {
-                }
+                if (login.ShowDialog() == DialogResult.OK) { }
                 else Application.Exit();
             }
             this.Close();
@@ -315,6 +330,46 @@ namespace ApplianceManagement.Forms
                 homeHost.SendToBack();
         }
 
+        private class ThemeMenuRenderer : ToolStripProfessionalRenderer
+        {
+            public ThemeMenuRenderer() : base(new MenuColorTable()) { }
+
+            protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
+            {
+                bool onMenuStrip = e.ToolStrip is MenuStrip;
+                bool selected = e.Item.Selected || e.Item.Pressed;
+                if (onMenuStrip)
+                    e.TextColor = Color.White;
+                else if (selected)
+                    e.TextColor = Color.White;
+                else
+                    e.TextColor = Color.FromArgb(0x1F, 0x29, 0x37);
+                base.OnRenderItemText(e);
+            }
+
+            protected override void OnRenderMenuItemBackground(ToolStripItemRenderEventArgs e)
+            {
+                Rectangle rc = new Rectangle(Point.Empty, e.Item.Size);
+                bool onMenuStrip = e.ToolStrip is MenuStrip;
+                bool selected = e.Item.Selected || e.Item.Pressed;
+                if (onMenuStrip)
+                {
+                    Color bg = selected ? UiHelper.ThemeDark : UiHelper.ThemeColor;
+                    using (var b = new SolidBrush(bg))
+                        e.Graphics.FillRectangle(b, rc);
+                    return;
+                }
+                if (selected)
+                {
+                    using (var b = new SolidBrush(UiHelper.ThemeDark))
+                        e.Graphics.FillRectangle(b, rc);
+                    return;
+                }
+                using (var b = new SolidBrush(Color.White))
+                    e.Graphics.FillRectangle(b, rc);
+            }
+        }
+
         private class MenuColorTable : ProfessionalColorTable
         {
             public override Color MenuStripGradientBegin { get { return UiHelper.ThemeColor; } }
@@ -330,6 +385,8 @@ namespace ApplianceManagement.Forms
             public override Color ImageMarginGradientBegin { get { return Color.White; } }
             public override Color ImageMarginGradientMiddle { get { return Color.White; } }
             public override Color ImageMarginGradientEnd { get { return Color.White; } }
+            public override Color SeparatorDark { get { return Color.FromArgb(0xD1, 0xD5, 0xDB); } }
+            public override Color SeparatorLight { get { return Color.White; } }
         }
     }
 }
