@@ -16,7 +16,7 @@ namespace ApplianceManagement.Forms
         private TextBox txtName, txtCode, txtBarcode, txtPurchase, txtSale, txtMinStock, txtPackSize;
         private ComboBox cmbCategory, cmbUom;
         private CheckBox chkCategory, chkEditExisting, chkUom;
-        private Label lblUnitPreview;
+        private Label lblUnitPreview, lblMode;
         private int? editingProductId = null;
 
         public NewItemForm()
@@ -39,46 +39,77 @@ namespace ApplianceManagement.Forms
 
         private void InitializeComponent()
         {
-            this.Text = "New Item";
-            this.Size = new Size(620, 620);
-            this.MinimumSize = new Size(520, 520);
+            this.Text = "New / Edit Item";
+            this.Size = new Size(640, 660);
+            this.MinimumSize = new Size(540, 560);
             this.BackColor = UiHelper.BgColor;
             this.KeyPreview = true;
             UiHelper.AttachF4Close(this);
             this.KeyDown += (s, e) => { if (e.KeyCode == Keys.F12) Save(); };
 
             this.Controls.Add(UiHelper.CreateFormBanner(
-                "NEW ITEM",
-                "Create / edit product  ·  Pack size divides sale price into unit price",
+                "NEW / EDIT ITEM",
+                "Tick EDIT EXISTING to change name, rates, pack size  ·  Purchase & Sale prices are PACK prices",
                 FormAccent.NewItem, FormAccent.NewItemDark));
 
             Panel card = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(28, 16, 28, 16) };
             this.Controls.Add(card);
 
-            int y = 12;
-            AddL(card, "Product Code", 0, y);
-            txtCode = AddT(card, 150, y, 140);
-            txtCode.ReadOnly = true;
-            txtCode.BackColor = Color.FromArgb(245, 247, 250);
+            int y = 8;
+
+            // Prominent edit mode bar
+            Panel modeBar = new Panel
+            {
+                Location = new Point(0, y),
+                Size = new Size(560, 40),
+                BackColor = Color.FromArgb(243, 229, 245)
+            };
             chkEditExisting = new CheckBox
             {
-                Text = "Edit existing (enter code)",
-                Font = UiHelper.SmallFont,
-                Location = new Point(300, y + 2),
-                Size = new Size(220, 24)
+                Text = "EDIT EXISTING PRODUCT  (tick → type Product Code → Enter to load)",
+                Font = UiHelper.HeaderFont,
+                ForeColor = FormAccent.NewItemDark,
+                Location = new Point(8, 8),
+                Size = new Size(540, 28),
+                Checked = false
             };
             chkEditExisting.CheckedChanged += (s, e) =>
             {
                 if (chkEditExisting.Checked)
                 {
                     txtCode.ReadOnly = false;
-                    txtCode.BackColor = Color.White;
+                    txtCode.BackColor = Color.FromArgb(255, 249, 196);
                     txtCode.Clear();
+                    modeBar.BackColor = Color.FromArgb(255, 236, 179);
+                    lblMode.Text = "MODE: EDIT — enter product code and press Enter";
+                    lblMode.ForeColor = Color.FromArgb(183, 110, 0);
                     txtCode.Focus();
                 }
-                else ResetNewMode();
+                else
+                {
+                    ResetNewMode();
+                    modeBar.BackColor = Color.FromArgb(243, 229, 245);
+                }
             };
-            card.Controls.Add(chkEditExisting);
+            modeBar.Controls.Add(chkEditExisting);
+            card.Controls.Add(modeBar);
+            y += 48;
+
+            lblMode = new Label
+            {
+                Text = "MODE: NEW PRODUCT",
+                Font = UiHelper.SmallFont,
+                ForeColor = FormAccent.NewItem,
+                Location = new Point(0, y),
+                AutoSize = true
+            };
+            card.Controls.Add(lblMode);
+            y += 28;
+
+            AddL(card, "Product Code", 0, y);
+            txtCode = AddT(card, 150, y, 140);
+            txtCode.ReadOnly = true;
+            txtCode.BackColor = Color.FromArgb(245, 247, 250);
             txtCode.KeyDown += (s, e) =>
             {
                 if (e.KeyCode == Keys.Enter)
@@ -121,7 +152,7 @@ namespace ApplianceManagement.Forms
             txtPackSize.TextChanged += (s, e) => UpdateUnitPreview();
             card.Controls.Add(new Label
             {
-                Text = "e.g. 50 for 50kg bag — Sale uses price ÷ pack",
+                Text = "e.g. 50 for 50kg — prices below are for ONE PACK",
                 Font = UiHelper.SmallFont,
                 ForeColor = Color.Gray,
                 Location = new Point(260, y + 4),
@@ -129,13 +160,16 @@ namespace ApplianceManagement.Forms
             });
             y += 42;
 
-            AddL(card, "Purchase Price", 0, y); txtPurchase = AddT(card, 150, y, 160); txtPurchase.KeyDown += Next; y += 42;
+            AddL(card, "Purchase Price (pack)", 0, y); txtPurchase = AddT(card, 150, y, 160);
+            txtPurchase.KeyDown += Next;
+            txtPurchase.TextChanged += (s, e) => UpdateUnitPreview();
+            y += 42;
             AddL(card, "Sale Price (pack)", 0, y); txtSale = AddT(card, 150, y, 160);
             txtSale.KeyDown += Next;
             txtSale.TextChanged += (s, e) => UpdateUnitPreview();
             lblUnitPreview = new Label
             {
-                Text = "Unit sale price: —",
+                Text = "Unit sale / unit cost: —",
                 Font = UiHelper.HeaderFont,
                 ForeColor = FormAccent.NewItem,
                 Location = new Point(320, y + 2),
@@ -156,14 +190,16 @@ namespace ApplianceManagement.Forms
 
         private void UpdateUnitPreview()
         {
-            if (lblUnitPreview == null || txtSale == null || txtPackSize == null) return;
-            decimal sale = 0, pack = 1;
-            decimal.TryParse(txtSale.Text, out sale);
-            decimal.TryParse(txtPackSize.Text, out pack);
+            if (lblUnitPreview == null) return;
+            decimal sale = 0, pur = 0, pack = 1;
+            if (txtSale != null) decimal.TryParse(txtSale.Text, out sale);
+            if (txtPurchase != null) decimal.TryParse(txtPurchase.Text, out pur);
+            if (txtPackSize != null) decimal.TryParse(txtPackSize.Text, out pack);
             if (pack <= 0) pack = 1;
-            decimal unit = pack == 1m ? sale : Math.Round(sale / pack, 4);
-            lblUnitPreview.Text = "Unit sale price: " + unit.ToString("0.####") +
-                (pack != 1m ? ("  (" + sale.ToString("0.##") + " ÷ " + pack.ToString("0.####") + ")") : "");
+            decimal unitSale = pack == 1m ? sale : Math.Round(sale / pack, 4);
+            decimal unitCost = pack == 1m ? pur : Math.Round(pur / pack, 4);
+            lblUnitPreview.Text = "Unit sale: " + unitSale.ToString("0.####") +
+                "   |   Unit cost: " + unitCost.ToString("0.####");
         }
 
         private void LoadByCode()
@@ -175,6 +211,7 @@ namespace ApplianceManagement.Forms
             editingProductId = p.ProductID;
             txtName.Text = p.ProductName;
             txtBarcode.Text = p.Barcode ?? p.ProductCode;
+            // PurchasePrice on product is PACK price (after cost fix)
             txtPurchase.Text = p.PurchasePrice.ToString("0.00");
             txtSale.Text = p.SalePrice.ToString("0.00");
             txtMinStock.Text = p.MinimumStock.ToString();
@@ -189,6 +226,13 @@ namespace ApplianceManagement.Forms
                 chkUom.Checked = false;
                 cmbUom.SelectedIndex = -1;
             }
+            if (p.CategoryID > 0 && cmbCategory.DataSource != null)
+            {
+                chkCategory.Checked = true;
+                try { cmbCategory.SelectedValue = p.CategoryID; } catch { }
+            }
+            lblMode.Text = "MODE: EDIT — " + p.ProductCode + "  " + p.ProductName;
+            lblMode.ForeColor = Color.FromArgb(183, 110, 0);
             UpdateUnitPreview();
             txtName.Focus();
         }
@@ -204,11 +248,16 @@ namespace ApplianceManagement.Forms
             chkCategory.Checked = false; cmbCategory.Enabled = false;
             chkUom.Checked = false; cmbUom.Enabled = false; cmbUom.SelectedIndex = -1;
             txtPackSize.Enabled = true; txtPackSize.Text = "1";
+            if (lblMode != null)
+            {
+                lblMode.Text = "MODE: NEW PRODUCT";
+                lblMode.ForeColor = FormAccent.NewItem;
+            }
             UpdateUnitPreview();
         }
 
         private void Next(object s, KeyEventArgs e) { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; SelectNextControl((Control)s, true, true, true, true); } }
-        private void AddL(Control parent, string t, int x, int y) { parent.Controls.Add(new Label { Text = t, Font = UiHelper.NormalFont, Location = new Point(x, y + 4), Size = new Size(140, 22) }); }
+        private void AddL(Control parent, string t, int x, int y) { parent.Controls.Add(new Label { Text = t, Font = UiHelper.NormalFont, Location = new Point(x, y + 4), Size = new Size(150, 22) }); }
         private TextBox AddT(Control parent, int x, int y, int w) { var t = new TextBox { Location = new Point(x, y), Size = new Size(w, 28) }; UiHelper.StyleTextBox(t); parent.Controls.Add(t); return t; }
 
         private void Save()
@@ -228,11 +277,15 @@ namespace ApplianceManagement.Forms
                 }
                 string uom = chkUom.Checked && cmbUom.SelectedItem != null ? cmbUom.SelectedItem.ToString() : null;
 
+                // Both prices are PACK prices (domain model)
                 if (chkEditExisting.Checked && editingProductId.HasValue)
                 {
-                    if (!DialogHelpers.Confirm(this, "Update this product?")) return;
+                    if (!DialogHelpers.Confirm(this, "Update this product?\nPack purchase: " + pur.ToString("0.00") +
+                            "\nPack sale: " + sale.ToString("0.00") +
+                            "\nPack size: " + pack.ToString("0.####"))) return;
                     _productService.Update(editingProductId.Value, txtName.Text.Trim(), pur, sale, min, true, uom, pack);
-                    DialogHelpers.Info(this, "Product updated.\nUnit sale price: " + Math.Round(sale / pack, 4).ToString("0.####"));
+                    DialogHelpers.Info(this, "Product updated.\nUnit cost: " + Math.Round(pur / pack, 4).ToString("0.####") +
+                        "\nUnit sale: " + Math.Round(sale / pack, 4).ToString("0.####"));
                     this.Tag = "NOSAVECONFIRM";
                     chkEditExisting.Checked = false;
                     return;
@@ -260,7 +313,8 @@ namespace ApplianceManagement.Forms
                 try { _productService.Update(newId, product.ProductName, pur, sale, min, true, uom, pack); }
                 catch { }
 
-                DialogHelpers.Info(this, "Saved!\nUnit sale price: " + Math.Round(sale / pack, 4).ToString("0.####"));
+                DialogHelpers.Info(this, "Saved!\nUnit cost: " + Math.Round(pur / pack, 4).ToString("0.####") +
+                    "\nUnit sale: " + Math.Round(sale / pack, 4).ToString("0.####"));
                 this.Tag = "NOSAVECONFIRM";
                 ResetNewMode();
                 txtName.Focus();
