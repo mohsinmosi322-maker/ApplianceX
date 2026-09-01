@@ -18,42 +18,81 @@ jobs:
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
-      - name: Show tree (V6)
+      - name: Clean old bin / obj / Release folders
         shell: pwsh
         run: |
-          Get-ChildItem -Path V6 -Recurse -Filter *.csproj | Select-Object FullName
-          Get-ChildItem -Path V6 -Recurse -Filter *.sln | Select-Object FullName
+          $paths = @(
+            "V6\ApplianceManagement\bin",
+            "V6\ApplianceManagement\obj",
+            "V6\Authenticator\bin",
+            "V6\Authenticator\obj",
+            "V6\Release",
+            "artifacts"
+          )
+          foreach ($p in $paths) {
+            if (Test-Path $p) {
+              Write-Host "Removing $p"
+              Remove-Item -Recurse -Force $p
+            }
+          }
 
-      - name: Build ApplianceManagement
+      - name: Build ApplianceManagement (Release)
         shell: cmd
         run: |
-          msbuild "V6\ApplianceManagement\ApplianceManagement.csproj" /t:Rebuild /p:Configuration=Release /p:Platform=AnyCPU /v:minimal /nologo /p:WarningLevel=1
+          msbuild "V6\ApplianceManagement\ApplianceManagement.csproj" /t:Rebuild /p:Configuration=Release /p:Platform=AnyCPU /v:minimal /nologo
 
-      - name: Build Authenticator
+      - name: Build Authenticator (Release)
         shell: cmd
         run: |
-          msbuild "V6\Authenticator\Authenticator.csproj" /t:Rebuild /p:Configuration=Release /p:Platform=AnyCPU /v:minimal /nologo /p:WarningLevel=1
+          msbuild "V6\Authenticator\Authenticator.csproj" /t:Rebuild /p:Configuration=Release /p:Platform=AnyCPU /v:minimal /nologo
 
-      - name: Collect build output
+      - name: Package separate exe folders
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
-          if (Test-Path "V6\ApplianceManagement\bin\Release") {
-            Copy-Item "V6\ApplianceManagement\bin\Release" "artifacts\ApplianceManagement" -Recurse -Force
-          } else {
-            Write-Host "WARNING: ApplianceManagement Release output missing"
-            Get-ChildItem -Path "V6\ApplianceManagement" -Recurse -Directory | Select-Object FullName
+          # Final layout:
+          #   V6/Release/ApplianceManagement/  -> ApplianceManagement.exe + related files
+          #   V6/Release/Authenticator/        -> Authenticator.exe + related files
+
+          $root = "V6\Release"
+          New-Item -ItemType Directory -Force -Path "$root\ApplianceManagement" | Out-Null
+          New-Item -ItemType Directory -Force -Path "$root\Authenticator" | Out-Null
+
+          $amSrc = "V6\ApplianceManagement\bin\Release"
+          $auSrc = "V6\Authenticator\bin\Release"
+
+          if (-not (Test-Path $amSrc)) { throw "Missing build output: $amSrc" }
+          if (-not (Test-Path $auSrc)) { throw "Missing build output: $auSrc" }
+
+          # Copy only runtime files (exe, config, dll) — skip .pdb optional keep
+          Get-ChildItem $amSrc -File | Where-Object {
+            $_.Extension -in '.exe','.dll','.config','.json','.xml','.pdb' -or $_.Name -like '*.dat'
+          } | Copy-Item -Destination "$root\ApplianceManagement" -Force
+
+          Get-ChildItem $auSrc -File | Where-Object {
+            $_.Extension -in '.exe','.dll','.config','.json','.xml','.pdb' -or $_.Name -like '*.dat'
+          } | Copy-Item -Destination "$root\Authenticator" -Force
+
+          # Also mirror under artifacts for GitHub Actions upload
+          New-Item -ItemType Directory -Force -Path "artifacts\ApplianceManagement" | Out-Null
+          New-Item -ItemType Directory -Force -Path "artifacts\Authenticator" | Out-Null
+          Copy-Item "$root\ApplianceManagement\*" "artifacts\ApplianceManagement\" -Force
+          Copy-Item "$root\Authenticator\*" "artifacts\Authenticator\" -Force
+
+          Write-Host "=== Package layout ==="
+          Get-ChildItem -Path $root -Recurse | Select-Object FullName
+
+          if (-not (Test-Path "$root\ApplianceManagement\ApplianceManagement.exe")) {
+            throw "ApplianceManagement.exe not found in package folder"
           }
-          if (Test-Path "V6\Authenticator\bin\Release") {
-            Copy-Item "V6\Authenticator\bin\Release" "artifacts\Authenticator" -Recurse -Force
-          } else {
-            Write-Host "WARNING: Authenticator Release output missing"
+          if (-not (Test-Path "$root\Authenticator\Authenticator.exe")) {
+            throw "Authenticator.exe not found in package folder"
           }
-          Get-ChildItem -Path artifacts -Recurse | Select-Object FullName
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ApplianceX-Release
-          path: artifacts
-          if-no-files-found: warn
+          path: |
+            V6/Release/ApplianceManagement
+            V6/Release/Authenticator
+          if-no-files-found: error
