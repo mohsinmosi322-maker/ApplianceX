@@ -10,10 +10,6 @@ using ApplianceManagement.Services;
 
 namespace ApplianceManagement.Forms
 {
-    /// <summary>
-    /// Hybrid Sale Return: product entry like Sale + optional original invoice for qty limits.
-    /// Stock increases on save.
-    /// </summary>
     public class SaleReturnForm : Form
     {
         private readonly SaleReturnService _svc = new SaleReturnService();
@@ -25,6 +21,7 @@ namespace ApplianceManagement.Forms
         private Label lblCustomer, lblInfo;
         private DataGridView dgv;
         private Product selectedProduct;
+        private ListBox lstSuggest;
         private int originalSaleId;
         private int customerId;
         private string customerName;
@@ -45,10 +42,9 @@ namespace ApplianceManagement.Forms
 
             Controls.Add(UiHelper.CreateFormBanner(
                 "SALE RETURN",
-                "Optional invoice · Product + qty like Sale · Reason required · Stock increases · F12 save",
+                "Optional invoice · Type product to search · Reason required · Stock increases · F12 save",
                 FormAccent.SaleReturn, FormAccent.SaleReturnDark));
 
-            // --- Invoice row ---
             var invBar = new Panel { Dock = DockStyle.Top, Height = 48, BackColor = Color.White, Padding = new Padding(10, 8, 10, 6) };
             invBar.Controls.Add(new Label { Text = "Original Inv (optional)", Location = new Point(8, 12), AutoSize = true, Font = UiHelper.SmallFont });
             txtInvoice = new TextBox { Location = new Point(150, 8), Size = new Size(130, 28) };
@@ -60,15 +56,15 @@ namespace ApplianceManagement.Forms
             invBar.Controls.Add(btnLoad);
             lblCustomer = new Label { Text = "Customer: —", Location = new Point(410, 12), AutoSize = true, Font = UiHelper.NormalFont, ForeColor = FormAccent.SaleReturnDark };
             invBar.Controls.Add(lblCustomer);
-            lblInfo = new Label { Text = "Or search product below (free return)", Location = new Point(620, 12), AutoSize = true, Font = UiHelper.SmallFont, ForeColor = Color.Gray };
+            lblInfo = new Label { Text = "Type in search to load products", Location = new Point(620, 12), AutoSize = true, Font = UiHelper.SmallFont, ForeColor = Color.Gray };
             invBar.Controls.Add(lblInfo);
             Controls.Add(invBar);
 
-            // --- Product entry (Sale-like) ---
             var top = new Panel { Dock = DockStyle.Top, Height = 88, BackColor = Color.FromArgb(255, 248, 240), Padding = new Padding(10, 8, 10, 6) };
             top.Controls.Add(new Label { Text = "Product code / name", Location = new Point(8, 6), AutoSize = true, Font = UiHelper.SmallFont });
             txtSearch = new TextBox { Location = new Point(8, 26), Size = new Size(280, 28) };
             UiHelper.StyleTextBox(txtSearch);
+            txtSearch.TextChanged += (s, e) => ShowSuggestions();
             txtSearch.KeyDown += Search_KeyDown;
             top.Controls.Add(txtSearch);
 
@@ -82,18 +78,24 @@ namespace ApplianceManagement.Forms
             UiHelper.StyleAccentButton(btnAdd, FormAccent.SaleReturn, FormAccent.SaleReturnDark);
             btnAdd.Click += (s, e) => AddLine();
             top.Controls.Add(btnAdd);
-
-            top.Controls.Add(new Label
-            {
-                Text = "Enter · add line · Del removes selected · F5 load invoice · F12 save",
-                Location = new Point(480, 30),
-                AutoSize = true,
-                Font = UiHelper.SmallFont,
-                ForeColor = Color.FromArgb(120, 80, 40)
-            });
             Controls.Add(top);
 
-            // --- Grid ---
+            lstSuggest = new ListBox
+            {
+                Location = new Point(18, 200),
+                Size = new Size(420, 160),
+                Visible = false,
+                Font = UiHelper.NormalFont,
+                IntegralHeight = false
+            };
+            lstSuggest.Click += (s, e) => SelectSuggestion();
+            lstSuggest.KeyDown += (s, e) =>
+            {
+                if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; SelectSuggestion(); }
+            };
+            Controls.Add(lstSuggest);
+            lstSuggest.BringToFront();
+
             dgv = new DataGridView { Dock = DockStyle.Fill };
             UiHelper.StyleGridWithAccent(dgv, FormAccent.SaleReturn);
             dgv.AutoGenerateColumns = false;
@@ -112,7 +114,6 @@ namespace ApplianceManagement.Forms
             };
             Controls.Add(dgv);
 
-            // --- Footer ---
             var foot = new Panel { Dock = DockStyle.Bottom, Height = 110, BackColor = Color.FromArgb(255, 243, 224) };
             foot.Controls.Add(new Label { Text = "Return reason (required)", Location = new Point(12, 10), AutoSize = true, Font = UiHelper.SmallFont });
             txtReason = new TextBox { Location = new Point(12, 30), Size = new Size(320, 28) };
@@ -149,10 +150,7 @@ namespace ApplianceManagement.Forms
             UiHelper.StyleButton(btnClose);
             btnClose.Click += (s, e) => Close();
             foot.Controls.Add(btnClose);
-
             Controls.Add(foot);
-
-            // Dock order
             Controls.SetChildIndex(dgv, 0);
             Controls.SetChildIndex(foot, 0);
 
@@ -173,9 +171,8 @@ namespace ApplianceManagement.Forms
                 customerId = invoiceLines[0].CustomerID;
                 customerName = invoiceLines[0].CustomerName;
                 lblCustomer.Text = "Customer: " + customerName + "  ·  Sale# " + invoiceLines[0].InvoiceNo;
-                lblInfo.Text = invoiceLines.Count + " line(s) — search product or add from invoice items";
-                // Pre-fill cart with returnable lines at 0 qty? Better leave empty; user adds.
-                DialogHelpers.Info(this, "Invoice loaded. Search product / enter qty to return.");
+                lblInfo.Text = invoiceLines.Count + " line(s) — type product name/code";
+                DialogHelpers.Info(this, "Invoice loaded. Type product to search.");
                 txtSearch.Focus();
             }
             catch (Exception ex)
@@ -184,14 +181,94 @@ namespace ApplianceManagement.Forms
             }
         }
 
+        private void ShowSuggestions()
+        {
+            string q = (txtSearch.Text ?? "").Trim();
+            if (lstSuggest == null) return;
+            if (q.Length < 1)
+            {
+                lstSuggest.Visible = false;
+                return;
+            }
+
+            var list = new List<Product>();
+            if (invoiceLines != null && invoiceLines.Count > 0)
+            {
+                foreach (var line in invoiceLines)
+                {
+                    if ((line.ProductCode != null && line.ProductCode.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                        (line.ProductName != null && line.ProductName.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0))
+                    {
+                        list.Add(new Product
+                        {
+                            ProductID = line.ProductID,
+                            ProductCode = line.ProductCode,
+                            ProductName = line.ProductName,
+                            SalePrice = line.SalePrice
+                        });
+                    }
+                }
+            }
+            if (list.Count == 0)
+            {
+                var found = _products.Search(q);
+                if (found != null) list.AddRange(found);
+            }
+
+            lstSuggest.DataSource = null;
+            lstSuggest.DisplayMember = "ProductName";
+            lstSuggest.DataSource = list;
+            lstSuggest.Visible = list.Count > 0;
+            if (list.Count > 0) lstSuggest.SelectedIndex = 0;
+            try
+            {
+                Point screen = txtSearch.PointToScreen(new Point(0, txtSearch.Height));
+                Point client = PointToClient(screen);
+                lstSuggest.Location = new Point(client.X, client.Y + 2);
+                lstSuggest.Width = Math.Max(320, txtSearch.Width + 100);
+            }
+            catch { }
+            lstSuggest.BringToFront();
+        }
+
+        private void SelectSuggestion()
+        {
+            if (lstSuggest == null || !lstSuggest.Visible) return;
+            if (lstSuggest.SelectedItem is Product p)
+            {
+                selectedProduct = p;
+                txtSearch.Text = p.ProductCode + " - " + p.ProductName;
+                lstSuggest.Visible = false;
+                txtQty.Focus();
+                txtQty.SelectAll();
+            }
+        }
+
         private void Search_KeyDown(object sender, KeyEventArgs e)
         {
+            if (e.KeyCode == Keys.Down && lstSuggest != null && lstSuggest.Visible)
+            {
+                lstSuggest.Focus();
+                e.Handled = true;
+                return;
+            }
+            if (e.KeyCode == Keys.Escape && lstSuggest != null)
+            {
+                lstSuggest.Visible = false;
+                return;
+            }
             if (e.KeyCode != Keys.Enter) return;
             e.SuppressKeyPress = true;
+
+            if (lstSuggest != null && lstSuggest.Visible && lstSuggest.SelectedItem is Product)
+            {
+                SelectSuggestion();
+                return;
+            }
+
             string q = (txtSearch.Text ?? "").Trim();
             if (q.Length == 0) return;
 
-            // Prefer match on loaded invoice
             if (invoiceLines != null && invoiceLines.Count > 0)
             {
                 var line = invoiceLines.FirstOrDefault(x =>
@@ -206,7 +283,8 @@ namespace ApplianceManagement.Forms
                         ProductName = line.ProductName,
                         SalePrice = line.SalePrice
                     };
-                    txtSearch.Text = line.ProductName;
+                    txtSearch.Text = line.ProductCode + " - " + line.ProductName;
+                    if (lstSuggest != null) lstSuggest.Visible = false;
                     txtQty.Focus();
                     txtQty.SelectAll();
                     return;
@@ -225,7 +303,8 @@ namespace ApplianceManagement.Forms
                 return;
             }
             selectedProduct = p;
-            txtSearch.Text = p.ProductName;
+            txtSearch.Text = p.ProductCode + " - " + p.ProductName;
+            if (lstSuggest != null) lstSuggest.Visible = false;
             txtQty.Focus();
             txtQty.SelectAll();
         }
@@ -234,7 +313,6 @@ namespace ApplianceManagement.Forms
         {
             if (selectedProduct == null)
             {
-                // try resolve search text
                 Search_KeyDown(txtSearch, new KeyEventArgs(Keys.Enter));
                 if (selectedProduct == null) return;
             }
@@ -256,7 +334,6 @@ namespace ApplianceManagement.Forms
                     already = line.AlreadyReturned;
                     rate = line.SalePrice;
                     int returnable = Math.Max(0, sold - already);
-                    // existing cart qty for same product
                     int inCart = cart.Where(c => c.ProductID == selectedProduct.ProductID).Sum(c => c.Quantity);
                     if (qty + inCart > returnable)
                     {
@@ -291,6 +368,7 @@ namespace ApplianceManagement.Forms
             selectedProduct = null;
             txtSearch.Clear();
             txtQty.Text = "1";
+            if (lstSuggest != null) lstSuggest.Visible = false;
             RefreshGrid();
             txtSearch.Focus();
         }
