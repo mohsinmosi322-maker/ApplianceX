@@ -28,6 +28,13 @@ namespace ApplianceManagement.Forms
         private decimal cartBaseTotal;
         private bool calcBusy;
 
+        private sealed class ProductSuggestRow
+        {
+            public Product Product { get; set; }
+            public string Display { get; set; }
+            public override string ToString() { return Display ?? ""; }
+        }
+
         public PurchaseForm()
         {
             InitializeComponent();
@@ -48,38 +55,21 @@ namespace ApplianceManagement.Forms
             BackColor = UiHelper.BgColor;
             KeyPreview = true;
             UiHelper.AttachF4Close(this, false);
-            Controls.Add(UiHelper.CreateFormBanner("PURCHASE", "Stock in \u00b7 pack quantities", FormAccent.Purchase, FormAccent.PurchaseDark));
+            Controls.Add(UiHelper.CreateFormBanner("PURCHASE", "Stock in - pack quantities", FormAccent.Purchase, FormAccent.PurchaseDark));
 
-            var head = new Panel { Dock = DockStyle.Top, Height = 52, BackColor = Color.White, Padding = new Padding(10, 8, 10, 6) };
+            var head = new Panel { Dock = DockStyle.Top, Height = 52, BackColor = Color.White };
             head.Controls.Add(new Label { Text = "Invoice:", Font = UiHelper.SmallFont, Location = new Point(8, 14), AutoSize = true });
             txtInvoice = new TextBox { Location = new Point(60, 10), Size = new Size(100, 28), Text = "Auto", ReadOnly = true };
             UiHelper.StyleTextBox(txtInvoice);
             head.Controls.Add(txtInvoice);
-
-            lblDate = new Label
-            {
-                Text = DateTime.Now.ToString("dd MMM yyyy  HH:mm"),
-                Font = UiHelper.NormalFont,
-                ForeColor = Color.Gray,
-                Location = new Point(180, 14),
-                AutoSize = true
-            };
+            lblDate = new Label { Text = DateTime.Now.ToString("dd MMM yyyy  HH:mm"), Font = UiHelper.NormalFont, ForeColor = Color.Gray, Location = new Point(180, 14), AutoSize = true };
             head.Controls.Add(lblDate);
-
             head.Controls.Add(new Label { Text = "Supplier:", Font = UiHelper.SmallFont, Location = new Point(380, 14), AutoSize = true });
             txtSupplier = new TextBox { Location = new Point(450, 10), Size = new Size(320, 28) };
             UiHelper.StyleTextBox(txtSupplier);
             txtSupplier.TextChanged += (s, e) => ShowSupplierSuggestions();
             txtSupplier.KeyDown += Supplier_KeyDown;
             head.Controls.Add(txtSupplier);
-            head.Controls.Add(new Label
-            {
-                Text = "Type name/phone \u00b7 Enter select",
-                Font = UiHelper.SmallFont,
-                ForeColor = Color.Gray,
-                Location = new Point(780, 14),
-                AutoSize = true
-            });
             Controls.Add(head);
 
             var entry = new Panel { Dock = DockStyle.Top, Height = 56, BackColor = Color.White };
@@ -89,31 +79,14 @@ namespace ApplianceManagement.Forms
             txtDescription.TextChanged += (s, e) => ShowProductSuggestions();
             txtDescription.KeyDown += Description_KeyDown;
             entry.Controls.Add(txtDescription);
-
             entry.Controls.Add(new Label { Text = "Qty (packs)", Font = UiHelper.SmallFont, Location = new Point(540, 4), AutoSize = true });
             txtQty = new TextBox { Location = new Point(540, 22), Size = new Size(90, 28), Text = "1" };
             UiHelper.StyleTextBox(txtQty);
             txtQty.KeyDown += Qty_KeyDown;
             entry.Controls.Add(txtQty);
-
-            entry.Controls.Add(new Label
-            {
-                Text = "Enter add \u00b7 F8 remove \u00b7 F9 history \u00b7 F12 discount",
-                Font = UiHelper.SmallFont,
-                ForeColor = Color.Gray,
-                Location = new Point(650, 26),
-                AutoSize = true
-            });
             Controls.Add(entry);
 
-            lstSupplier = new ListBox
-            {
-                Visible = false,
-                Font = UiHelper.NormalFont,
-                IntegralHeight = false,
-                Size = new Size(320, 140),
-                DisplayMember = "SupplierName"
-            };
+            lstSupplier = new ListBox { Visible = false, Font = UiHelper.NormalFont, IntegralHeight = false, Size = new Size(320, 140), DisplayMember = "SupplierName" };
             lstSupplier.Click += (s, e) => SelectSupplierSug();
             lstSupplier.KeyDown += (s, e) =>
             {
@@ -122,13 +95,7 @@ namespace ApplianceManagement.Forms
             };
             Controls.Add(lstSupplier);
 
-            lstProduct = new ListBox
-            {
-                Visible = false,
-                Font = UiHelper.NormalFont,
-                IntegralHeight = false,
-                Size = new Size(520, 160)
-            };
+            lstProduct = new ListBox { Visible = false, Font = UiHelper.NormalFont, IntegralHeight = false, Size = new Size(520, 160) };
             lstProduct.Click += (s, e) => SelectProductSug();
             lstProduct.KeyDown += (s, e) =>
             {
@@ -163,21 +130,11 @@ namespace ApplianceManagement.Forms
             txtNet = MakeFootBox(foot, x, 32, 100, "0.00", true); x += 110;
             foot.Controls.Add(new Label { Text = "Paid", Font = UiHelper.SmallFont, Location = new Point(x, 10), AutoSize = true });
             txtPaid = MakeFootBox(foot, x, 32, 100, "0.00");
-
             txtDiscount.TextChanged += (s, e) => RecalcFromPct();
             txtDiscAmt.TextChanged += (s, e) => RecalcFromAmt();
-            txtDiscount.KeyDown += (s, e) =>
-            {
-                if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; txtDiscAmt.Focus(); txtDiscAmt.SelectAll(); }
-            };
-            txtDiscAmt.KeyDown += (s, e) =>
-            {
-                if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; txtPaid.Text = txtNet.Text; txtPaid.Focus(); txtPaid.SelectAll(); }
-            };
-            txtPaid.KeyDown += (s, e) =>
-            {
-                if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; Save(); }
-            };
+            txtDiscount.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; txtDiscAmt.Focus(); txtDiscAmt.SelectAll(); } };
+            txtDiscAmt.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; txtPaid.Text = txtNet.Text; txtPaid.Focus(); txtPaid.SelectAll(); } };
+            txtPaid.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; Save(); } };
 
             var btnSave = new Button { Text = "SAVE (F12)", Size = new Size(130, 36), Anchor = AnchorStyles.Top | AnchorStyles.Right };
             var btnClose = new Button { Text = "CLOSE (F4)", Size = new Size(120, 36), Anchor = AnchorStyles.Top | AnchorStyles.Right };
@@ -195,12 +152,7 @@ namespace ApplianceManagement.Forms
             Controls.Add(foot);
 
             KeyDown += Form_KeyDown;
-            Shown += (s, e) =>
-            {
-                lstSupplier.BringToFront();
-                lstProduct.BringToFront();
-                txtDescription.Focus();
-            };
+            Shown += (s, e) => { lstSupplier.BringToFront(); lstProduct.BringToFront(); txtDescription.Focus(); };
         }
 
         private static TextBox MakeFootBox(Control p, int x, int y, int w, string val, bool readOnly = false)
@@ -236,16 +188,11 @@ namespace ApplianceManagement.Forms
             if (e.KeyCode == Keys.Escape) { lstSupplier.Visible = false; return; }
             if (e.KeyCode != Keys.Enter) return;
             e.SuppressKeyPress = true;
-            if (lstSupplier.Visible && lstSupplier.SelectedItem is Supplier)
-                SelectSupplierSug();
+            if (lstSupplier.Visible && lstSupplier.SelectedItem is Supplier) SelectSupplierSug();
             else
             {
                 var list = supplierRepo.Search(txtSupplier.Text);
-                if (list.Count > 0)
-                {
-                    selectedSupplier = list[0];
-                    txtSupplier.Text = selectedSupplier.SupplierName;
-                }
+                if (list.Count > 0) { selectedSupplier = list[0]; txtSupplier.Text = selectedSupplier.SupplierName; }
                 lstSupplier.Visible = false;
                 txtDescription.Focus();
             }
@@ -266,17 +213,30 @@ namespace ApplianceManagement.Forms
         {
             string q = (txtDescription.Text ?? "").Trim();
             if (q.Length < 1) { lstProduct.Visible = false; return; }
-            var list = productRepo.Search(q) ?? new List<Product>();
-            lstProduct.Items.Clear();
-            var map = new List<Product>();
-            foreach (var p in list)
+            List<Product> products;
+            try { products = productRepo.Search(q) ?? new List<Product>(); }
+            catch { products = new List<Product>(); }
+            var rows = new List<ProductSuggestRow>();
+            foreach (Product p in products)
             {
-                lstProduct.Items.Add(p.ProductCode + " \u2014 " + p.ProductName + "  |  Cost: " + p.PurchasePrice.ToString("0.00"));
-                map.Add(p);
+                if (p == null) continue;
+                rows.Add(new ProductSuggestRow
+                {
+                    Product = p,
+                    Display = (p.ProductCode ?? "") + " - " + (p.ProductName ?? "") + "  |  Cost: " + p.PurchasePrice.ToString("0.00")
+                });
             }
-            lstProduct.Tag = map;
-            lstProduct.Visible = map.Count > 0;
-            if (map.Count > 0) lstProduct.SelectedIndex = 0;
+            lstProduct.BeginUpdate();
+            try
+            {
+                lstProduct.DataSource = null;
+                lstProduct.DisplayMember = "Display";
+                lstProduct.ValueMember = "Product";
+                lstProduct.DataSource = rows;
+            }
+            finally { lstProduct.EndUpdate(); }
+            lstProduct.Visible = rows.Count > 0;
+            if (rows.Count > 0) lstProduct.SelectedIndex = 0;
             PositionList(lstProduct, txtDescription);
         }
 
@@ -286,13 +246,13 @@ namespace ApplianceManagement.Forms
             if (e.KeyCode == Keys.Escape) { lstProduct.Visible = false; return; }
             if (e.KeyCode != Keys.Enter) return;
             e.SuppressKeyPress = true;
-            if (lstProduct.Visible && lstProduct.SelectedIndex >= 0) { SelectProductSug(); return; }
+            if (lstProduct.Visible && lstProduct.SelectedItem != null) { SelectProductSug(); return; }
             string q = (txtDescription.Text ?? "").Trim();
-            var p = productRepo.GetByCode(q) ?? productRepo.GetByBarcode(q);
+            Product p = null;
+            try { p = productRepo.GetByCode(q) ?? productRepo.GetByBarcode(q); } catch { }
             if (p == null)
             {
-                var list = productRepo.Search(q);
-                if (list != null && list.Count > 0) p = list[0];
+                try { var list = productRepo.Search(q); if (list != null && list.Count > 0) p = list[0]; } catch { }
             }
             if (p == null) { DialogHelpers.Warn(this, "Product not found."); return; }
             SetSelectedProduct(p);
@@ -302,9 +262,9 @@ namespace ApplianceManagement.Forms
 
         private void SelectProductSug()
         {
-            var map = lstProduct.Tag as List<Product>;
-            if (map == null || lstProduct.SelectedIndex < 0 || lstProduct.SelectedIndex >= map.Count) return;
-            SetSelectedProduct(map[lstProduct.SelectedIndex]);
+            var row = lstProduct.SelectedItem as ProductSuggestRow;
+            if (row == null || row.Product == null) return;
+            SetSelectedProduct(row.Product);
             lstProduct.Visible = false;
             txtQty.Focus();
             txtQty.SelectAll();
@@ -313,7 +273,7 @@ namespace ApplianceManagement.Forms
         private void SetSelectedProduct(Product p)
         {
             selectedProduct = p;
-            txtDescription.Text = p.ProductCode + " \u2014 " + p.ProductName;
+            txtDescription.Text = (p.ProductCode ?? "") + " - " + (p.ProductName ?? "");
             txtQty.Text = "1";
         }
 
@@ -417,11 +377,7 @@ namespace ApplianceManagement.Forms
             Product p = selectedProduct;
             if (p == null && dgv.CurrentRow != null && dgv.CurrentRow.Index >= 0 && dgv.CurrentRow.Index < cart.Count)
                 p = productRepo.GetById(cart[dgv.CurrentRow.Index].ProductID);
-            if (p == null)
-            {
-                DialogHelpers.Warn(this, "Select or search a product first, then press F9.");
-                return;
-            }
+            if (p == null) { DialogHelpers.Warn(this, "Select or search a product first, then press F9."); return; }
             using (var f = new ProductHistoryForm(p, false))
                 f.ShowDialog(this);
         }
@@ -442,16 +398,10 @@ namespace ApplianceManagement.Forms
         private void Save()
         {
             if (cart.Count == 0) { DialogHelpers.Warn(this, "Add at least one product."); return; }
-            if (selectedSupplier == null)
-            {
-                DialogHelpers.Error(this, "Select a supplier.");
-                txtSupplier.Focus();
-                return;
-            }
+            if (selectedSupplier == null) { DialogHelpers.Error(this, "Select a supplier."); txtSupplier.Focus(); return; }
 
             decimal total = cartBaseTotal;
-            decimal pct = 0, discAmt = 0, paid = 0, net = 0;
-            decimal.TryParse(txtDiscount.Text, out pct);
+            decimal discAmt = 0, paid = 0, net = 0;
             decimal.TryParse(txtDiscAmt.Text, out discAmt);
             decimal.TryParse(txtPaid.Text, out paid);
             decimal.TryParse(txtNet.Text, out net);
