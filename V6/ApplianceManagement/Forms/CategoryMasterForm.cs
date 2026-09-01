@@ -47,7 +47,7 @@ namespace ApplianceManagement.Forms
 
             btnDeactivate = new Button { Text = "DEACTIVATE", Location = new Point(510, 32), Size = new Size(110, 34), Enabled = false };
             UiHelper.StyleAccentButton(btnDeactivate, FormAccent.LowStock, FormAccent.LowStockDark);
-            btnDeactivate.Click += (s, e) => Deactivate();
+            btnDeactivate.Click += (s, e) => SoftDeactivate();
             top.Controls.Add(btnDeactivate);
 
             top.Controls.Add(new Label
@@ -99,7 +99,7 @@ namespace ApplianceManagement.Forms
             if (dgv.Columns.Contains("IsActive")) dgv.Columns["IsActive"].Visible = false;
         }
 
-        private void Deactivate()
+        private void SoftDeactivate()
         {
             if (_editId <= 0) return;
             if (!DialogHelpers.Confirm(this, "Deactivate this category?\nExisting products keep their category id."))

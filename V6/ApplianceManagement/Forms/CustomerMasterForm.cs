@@ -66,7 +66,7 @@ namespace ApplianceManagement.Forms
             y += 40;
             btnDeactivate = new Button { Text = "DEACTIVATE", Location = new Point(0, y), Size = new Size(160, 32), Enabled = false };
             UiHelper.StyleAccentButton(btnDeactivate, FormAccent.LowStock, FormAccent.LowStockDark);
-            btnDeactivate.Click += (s, e) => Deactivate();
+            btnDeactivate.Click += (s, e) => SoftDeactivate();
             left.Controls.Add(btnDeactivate);
             Controls.Add(left);
 
@@ -115,7 +115,7 @@ namespace ApplianceManagement.Forms
             if (dgv.Columns.Contains("IsActive")) dgv.Columns["IsActive"].Visible = false;
         }
 
-        private void Deactivate()
+        private void SoftDeactivate()
         {
             if (_editId <= 0) return;
             if (!DialogHelpers.Confirm(this, "Deactivate this customer?\nThey will no longer appear in sales lists."))
