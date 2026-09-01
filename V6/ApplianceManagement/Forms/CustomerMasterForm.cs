@@ -12,20 +12,20 @@ namespace ApplianceManagement.Forms
         private readonly CustomerRepository _repo = new CustomerRepository();
         private DataGridView dgv;
         private TextBox txtName, txtPhone, txtAddress, txtOpening;
-        private Button btnSave;
+        private Button btnSave, btnDeactivate;
         private int _editId = 0;
 
         public CustomerMasterForm()
         {
             Text = "Customers";
-            Size = new Size(900, 560);
+            Size = new Size(920, 580);
             BackColor = UiHelper.BgColor;
             KeyPreview = true;
             UiHelper.AttachF4Close(this, false);
             UiHelper.AttachEnterNavigation(this);
 
             Controls.Add(UiHelper.CreateFormBanner("CUSTOMERS",
-                "Double-click row to edit  ·  Enter next field  ·  Opening balance seeds receivable",
+                "CRUD: Add · Double-click Edit · Deactivate  ·  Opening balance seeds receivable",
                 FormAccent.Sale, FormAccent.SaleDark));
 
             var left = new Panel { Dock = DockStyle.Left, Width = 320, BackColor = Color.White, Padding = new Padding(16) };
@@ -63,6 +63,11 @@ namespace ApplianceManagement.Forms
             UiHelper.StyleAccentButton(btnClear, FormAccent.SaleDark, FormAccent.Sale);
             btnClear.Click += (s, e) => ClearEdit();
             left.Controls.Add(btnClear);
+            y += 40;
+            btnDeactivate = new Button { Text = "DEACTIVATE", Location = new Point(0, y), Size = new Size(160, 32), Enabled = false };
+            UiHelper.StyleAccentButton(btnDeactivate, FormAccent.LowStock, FormAccent.LowStockDark);
+            btnDeactivate.Click += (s, e) => Deactivate();
+            left.Controls.Add(btnDeactivate);
             Controls.Add(left);
 
             dgv = new DataGridView { Dock = DockStyle.Fill };
@@ -70,11 +75,7 @@ namespace ApplianceManagement.Forms
             dgv.ReadOnly = true;
             dgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             dgv.MultiSelect = false;
-            dgv.CellDoubleClick += (s, e) =>
-            {
-                if (e.RowIndex < 0) return;
-                LoadRow(e.RowIndex);
-            };
+            dgv.CellDoubleClick += (s, e) => { if (e.RowIndex >= 0) LoadRow(e.RowIndex); };
             Controls.Add(dgv);
             dgv.BringToFront();
             RefreshGrid();
@@ -86,6 +87,7 @@ namespace ApplianceManagement.Forms
             txtName.Clear(); txtPhone.Clear(); txtAddress.Clear(); txtOpening.Text = "0";
             txtOpening.Enabled = true;
             btnSave.Text = "ADD CUSTOMER";
+            btnDeactivate.Enabled = false;
             txtName.Focus();
         }
 
@@ -100,6 +102,7 @@ namespace ApplianceManagement.Forms
                 txtOpening.Text = c.OpeningBalance.ToString("0.##");
                 txtOpening.Enabled = false;
                 btnSave.Text = "UPDATE CUSTOMER";
+                btnDeactivate.Enabled = !string.Equals(c.CustomerName, "Walk-in Customer", StringComparison.OrdinalIgnoreCase);
                 txtName.Focus();
             }
         }
@@ -110,6 +113,22 @@ namespace ApplianceManagement.Forms
             dgv.DataSource = _repo.GetAllActive();
             if (dgv.Columns.Contains("CustomerID")) dgv.Columns["CustomerID"].Visible = false;
             if (dgv.Columns.Contains("IsActive")) dgv.Columns["IsActive"].Visible = false;
+        }
+
+        private void Deactivate()
+        {
+            if (_editId <= 0) return;
+            if (!DialogHelpers.Confirm(this, "Deactivate this customer?\nThey will no longer appear in sales lists."))
+                return;
+            try
+            {
+                _repo.SetActive(_editId, false);
+                DialogHelpers.Info(this, "Customer deactivated.");
+                Tag = "NOSAVECONFIRM";
+                ClearEdit();
+                RefreshGrid();
+            }
+            catch (Exception ex) { DialogHelpers.Error(this, ex.Message); }
         }
 
         private void Save()
