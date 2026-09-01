@@ -48,8 +48,12 @@ namespace ApplianceManagement.Data
                         {
                             decimal packSize = ReadPackSize(conn, trans, d.ProductID);
                             int packs = d.Quantity < 1 ? 1 : d.Quantity;
+                            // Line PurchasePrice = PACK price (domain model)
+                            decimal packPrice = d.PurchasePrice;
+                            if (packPrice < 0) packPrice = 0;
                             int unitsIn = PackMath.PacksToUnits(packs, packSize);
-                            decimal unitCost = PackMath.UnitCost(d.PurchasePrice, packSize);
+                            // Ledger / COGS uses unit cost only
+                            decimal unitCost = PackMath.UnitCost(packPrice, packSize);
 
                             using (var cmd = DbHelper.CreateCommand(
                                 "INSERT INTO PurchaseDetail(PurchaseID,ProductID,Quantity,PurchasePrice,Discount,Amount) VALUES(@P,@Pr,@Q,@Price,@Di,@Am)", conn, trans))
@@ -57,18 +61,20 @@ namespace ApplianceManagement.Data
                                 cmd.Parameters.AddWithValue("@P", purchaseId);
                                 cmd.Parameters.AddWithValue("@Pr", d.ProductID);
                                 cmd.Parameters.AddWithValue("@Q", packs);
-                                cmd.Parameters.AddWithValue("@Price", d.PurchasePrice);
+                                cmd.Parameters.AddWithValue("@Price", packPrice);
                                 cmd.Parameters.AddWithValue("@Di", d.Discount);
                                 cmd.Parameters.AddWithValue("@Am", d.Amount);
                                 cmd.ExecuteNonQuery();
                             }
 
+                            // CRITICAL: Products.PurchasePrice must remain PACK price (never unit cost).
+                            // Dividing and storing unit cost here was the fatal bug that corrupted every purchase.
                             try
                             {
                                 using (var cmd = DbHelper.CreateCommand(
-                                    "UPDATE Products SET PurchasePrice = @Price WHERE ProductID=@P", conn, trans))
+                                    "UPDATE Products SET PurchasePrice = @PackPrice WHERE ProductID=@P", conn, trans))
                                 {
-                                    cmd.Parameters.AddWithValue("@Price", unitCost);
+                                    cmd.Parameters.AddWithValue("@PackPrice", packPrice);
                                     cmd.Parameters.AddWithValue("@P", d.ProductID);
                                     cmd.ExecuteNonQuery();
                                 }
@@ -83,7 +89,7 @@ namespace ApplianceManagement.Data
                                 quantityIn: unitsIn,
                                 quantityOut: 0,
                                 unitCost: unitCost,
-                                remarks: "Purchase: " + invoiceNo + " packs=" + packs + " packSize=" + packSize,
+                                remarks: "Purchase: " + invoiceNo + " packs=" + packs + " packSize=" + packSize + " packPrice=" + packPrice + " unitCost=" + unitCost,
                                 when: purchase.PurchaseDate);
                         }
 
