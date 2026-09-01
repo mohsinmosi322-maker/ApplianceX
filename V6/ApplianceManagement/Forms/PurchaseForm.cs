@@ -411,6 +411,19 @@ namespace ApplianceManagement.Forms
         {
             if (cart.Count == 0) { DialogHelpers.Error(this, "Add products first."); return; }
             if (selectedSupplier == null) { DialogHelpers.Error(this, "Select supplier (Masters → Suppliers)."); return; }
+            foreach (var line in cart)
+            {
+                if (line.PurchasePrice <= 0)
+                {
+                    DialogHelpers.Error(this, "Pack purchase price must be greater than 0.\nProduct ID: " + line.ProductID);
+                    return;
+                }
+                if (line.Quantity < 1)
+                {
+                    DialogHelpers.Error(this, "Pack quantity must be at least 1.");
+                    return;
+                }
+            }
             if (!DialogHelpers.Confirm(this, "Save this purchase?\nStock will increase by packs × pack size."))
                 return;
             try
