@@ -9,11 +9,11 @@ namespace ApplianceManagement.Forms
 {
     public partial class ProductManageForm : Form
     {
-        private ProductRepository repo = new ProductRepository();
+        private readonly ProductRepository repo = new ProductRepository();
         private DataGridView dgv;
         private TextBox txtSearch, txtName, txtSale, txtPur, txtMin, txtPack;
         private CheckBox chkActive;
-        private Label lblStatus;
+        private Label lblStatus, lblHint;
         private Product selected;
 
         public ProductManageForm()
@@ -24,77 +24,98 @@ namespace ApplianceManagement.Forms
 
         private void InitializeComponent()
         {
-            this.Text = "Manage Products";
-            this.Size = new Size(980, 600);
-            this.BackColor = UiHelper.BgColor;
-            this.KeyPreview = true;
+            Text = "Manage Products";
+            Size = new Size(1040, 640);
+            BackColor = UiHelper.BgColor;
+            KeyPreview = true;
             UiHelper.AttachF4Close(this);
             UiHelper.AttachEnterNavigation(this);
 
-            Controls.Add(UiHelper.CreateFormBanner(
-                "PRODUCTS",
-                "List · Edit rates/pack · Disable / Reactivate  ·  Prices are PACK prices",
-                FormAccent.NewItem, FormAccent.NewItemDark));
-
-            var top = new Panel { Dock = DockStyle.Top, Height = 48, BackColor = Color.White, Padding = new Padding(12, 10, 12, 8) };
-            top.Controls.Add(new Label { Text = "Search:", Font = UiHelper.NormalFont, Location = new Point(8, 12), AutoSize = true });
-            txtSearch = new TextBox { Location = new Point(70, 8), Size = new Size(320, 26) };
-            UiHelper.StyleTextBox(txtSearch);
-            txtSearch.TextChanged += (s, e) => LoadGrid(txtSearch.Text);
-            top.Controls.Add(txtSearch);
-            Controls.Add(top);
-
-            dgv = new DataGridView { Dock = DockStyle.Fill };
-            UiHelper.StyleGridWithAccent(dgv, FormAccent.NewItem);
-            dgv.ReadOnly = true;
-            dgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-            dgv.MultiSelect = false;
-            dgv.SelectionChanged += (s, e) =>
+            // ---- RIGHT edit panel first in tree (docked last for edge) ----
+            var edit = new Panel
             {
-                if (dgv.CurrentRow == null || dgv.CurrentRow.DataBoundItem == null) return;
-                selected = dgv.CurrentRow.DataBoundItem as Product;
-                if (selected == null) return;
-                txtName.Text = selected.ProductName;
-                txtSale.Text = selected.SalePrice.ToString("0.00");
-                txtPur.Text = selected.PurchasePrice.ToString("0.00");
-                txtMin.Text = selected.MinimumStock.ToString();
-                txtPack.Text = selected.PackSize > 0 ? selected.PackSize.ToString("0.####") : "1";
-                chkActive.Checked = selected.IsActive;
-                lblStatus.Text = selected.IsActive ? "Status: ACTIVE" : "Status: DISABLED";
-                lblStatus.ForeColor = selected.IsActive ? Color.FromArgb(46, 125, 50) : Color.FromArgb(198, 40, 40);
+                Dock = DockStyle.Right,
+                Width = 310,
+                BackColor = Color.White,
+                Padding = new Padding(16, 12, 16, 12)
             };
-            Controls.Add(dgv);
+            edit.Paint += (s, e) =>
+            {
+                using (var pen = new Pen(Color.FromArgb(220, 220, 230)))
+                    e.Graphics.DrawLine(pen, 0, 0, 0, edit.Height);
+            };
 
-            Panel edit = new Panel { Dock = DockStyle.Right, Width = 300, BackColor = Color.White, Padding = new Padding(16) };
-            int y = 8;
-            edit.Controls.Add(new Label { Text = "Edit Product", Font = UiHelper.HeaderFont, Location = new Point(0, y), AutoSize = true });
-            y += 36;
-            edit.Controls.Add(new Label { Text = "Name", Location = new Point(0, y), AutoSize = true, Font = UiHelper.SmallFont });
-            y += 18;
-            txtName = new TextBox { Location = new Point(0, y), Size = new Size(260, 26) }; UiHelper.StyleTextBox(txtName); edit.Controls.Add(txtName); y += 36;
-            edit.Controls.Add(new Label { Text = "Sale Price (pack)", Location = new Point(0, y), AutoSize = true, Font = UiHelper.SmallFont });
-            y += 18;
-            txtSale = new TextBox { Location = new Point(0, y), Size = new Size(140, 26) }; UiHelper.StyleTextBox(txtSale); edit.Controls.Add(txtSale); y += 36;
-            edit.Controls.Add(new Label { Text = "Purchase Price (pack)", Location = new Point(0, y), AutoSize = true, Font = UiHelper.SmallFont });
-            y += 18;
-            txtPur = new TextBox { Location = new Point(0, y), Size = new Size(140, 26) }; UiHelper.StyleTextBox(txtPur); edit.Controls.Add(txtPur); y += 36;
-            edit.Controls.Add(new Label { Text = "Pack size", Location = new Point(0, y), AutoSize = true, Font = UiHelper.SmallFont });
-            y += 18;
-            txtPack = new TextBox { Location = new Point(0, y), Size = new Size(100, 26), Text = "1" }; UiHelper.StyleTextBox(txtPack); edit.Controls.Add(txtPack); y += 36;
-            edit.Controls.Add(new Label { Text = "Min Stock", Location = new Point(0, y), AutoSize = true, Font = UiHelper.SmallFont });
-            y += 18;
-            txtMin = new TextBox { Location = new Point(0, y), Size = new Size(80, 26) }; UiHelper.StyleTextBox(txtMin); edit.Controls.Add(txtMin); y += 36;
-            chkActive = new CheckBox { Text = "Active (sale/purchase)", Font = UiHelper.NormalFont, Location = new Point(0, y), Size = new Size(260, 24), Checked = true };
+            int y = 4;
+            edit.Controls.Add(new Label
+            {
+                Text = "EDIT PRODUCT",
+                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
+                ForeColor = FormAccent.NewItemDark,
+                Location = new Point(0, y),
+                AutoSize = true
+            });
+            y += 32;
+
+            edit.Controls.Add(Lbl("Product name", y)); y += 18;
+            txtName = new TextBox { Location = new Point(0, y), Size = new Size(270, 28) };
+            UiHelper.StyleTextBox(txtName);
+            edit.Controls.Add(txtName); y += 38;
+
+            edit.Controls.Add(Lbl("Sale price (pack)", y)); y += 18;
+            txtSale = new TextBox { Location = new Point(0, y), Size = new Size(150, 28) };
+            UiHelper.StyleTextBox(txtSale);
+            edit.Controls.Add(txtSale); y += 38;
+
+            edit.Controls.Add(Lbl("Purchase price (pack)", y)); y += 18;
+            txtPur = new TextBox { Location = new Point(0, y), Size = new Size(150, 28) };
+            UiHelper.StyleTextBox(txtPur);
+            edit.Controls.Add(txtPur); y += 38;
+
+            edit.Controls.Add(Lbl("Pack size", y)); y += 18;
+            txtPack = new TextBox { Location = new Point(0, y), Size = new Size(100, 28) };
+            UiHelper.StyleTextBox(txtPack);
+            edit.Controls.Add(txtPack); y += 38;
+
+            edit.Controls.Add(Lbl("Min stock (base units)", y)); y += 18;
+            txtMin = new TextBox { Location = new Point(0, y), Size = new Size(100, 28) };
+            UiHelper.StyleTextBox(txtMin);
+            edit.Controls.Add(txtMin); y += 38;
+
+            chkActive = new CheckBox
+            {
+                Text = "Active (sale / purchase)",
+                Location = new Point(0, y),
+                AutoSize = true,
+                Font = UiHelper.NormalFont,
+                Checked = true
+            };
             edit.Controls.Add(chkActive); y += 32;
-            lblStatus = new Label { Text = "Status: —", Font = UiHelper.SmallFont, Location = new Point(0, y), AutoSize = true };
+
+            lblStatus = new Label
+            {
+                Text = "Status: —",
+                Location = new Point(0, y),
+                AutoSize = true,
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold)
+            };
             edit.Controls.Add(lblStatus); y += 28;
 
-            Button btnSave = new Button { Text = "SAVE CHANGES", Location = new Point(0, y), Size = new Size(160, 34) };
-            UiHelper.StyleAccentButton(btnSave, FormAccent.NewItem, FormAccent.NewItemDark);
-            btnSave.Click += BtnSave_Click;
-            edit.Controls.Add(btnSave); y += 42;
+            lblHint = new Label
+            {
+                Text = "Select a product from the list.",
+                Location = new Point(0, y),
+                Size = new Size(270, 40),
+                ForeColor = Color.FromArgb(120, 120, 130),
+                Font = UiHelper.SmallFont
+            };
+            edit.Controls.Add(lblHint); y += 48;
 
-            Button btnDisable = new Button { Text = "DISABLE", Location = new Point(0, y), Size = new Size(120, 32) };
+            var btnSave = new Button { Text = "SAVE CHANGES", Location = new Point(0, y), Size = new Size(270, 36) };
+            UiHelper.StyleAccentButton(btnSave, FormAccent.NewItem, FormAccent.NewItemDark);
+            btnSave.Click += (s, e) => Save();
+            edit.Controls.Add(btnSave); y += 44;
+
+            var btnDisable = new Button { Text = "DISABLE", Location = new Point(0, y), Size = new Size(130, 34) };
             UiHelper.StyleAccentButton(btnDisable, FormAccent.LowStock, FormAccent.LowStockDark);
             btnDisable.Click += (s, e) =>
             {
@@ -106,7 +127,7 @@ namespace ApplianceManagement.Forms
             };
             edit.Controls.Add(btnDisable);
 
-            Button btnReactivate = new Button { Text = "REACTIVATE", Location = new Point(130, y), Size = new Size(120, 32) };
+            var btnReactivate = new Button { Text = "REACTIVATE", Location = new Point(140, y), Size = new Size(130, 34) };
             UiHelper.StyleAccentButton(btnReactivate, FormAccent.Purchase, FormAccent.PurchaseDark);
             btnReactivate.Click += (s, e) =>
             {
@@ -117,41 +138,254 @@ namespace ApplianceManagement.Forms
                 LoadGrid(txtSearch.Text);
             };
             edit.Controls.Add(btnReactivate);
+
+            // ---- GRID ----
+            dgv = new DataGridView
+            {
+                Dock = DockStyle.Fill,
+                BackgroundColor = Color.White,
+                BorderStyle = BorderStyle.None
+            };
+            UiHelper.StyleGridWithAccent(dgv, FormAccent.NewItem);
+            dgv.ReadOnly = true;
+            dgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            dgv.MultiSelect = false;
+            dgv.AutoGenerateColumns = false;
+            dgv.Columns.Clear();
+            dgv.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                Name = "ProductName",
+                DataPropertyName = "ProductName",
+                HeaderText = "Product Name",
+                FillWeight = 45
+            });
+            dgv.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                Name = "ProductCode",
+                DataPropertyName = "ProductCode",
+                HeaderText = "Code",
+                FillWeight = 12
+            });
+            dgv.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                Name = "SalePrice",
+                DataPropertyName = "SalePrice",
+                HeaderText = "Sale (pack)",
+                DefaultCellStyle = { Format = "N2", Alignment = DataGridViewContentAlignment.MiddleRight },
+                FillWeight = 14
+            });
+            dgv.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                Name = "PurchasePrice",
+                DataPropertyName = "PurchasePrice",
+                HeaderText = "Cost (pack)",
+                DefaultCellStyle = { Format = "N2", Alignment = DataGridViewContentAlignment.MiddleRight },
+                FillWeight = 14
+            });
+            dgv.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                Name = "PackSize",
+                DataPropertyName = "PackSize",
+                HeaderText = "Pack",
+                DefaultCellStyle = { Format = "0.####", Alignment = DataGridViewContentAlignment.MiddleCenter },
+                FillWeight = 8
+            });
+            dgv.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                Name = "CurrentStock",
+                DataPropertyName = "CurrentStock",
+                HeaderText = "Stock",
+                DefaultCellStyle = { Alignment = DataGridViewContentAlignment.MiddleCenter },
+                FillWeight = 8
+            });
+            dgv.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                Name = "IsActive",
+                DataPropertyName = "IsActive",
+                HeaderText = "Active",
+                FillWeight = 8
+            });
+            dgv.SelectionChanged += (s, e) => BindSelected();
+            dgv.CellDoubleClick += (s, e) => { if (e.RowIndex >= 0) txtName.Focus(); };
+
+            // ---- SEARCH BAR ----
+            var top = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 52,
+                BackColor = Color.White,
+                Padding = new Padding(12, 10, 12, 8)
+            };
+            top.Controls.Add(new Label
+            {
+                Text = "Search by name / code",
+                Font = UiHelper.NormalFont,
+                ForeColor = Color.FromArgb(80, 80, 90),
+                Location = new Point(8, 14),
+                AutoSize = true
+            });
+            txtSearch = new TextBox { Location = new Point(170, 10), Size = new Size(360, 28) };
+            UiHelper.StyleTextBox(txtSearch);
+            txtSearch.TextChanged += (s, e) => LoadGrid(txtSearch.Text);
+            top.Controls.Add(txtSearch);
+            top.Controls.Add(new Label
+            {
+                Text = "Type product name to filter · click row to edit",
+                Font = UiHelper.SmallFont,
+                ForeColor = Color.FromArgb(140, 140, 150),
+                Location = new Point(540, 16),
+                AutoSize = true
+            });
+
+            // ---- BANNER ----
+            var banner = UiHelper.CreateFormBanner(
+                "PRODUCTS",
+                "Search by name · Edit rates / pack · Disable / Reactivate  ·  Prices are PACK prices",
+                FormAccent.NewItem, FormAccent.NewItemDark);
+
+            // Dock order: Fill → Right → Top (search) → Top (banner last = outer)
+            SuspendLayout();
+            Controls.Add(dgv);
             Controls.Add(edit);
-            edit.BringToFront();
+            Controls.Add(top);
+            Controls.Add(banner);
+            ResumeLayout(true);
+
+            UiHelper.EnableAutoSelectOnFocus(this);
+        }
+
+        private static Label Lbl(string text, int y)
+        {
+            return new Label
+            {
+                Text = text,
+                Location = new Point(0, y),
+                AutoSize = true,
+                Font = UiHelper.SmallFont,
+                ForeColor = Color.FromArgb(90, 90, 100)
+            };
+        }
+
+        private void BindSelected()
+        {
+            if (dgv.CurrentRow == null || dgv.CurrentRow.DataBoundItem == null)
+            {
+                selected = null;
+                return;
+            }
+            selected = dgv.CurrentRow.DataBoundItem as Product;
+            if (selected == null) return;
+
+            txtName.Text = selected.ProductName ?? "";
+            txtSale.Text = selected.SalePrice.ToString("0.00");
+            txtPur.Text = selected.PurchasePrice.ToString("0.00");
+            txtMin.Text = selected.MinimumStock.ToString();
+            txtPack.Text = selected.PackSize > 0 ? selected.PackSize.ToString("0.####") : "1";
+            chkActive.Checked = selected.IsActive;
+            lblStatus.Text = selected.IsActive ? "Status: ACTIVE" : "Status: DISABLED";
+            lblStatus.ForeColor = selected.IsActive ? Color.FromArgb(46, 125, 50) : Color.FromArgb(198, 40, 40);
+            lblHint.Text = "Code: " + selected.ProductCode +
+                           (string.IsNullOrEmpty(selected.UnitOfMeasure) ? "" : "  ·  UOM: " + selected.UnitOfMeasure);
         }
 
         private void LoadGrid(string kw)
         {
-            var list = string.IsNullOrWhiteSpace(kw) ? repo.GetAllForManage() : repo.SearchAll(kw);
-            dgv.DataSource = null;
-            dgv.DataSource = list;
-            foreach (var h in new[] { "ProductID", "CategoryID", "CreatedDate", "UnitOfMeasure", "Barcode" })
-                if (dgv.Columns.Contains(h)) dgv.Columns[h].Visible = false;
+            try
+            {
+                var list = string.IsNullOrWhiteSpace(kw)
+                    ? repo.GetAllForManage()
+                    : repo.SearchAll(kw.Trim());
+
+                // Prefer name order (repo already ORDERS BY ProductName)
+                int keepId = selected != null ? selected.ProductID : 0;
+                dgv.DataSource = null;
+                dgv.DataSource = list;
+
+                if (list.Count == 0)
+                {
+                    selected = null;
+                    lblHint.Text = "No products match this search.";
+                    return;
+                }
+
+                // Restore selection if possible
+                if (keepId > 0)
+                {
+                    foreach (DataGridViewRow row in dgv.Rows)
+                    {
+                        var p = row.DataBoundItem as Product;
+                        if (p != null && p.ProductID == keepId)
+                        {
+                            row.Selected = true;
+                            dgv.CurrentCell = row.Cells[0];
+                            break;
+                        }
+                    }
+                }
+                else if (dgv.Rows.Count > 0)
+                {
+                    dgv.Rows[0].Selected = true;
+                    dgv.CurrentCell = dgv.Rows[0].Cells[0];
+                }
+            }
+            catch (Exception ex)
+            {
+                DialogHelpers.Error(this, "Could not load products: " + ex.Message);
+            }
         }
 
-        private void BtnSave_Click(object sender, EventArgs e)
+        private void Save()
         {
-            if (selected == null) { DialogHelpers.Error(this, "Select a product."); return; }
-            decimal sale = 0, pur = 0, pack = 1; int min = 0;
-            decimal.TryParse(txtSale.Text, out sale);
-            decimal.TryParse(txtPur.Text, out pur);
-            int.TryParse(txtMin.Text, out min);
-            if (!decimal.TryParse(txtPack.Text, out pack) || pack <= 0)
+            if (selected == null)
             {
-                DialogHelpers.Error(this, "Pack size must be greater than 0.");
+                DialogHelpers.Warn(this, "Select a product from the list first.");
                 return;
             }
-            if (pur < 0 || sale < 0)
+            if (string.IsNullOrWhiteSpace(txtName.Text))
             {
-                DialogHelpers.Error(this, "Prices cannot be negative.");
+                DialogHelpers.Warn(this, "Product name is required.");
+                txtName.Focus();
                 return;
             }
-            if (!DialogHelpers.Confirm(this, "Save changes to " + selected.ProductCode + "?")) return;
-            repo.UpdateFull(selected.ProductID, txtName.Text.Trim(), pur, sale, min, chkActive.Checked, selected.UnitOfMeasure, pack);
-            DialogHelpers.Info(this, "Updated.\nUnit cost: " + Math.Round(pur / pack, 4).ToString("0.####") +
-                "\nUnit sale: " + Math.Round(sale / pack, 4).ToString("0.####"));
-            LoadGrid(txtSearch.Text);
+
+            decimal sale, pur, pack;
+            int min;
+            if (!decimal.TryParse(txtSale.Text, out sale) || sale < 0)
+            {
+                DialogHelpers.Warn(this, "Invalid sale price.");
+                txtSale.Focus();
+                return;
+            }
+            if (!decimal.TryParse(txtPur.Text, out pur) || pur < 0)
+            {
+                DialogHelpers.Warn(this, "Invalid purchase price.");
+                txtPur.Focus();
+                return;
+            }
+            if (!decimal.TryParse(txtPack.Text, out pack) || pack <= 0) pack = 1;
+            if (!int.TryParse(txtMin.Text, out min) || min < 0) min = 0;
+
+            try
+            {
+                repo.UpdateFull(
+                    selected.ProductID,
+                    txtName.Text.Trim(),
+                    pur,
+                    sale,
+                    min,
+                    chkActive.Checked,
+                    selected.UnitOfMeasure,
+                    pack);
+
+                DialogHelpers.Info(this,
+                    "Saved.\nUnit sale: " + Math.Round(sale / pack, 4).ToString("0.####") +
+                    "\nUnit cost: " + Math.Round(pur / pack, 4).ToString("0.####"));
+                LoadGrid(txtSearch.Text);
+            }
+            catch (Exception ex)
+            {
+                DialogHelpers.Error(this, "Save failed: " + ex.Message);
+            }
         }
     }
 }
