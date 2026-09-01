@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
+using ApplianceManagement.Data;
 using ApplianceManagement.Helpers;
 using ApplianceManagement.Models;
 using ApplianceManagement.Services;
@@ -10,274 +11,361 @@ using ApplianceManagement.Services;
 namespace ApplianceManagement.Forms
 {
     /// <summary>
-    /// Invoice-linked sale return: load original INV → choose return qty ≤ returnable → reason → save.
+    /// Hybrid Sale Return: product entry like Sale + optional original invoice for qty limits.
+    /// Stock increases on save.
     /// </summary>
-    public partial class SaleReturnForm : Form
+    public class SaleReturnForm : Form
     {
-        private readonly SaleReturnService _service = new SaleReturnService();
-        private List<SaleInvoiceLine> _invoiceLines = new List<SaleInvoiceLine>();
-        private int _saleId;
-        private int _customerId;
-        private string _customerName = "";
-        private string _invoiceNo = "";
+        private readonly SaleReturnService _svc = new SaleReturnService();
+        private readonly ProductRepository _products = new ProductRepository();
+        private readonly List<SaleReturnDetail> cart = new List<SaleReturnDetail>();
+        private List<SaleInvoiceLine> invoiceLines = new List<SaleInvoiceLine>();
 
-        private TextBox txtInvoice, txtReason, txtRefund;
-        private Label lblCustomer, lblSaleDate, lblReturnNo;
+        private TextBox txtInvoice, txtSearch, txtQty, txtReason, txtDiscount, txtRefund, txtTotal, txtNet;
+        private Label lblCustomer, lblInfo;
         private DataGridView dgv;
-        private Button btnLoad, btnSave;
+        private Product selectedProduct;
+        private int originalSaleId;
+        private int customerId;
+        private string customerName;
 
         public SaleReturnForm()
         {
             InitializeComponent();
-            txtInvoice.Focus();
         }
 
         private void InitializeComponent()
         {
-            this.Text = "Sale Return";
-            this.Size = new Size(1100, 680);
-            this.BackColor = UiHelper.BgColor;
-            this.KeyPreview = true;
-            UiHelper.AttachF4Close(this);
-            this.KeyDown += (s, e) =>
-            {
-                if (e.KeyCode == Keys.F12) { Save(); e.Handled = true; }
-                if (e.KeyCode == Keys.F5) { LoadInvoice(); e.Handled = true; }
-            };
+            Text = "Sale Return";
+            Size = new Size(980, 640);
+            BackColor = UiHelper.BgColor;
+            KeyPreview = true;
+            UiHelper.AttachF4Close(this, false);
+            UiHelper.AttachEnterNavigation(this);
 
-            this.Controls.Add(UiHelper.CreateFormBanner(
+            Controls.Add(UiHelper.CreateFormBanner(
                 "SALE RETURN",
-                "Load original invoice  ·  Return qty ≤ sold − already returned  ·  Reason required  ·  F5 load  F12 save",
+                "Optional invoice · Product + qty like Sale · Reason required · Stock increases · F12 save",
                 FormAccent.SaleReturn, FormAccent.SaleReturnDark));
 
-            Panel top = new Panel { Dock = DockStyle.Top, Height = 100, BackColor = Color.White, Padding = new Padding(12) };
-            top.Controls.Add(new Label { Text = "Original Invoice", Font = UiHelper.SmallFont, Location = new Point(16, 12), AutoSize = true });
-            txtInvoice = new TextBox { Location = new Point(16, 32), Size = new Size(200, 28) };
+            // --- Invoice row ---
+            var invBar = new Panel { Dock = DockStyle.Top, Height = 48, BackColor = Color.White, Padding = new Padding(10, 8, 10, 6) };
+            invBar.Controls.Add(new Label { Text = "Original Inv (optional)", Location = new Point(8, 12), AutoSize = true, Font = UiHelper.SmallFont });
+            txtInvoice = new TextBox { Location = new Point(150, 8), Size = new Size(130, 28) };
             UiHelper.StyleTextBox(txtInvoice);
-            txtInvoice.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; LoadInvoice(); } };
-            top.Controls.Add(txtInvoice);
-
-            btnLoad = new Button { Text = "LOAD (F5)", Location = new Point(230, 30), Size = new Size(110, 32) };
+            invBar.Controls.Add(txtInvoice);
+            var btnLoad = new Button { Text = "LOAD (F5)", Location = new Point(290, 6), Size = new Size(100, 32) };
             UiHelper.StyleAccentButton(btnLoad, FormAccent.SaleReturn, FormAccent.SaleReturnDark);
             btnLoad.Click += (s, e) => LoadInvoice();
-            top.Controls.Add(btnLoad);
+            invBar.Controls.Add(btnLoad);
+            lblCustomer = new Label { Text = "Customer: —", Location = new Point(410, 12), AutoSize = true, Font = UiHelper.NormalFont, ForeColor = FormAccent.SaleReturnDark };
+            invBar.Controls.Add(lblCustomer);
+            lblInfo = new Label { Text = "Or search product below (free return)", Location = new Point(620, 12), AutoSize = true, Font = UiHelper.SmallFont, ForeColor = Color.Gray };
+            invBar.Controls.Add(lblInfo);
+            Controls.Add(invBar);
 
-            lblReturnNo = new Label { Text = "Return No: (auto)", Font = UiHelper.HeaderFont, ForeColor = FormAccent.SaleReturnDark, Location = new Point(360, 12), AutoSize = true };
-            lblCustomer = new Label { Text = "Customer: —", Font = UiHelper.NormalFont, Location = new Point(360, 40), AutoSize = true };
-            lblSaleDate = new Label { Text = "Sale date: —", Font = UiHelper.NormalFont, Location = new Point(360, 64), AutoSize = true };
-            top.Controls.Add(lblReturnNo);
-            top.Controls.Add(lblCustomer);
-            top.Controls.Add(lblSaleDate);
-            this.Controls.Add(top);
+            // --- Product entry (Sale-like) ---
+            var top = new Panel { Dock = DockStyle.Top, Height = 88, BackColor = Color.FromArgb(255, 248, 240), Padding = new Padding(10, 8, 10, 6) };
+            top.Controls.Add(new Label { Text = "Product code / name", Location = new Point(8, 6), AutoSize = true, Font = UiHelper.SmallFont });
+            txtSearch = new TextBox { Location = new Point(8, 26), Size = new Size(280, 28) };
+            UiHelper.StyleTextBox(txtSearch);
+            txtSearch.KeyDown += Search_KeyDown;
+            top.Controls.Add(txtSearch);
 
-            Panel foot = new Panel { Dock = DockStyle.Bottom, Height = 100, BackColor = Color.FromArgb(253, 242, 233) };
-            foot.Controls.Add(new Label { Text = "Return reason (required)", Font = UiHelper.SmallFont, Location = new Point(16, 10), AutoSize = true });
-            txtReason = new TextBox { Location = new Point(16, 30), Size = new Size(400, 28) };
+            top.Controls.Add(new Label { Text = "Qty", Location = new Point(300, 6), AutoSize = true, Font = UiHelper.SmallFont });
+            txtQty = new TextBox { Location = new Point(300, 26), Size = new Size(70, 28), Text = "1" };
+            UiHelper.StyleTextBox(txtQty);
+            txtQty.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; AddLine(); } };
+            top.Controls.Add(txtQty);
+
+            var btnAdd = new Button { Text = "ADD", Location = new Point(385, 24), Size = new Size(80, 32) };
+            UiHelper.StyleAccentButton(btnAdd, FormAccent.SaleReturn, FormAccent.SaleReturnDark);
+            btnAdd.Click += (s, e) => AddLine();
+            top.Controls.Add(btnAdd);
+
+            top.Controls.Add(new Label
+            {
+                Text = "Enter · add line · Del removes selected · F5 load invoice · F12 save",
+                Location = new Point(480, 30),
+                AutoSize = true,
+                Font = UiHelper.SmallFont,
+                ForeColor = Color.FromArgb(120, 80, 40)
+            });
+            Controls.Add(top);
+
+            // --- Grid ---
+            dgv = new DataGridView { Dock = DockStyle.Fill };
+            UiHelper.StyleGridWithAccent(dgv, FormAccent.SaleReturn);
+            dgv.AutoGenerateColumns = false;
+            dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "ProductName", DataPropertyName = "ProductName", HeaderText = "Description", FillWeight = 40 });
+            dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "ProductCode", DataPropertyName = "ProductCode", HeaderText = "Code", FillWeight = 12 });
+            dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "Quantity", DataPropertyName = "Quantity", HeaderText = "Qty", FillWeight = 10 });
+            dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "SalePrice", DataPropertyName = "SalePrice", HeaderText = "Rate", DefaultCellStyle = { Format = "N2" }, FillWeight = 14 });
+            dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "Amount", DataPropertyName = "Amount", HeaderText = "Net Amount", DefaultCellStyle = { Format = "N2" }, FillWeight = 14 });
+            dgv.KeyDown += (s, e) =>
+            {
+                if (e.KeyCode == Keys.Delete && dgv.CurrentRow != null)
+                {
+                    int i = dgv.CurrentRow.Index;
+                    if (i >= 0 && i < cart.Count) { cart.RemoveAt(i); RefreshGrid(); }
+                }
+            };
+            Controls.Add(dgv);
+
+            // --- Footer ---
+            var foot = new Panel { Dock = DockStyle.Bottom, Height = 110, BackColor = Color.FromArgb(255, 243, 224) };
+            foot.Controls.Add(new Label { Text = "Return reason (required)", Location = new Point(12, 10), AutoSize = true, Font = UiHelper.SmallFont });
+            txtReason = new TextBox { Location = new Point(12, 30), Size = new Size(320, 28) };
             UiHelper.StyleTextBox(txtReason);
             foot.Controls.Add(txtReason);
 
-            foot.Controls.Add(new Label { Text = "Refund amount", Font = UiHelper.SmallFont, Location = new Point(440, 10), AutoSize = true });
-            txtRefund = new TextBox { Location = new Point(440, 30), Size = new Size(120, 28), Text = "0.00" };
+            foot.Controls.Add(new Label { Text = "Discount", Location = new Point(350, 10), AutoSize = true, Font = UiHelper.SmallFont });
+            txtDiscount = new TextBox { Location = new Point(350, 30), Size = new Size(80, 28), Text = "0" };
+            UiHelper.StyleTextBox(txtDiscount);
+            txtDiscount.TextChanged += (s, e) => Recalc();
+            foot.Controls.Add(txtDiscount);
+
+            foot.Controls.Add(new Label { Text = "Refund", Location = new Point(450, 10), AutoSize = true, Font = UiHelper.SmallFont });
+            txtRefund = new TextBox { Location = new Point(450, 30), Size = new Size(90, 28), Text = "0.00" };
             UiHelper.StyleTextBox(txtRefund);
             foot.Controls.Add(txtRefund);
 
-            btnSave = new Button { Text = "SAVE RETURN (F12)", Size = new Size(160, 36), Anchor = AnchorStyles.Top | AnchorStyles.Right };
-            Button btnClose = new Button { Text = "CLOSE (F4)", Size = new Size(120, 36), Anchor = AnchorStyles.Top | AnchorStyles.Right };
+            txtTotal = new TextBox { Location = new Point(560, 30), Size = new Size(90, 28), ReadOnly = true, Text = "0.00" };
+            UiHelper.StyleTextBox(txtTotal);
+            foot.Controls.Add(new Label { Text = "Total", Location = new Point(560, 10), AutoSize = true, Font = UiHelper.SmallFont });
+            foot.Controls.Add(txtTotal);
+
+            txtNet = new TextBox { Location = new Point(670, 30), Size = new Size(90, 28), ReadOnly = true, Text = "0.00" };
+            UiHelper.StyleTextBox(txtNet);
+            foot.Controls.Add(new Label { Text = "Net", Location = new Point(670, 10), AutoSize = true, Font = UiHelper.SmallFont });
+            foot.Controls.Add(txtNet);
+
+            var btnSave = new Button { Text = "SAVE RETURN (F12)", Location = new Point(780, 24), Size = new Size(160, 36) };
             UiHelper.StyleAccentButton(btnSave, FormAccent.SaleReturn, FormAccent.SaleReturnDark);
-            UiHelper.StyleAccentButton(btnClose, FormAccent.SaleReturnDark, FormAccent.SaleReturn);
             btnSave.Click += (s, e) => Save();
-            btnClose.Click += (s, e) => this.Close();
             foot.Controls.Add(btnSave);
+
+            var btnClose = new Button { Text = "CLOSE (F4)", Location = new Point(780, 66), Size = new Size(160, 28) };
+            UiHelper.StyleButton(btnClose);
+            btnClose.Click += (s, e) => Close();
             foot.Controls.Add(btnClose);
-            foot.Resize += (s, e) =>
+
+            Controls.Add(foot);
+
+            // Dock order
+            Controls.SetChildIndex(dgv, 0);
+            Controls.SetChildIndex(foot, 0);
+
+            KeyDown += (s, e) =>
             {
-                btnClose.Location = new Point(foot.Width - 16 - btnClose.Width, 28);
-                btnSave.Location = new Point(btnClose.Left - 10 - btnSave.Width, 28);
+                if (e.KeyCode == Keys.F5) { LoadInvoice(); e.Handled = true; }
+                if (e.KeyCode == Keys.F12) { Save(); e.Handled = true; }
             };
-            this.Controls.Add(foot);
-
-            dgv = new DataGridView { Dock = DockStyle.Fill };
-            UiHelper.StyleGridWithAccent(dgv, FormAccent.SaleReturn);
-            dgv.ReadOnly = false;
-            dgv.AllowUserToAddRows = false;
-            dgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-            this.Controls.Add(dgv);
-            dgv.BringToFront();
-
-            dgv.CellEndEdit += (s, e) => RecalcRefund();
         }
 
         private void LoadInvoice()
         {
             try
             {
-                string inv = txtInvoice.Text.Trim();
-                _invoiceLines = _service.LoadInvoice(inv);
-                var first = _invoiceLines[0];
-                _saleId = first.SaleID;
-                _customerId = first.CustomerID;
-                _customerName = first.CustomerName;
-                _invoiceNo = first.InvoiceNo;
-
-                lblCustomer.Text = "Customer: " + _customerName;
-                lblSaleDate.Text = "Sale date: " + first.SaleDate.ToString("dd MMM yyyy HH:mm");
-                lblReturnNo.Text = "Return No: (auto on save)";
-
-                BuildGrid();
-                RecalcRefund();
-                txtReason.Focus();
+                invoiceLines = _svc.LoadInvoice(txtInvoice.Text.Trim());
+                if (invoiceLines.Count == 0) return;
+                originalSaleId = invoiceLines[0].SaleID;
+                customerId = invoiceLines[0].CustomerID;
+                customerName = invoiceLines[0].CustomerName;
+                lblCustomer.Text = "Customer: " + customerName + "  ·  Sale# " + invoiceLines[0].InvoiceNo;
+                lblInfo.Text = invoiceLines.Count + " line(s) — search product or add from invoice items";
+                // Pre-fill cart with returnable lines at 0 qty? Better leave empty; user adds.
+                DialogHelpers.Info(this, "Invoice loaded. Search product / enter qty to return.");
+                txtSearch.Focus();
             }
             catch (Exception ex)
             {
                 DialogHelpers.Error(this, ex.Message);
-                _invoiceLines.Clear();
-                dgv.DataSource = null;
             }
         }
 
-        private void BuildGrid()
+        private void Search_KeyDown(object sender, KeyEventArgs e)
         {
-            var rows = _invoiceLines.Select(l => new ReturnGridRow
-            {
-                SaleDetailID = l.SaleDetailID,
-                ProductID = l.ProductID,
-                ProductCode = l.ProductCode,
-                ProductName = l.ProductName,
-                SoldQty = l.SoldQty,
-                AlreadyReturned = l.AlreadyReturned,
-                Returnable = l.ReturnableQty,
-                ReturnQty = 0,
-                UnitPrice = l.SalePrice,
-                LineRefund = 0
-            }).ToList();
+            if (e.KeyCode != Keys.Enter) return;
+            e.SuppressKeyPress = true;
+            string q = (txtSearch.Text ?? "").Trim();
+            if (q.Length == 0) return;
 
-            dgv.DataSource = null;
-            dgv.DataSource = rows;
-
-            foreach (DataGridViewColumn col in dgv.Columns)
+            // Prefer match on loaded invoice
+            if (invoiceLines != null && invoiceLines.Count > 0)
             {
-                col.ReadOnly = col.Name != "ReturnQty";
-            }
-            if (dgv.Columns.Contains("SaleDetailID")) dgv.Columns["SaleDetailID"].Visible = false;
-            if (dgv.Columns.Contains("ProductID")) dgv.Columns["ProductID"].Visible = false;
-            if (dgv.Columns.Contains("ReturnQty"))
-            {
-                dgv.Columns["ReturnQty"].HeaderText = "Return Qty";
-                dgv.Columns["ReturnQty"].DefaultCellStyle.BackColor = Color.FromArgb(255, 243, 224);
-            }
-        }
-
-        private void RecalcRefund()
-        {
-            if (dgv.DataSource is List<ReturnGridRow> rows)
-            {
-                decimal total = 0;
-                foreach (var r in rows)
+                var line = invoiceLines.FirstOrDefault(x =>
+                    string.Equals(x.ProductCode, q, StringComparison.OrdinalIgnoreCase) ||
+                    (x.ProductName != null && x.ProductName.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0));
+                if (line != null)
                 {
-                    if (r.ReturnQty < 0) r.ReturnQty = 0;
-                    if (r.ReturnQty > r.Returnable) r.ReturnQty = r.Returnable;
-                    r.LineRefund = Math.Round(r.ReturnQty * r.UnitPrice, 2);
-                    total += r.LineRefund;
+                    selectedProduct = _products.GetById(line.ProductID) ?? new Product
+                    {
+                        ProductID = line.ProductID,
+                        ProductCode = line.ProductCode,
+                        ProductName = line.ProductName,
+                        SalePrice = line.SalePrice
+                    };
+                    txtSearch.Text = line.ProductName;
+                    txtQty.Focus();
+                    txtQty.SelectAll();
+                    return;
                 }
-                txtRefund.Text = total.ToString("0.00");
-                dgv.Refresh();
             }
+
+            var p = _products.GetByCode(q) ?? _products.GetByBarcode(q);
+            if (p == null)
+            {
+                var list = _products.Search(q);
+                if (list != null && list.Count > 0) p = list[0];
+            }
+            if (p == null)
+            {
+                DialogHelpers.Warn(this, "Product not found.");
+                return;
+            }
+            selectedProduct = p;
+            txtSearch.Text = p.ProductName;
+            txtQty.Focus();
+            txtQty.SelectAll();
+        }
+
+        private void AddLine()
+        {
+            if (selectedProduct == null)
+            {
+                // try resolve search text
+                Search_KeyDown(txtSearch, new KeyEventArgs(Keys.Enter));
+                if (selectedProduct == null) return;
+            }
+            int qty = 1;
+            int.TryParse(txtQty.Text, out qty);
+            if (qty < 1) qty = 1;
+
+            int? origDetail = null;
+            int sold = 0, already = 0;
+            decimal rate = selectedProduct.SalePrice;
+
+            if (invoiceLines != null)
+            {
+                var line = invoiceLines.FirstOrDefault(x => x.ProductID == selectedProduct.ProductID);
+                if (line != null)
+                {
+                    origDetail = line.SaleDetailID;
+                    sold = line.SoldQty;
+                    already = line.AlreadyReturned;
+                    rate = line.SalePrice;
+                    int returnable = Math.Max(0, sold - already);
+                    // existing cart qty for same product
+                    int inCart = cart.Where(c => c.ProductID == selectedProduct.ProductID).Sum(c => c.Quantity);
+                    if (qty + inCart > returnable)
+                    {
+                        DialogHelpers.Warn(this, "Returnable qty is " + returnable + " (sold " + sold + " − returned " + already + ").");
+                        return;
+                    }
+                }
+            }
+
+            var existing = cart.FirstOrDefault(c => c.ProductID == selectedProduct.ProductID && c.OriginalSaleDetailID == origDetail);
+            if (existing != null)
+            {
+                existing.Quantity += qty;
+                existing.Amount = Math.Round(existing.Quantity * existing.SalePrice, 2);
+            }
+            else
+            {
+                cart.Add(new SaleReturnDetail
+                {
+                    OriginalSaleDetailID = origDetail,
+                    ProductID = selectedProduct.ProductID,
+                    ProductCode = selectedProduct.ProductCode,
+                    ProductName = selectedProduct.ProductName,
+                    Quantity = qty,
+                    SalePrice = rate,
+                    Amount = Math.Round(qty * rate, 2),
+                    SoldQty = sold,
+                    AlreadyReturned = already
+                });
+            }
+
+            selectedProduct = null;
+            txtSearch.Clear();
+            txtQty.Text = "1";
+            RefreshGrid();
+            txtSearch.Focus();
+        }
+
+        private void RefreshGrid()
+        {
+            dgv.DataSource = null;
+            dgv.DataSource = cart.ToList();
+            Recalc();
+        }
+
+        private void Recalc()
+        {
+            decimal gross = cart.Sum(c => c.Amount);
+            decimal disc = 0;
+            decimal.TryParse(txtDiscount.Text, out disc);
+            if (disc < 0) disc = 0;
+            decimal net = Math.Round(gross - disc, 2);
+            txtTotal.Text = gross.ToString("0.00");
+            txtNet.Text = net.ToString("0.00");
+            if (string.IsNullOrWhiteSpace(txtRefund.Text) || txtRefund.Text == "0.00" || txtRefund.Text == "0")
+                txtRefund.Text = net.ToString("0.00");
         }
 
         private void Save()
         {
-            if (_saleId <= 0 || _invoiceLines == null || _invoiceLines.Count == 0)
+            if (cart.Count == 0)
             {
-                DialogHelpers.Error(this, "Load an original invoice first (F5).");
+                DialogHelpers.Warn(this, "Add at least one product to return.");
                 return;
             }
-            if (!(dgv.DataSource is List<ReturnGridRow> rows))
+            if (string.IsNullOrWhiteSpace(txtReason.Text))
             {
-                DialogHelpers.Error(this, "Nothing to return.");
-                return;
-            }
-
-            string reason = txtReason.Text.Trim();
-            if (string.IsNullOrEmpty(reason))
-            {
-                DialogHelpers.Error(this, "Return reason is required.");
+                DialogHelpers.Warn(this, "Return reason is required.");
                 txtReason.Focus();
                 return;
             }
-
-            RecalcRefund();
-
-            var details = new List<SaleReturnDetail>();
-            foreach (var r in rows)
-            {
-                if (r.ReturnQty <= 0) continue;
-                details.Add(new SaleReturnDetail
-                {
-                    OriginalSaleDetailID = r.SaleDetailID,
-                    ProductID = r.ProductID,
-                    ProductCode = r.ProductCode,
-                    ProductName = r.ProductName,
-                    Quantity = r.ReturnQty,
-                    SalePrice = r.UnitPrice,
-                    Amount = r.LineRefund,
-                    SoldQty = r.SoldQty,
-                    AlreadyReturned = r.AlreadyReturned
-                });
-            }
-
-            if (details.Count == 0)
-            {
-                DialogHelpers.Error(this, "Enter Return Qty on at least one line.");
+            if (!DialogHelpers.Confirm(this, "Save sale return? Stock will increase."))
                 return;
-            }
 
-            decimal refund = 0;
+            decimal disc = 0, refund = 0;
+            decimal.TryParse(txtDiscount.Text, out disc);
             decimal.TryParse(txtRefund.Text, out refund);
 
-            if (!DialogHelpers.Confirm(this,
-                    "Save sale return against " + _invoiceNo + "?\nLines: " + details.Count +
-                    "\nRefund: " + refund.ToString("0.00") +
-                    "\nReason: " + reason))
-                return;
+            var ret = new SaleReturnHeader
+            {
+                OriginalSaleID = originalSaleId,
+                OriginalInvoiceNo = (txtInvoice.Text ?? "").Trim(),
+                CustomerID = customerId > 0 ? customerId : 1,
+                CustomerName = customerName,
+                Discount = disc,
+                RefundAmount = refund,
+                Remarks = txtReason.Text.Trim(),
+                ReturnDate = DateTime.Now,
+                Details = cart.ToList()
+            };
 
             try
             {
-                var header = new SaleReturnHeader
-                {
-                    OriginalSaleID = _saleId,
-                    OriginalInvoiceNo = _invoiceNo,
-                    CustomerID = _customerId,
-                    CustomerName = _customerName,
-                    Discount = 0,
-                    RefundAmount = refund,
-                    Remarks = reason,
-                    Details = details
-                };
-                _service.Save(header);
-                DialogHelpers.Info(this, "Return saved.\nReturn No: " + header.ReturnNo + "\nStock increased.");
-                this.Tag = "NOSAVECONFIRM";
-                LoadInvoice();
+                _svc.Save(ret);
+                DialogHelpers.Info(this, "Sale return saved.\nReturn No: " + ret.ReturnNo);
+                cart.Clear();
+                invoiceLines.Clear();
+                originalSaleId = 0;
+                customerId = 0;
+                RefreshGrid();
                 txtReason.Clear();
+                txtInvoice.Clear();
+                lblCustomer.Text = "Customer: —";
+                txtSearch.Focus();
             }
             catch (Exception ex)
             {
-                AppLog.Error("Sale return save", ex);
                 DialogHelpers.Error(this, ex.Message);
             }
-        }
-
-        private class ReturnGridRow
-        {
-            public int SaleDetailID { get; set; }
-            public int ProductID { get; set; }
-            public string ProductCode { get; set; }
-            public string ProductName { get; set; }
-            public int SoldQty { get; set; }
-            public int AlreadyReturned { get; set; }
-            public int Returnable { get; set; }
-            public int ReturnQty { get; set; }
-            public decimal UnitPrice { get; set; }
-            public decimal LineRefund { get; set; }
         }
     }
 }
