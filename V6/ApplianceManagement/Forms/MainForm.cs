@@ -108,12 +108,13 @@ namespace ApplianceManagement.Forms
             mnuTrans.DropDownItems.Add("Purchase Return", null, (s, e) => OpenChild(new PurchaseReturnForm(), "PURCHASE"));
 
             var mnuInv = new ToolStripMenuItem("  Inventory  ");
-            mnuInv.DropDownItems.Add("New Item", null, (s, e) => OpenChild(new NewItemForm(), "NEWITEM"));
+            mnuInv.DropDownItems.Add("New / Edit Item", null, (s, e) => OpenChild(new NewItemForm(), "NEWITEM"));
             mnuInv.DropDownItems.Add("Stock Position", null, (s, e) => OpenChild(new InventoryForm(), "INVENTORY"));
             mnuInv.DropDownItems.Add("Stock Operations", null, (s, e) => OpenChild(new StockOpsForm(), "INVENTORY"));
 
             var mnuMasters = new ToolStripMenuItem("  Masters  ");
-            mnuMasters.DropDownItems.Add("Products", null, (s, e) => OpenChild(new NewItemForm(), "NEWITEM"));
+            mnuMasters.DropDownItems.Add("Products (list / edit)", null, (s, e) => OpenChild(new ProductManageForm(), "NEWITEM"));
+            mnuMasters.DropDownItems.Add("New / Edit Item", null, (s, e) => OpenChild(new NewItemForm(), "NEWITEM"));
             mnuMasters.DropDownItems.Add("Customers", null, (s, e) => OpenChild(new CustomerMasterForm(), "SALE"));
             mnuMasters.DropDownItems.Add("Suppliers", null, (s, e) => OpenChild(new SupplierMasterForm(), "PURCHASE"));
             mnuMasters.DropDownItems.Add("Categories", null, (s, e) => OpenChild(new CategoryMasterForm(), "NEWITEM"));
@@ -296,7 +297,7 @@ namespace ApplianceManagement.Forms
             if (t.StartsWith("Products") || t.StartsWith("Categories")) return "NEWITEM";
             if (t.StartsWith("Purchase") && !t.StartsWith("Purchase Report")) return "PURCHASE";
             if (t.StartsWith("Supplier")) return "PURCHASE";
-            if (t.StartsWith("New Item")) return "NEWITEM";
+            if (t.StartsWith("New Item") || t.StartsWith("New /")) return "NEWITEM";
             if (t.StartsWith("Stock")) return "INVENTORY";
             if (t.StartsWith("Low Stock")) return "REPORTS";
             if (t.Contains("Report") || t.StartsWith("Reports") || t.StartsWith("Profit")) return "REPORTS";
