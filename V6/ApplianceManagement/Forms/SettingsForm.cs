@@ -30,7 +30,7 @@ namespace ApplianceManagement.Forms
         private void InitializeComponent()
         {
             this.Text = "Settings";
-            this.Size = new Size(940, 640);
+            this.Size = new Size(940, 680);
             this.MinimumSize = new Size(800, 520);
             this.BackColor = UiHelper.BgColor;
             this.KeyPreview = true;
@@ -38,84 +38,93 @@ namespace ApplianceManagement.Forms
 
             this.Controls.Add(UiHelper.CreateFormBanner(
                 "SETTINGS",
-                isAdmin
-                    ? "Appearance · discount limits · users · menu rights · backup"
-                    : "Appearance only",
+                isAdmin ? "Theme colors · fonts · limits · users · rights" : "Theme colors · fonts",
                 FormAccent.Settings, FormAccent.SettingsDark));
 
-            Panel top = new Panel { Dock = DockStyle.Top, Height = isAdmin ? 360 : 270, BackColor = UiHelper.BgColor, Padding = new Padding(10) };
+            Panel top = new Panel { Dock = DockStyle.Top, Height = isAdmin ? 420 : 300, BackColor = UiHelper.BgColor, Padding = new Padding(10), AutoScroll = true };
 
-            GroupBox gbTheme = new GroupBox { Text = "Theme Manager (live)", Font = UiHelper.HeaderFont, ForeColor = UiHelper.ThemeDark, Location = new Point(15, 10), Size = new Size(420, 250) };
-            gbTheme.Controls.Add(new Label
-            {
-                Text = "Select POS theme (4 professional themes):",
-                Font = UiHelper.SmallFont,
-                ForeColor = Color.Gray,
-                Location = new Point(15, 22),
-                AutoSize = true
-            });
+            GroupBox gbTheme = new GroupBox { Text = "Theme Manager — color combination (Nav · Accent · Background)", Font = UiHelper.HeaderFont, ForeColor = UiHelper.ThemeDark, Location = new Point(15, 10), Size = new Size(880, 200) };
 
-            cmbTheme = new ComboBox
-            {
-                Location = new Point(15, 44),
-                Size = new Size(250, 28),
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                Font = UiHelper.NormalFont
-            };
-            UiHelper.StyleComboBox(cmbTheme);
-            cmbTheme.Items.Clear();
+            cmbTheme = new ComboBox { Visible = false, Location = new Point(0, 0), Size = new Size(10, 10) };
             cmbTheme.Items.Add("Professional Navy");
-            cmbTheme.Items.Add("Modern State".Replace("State", "Slate"));
+            cmbTheme.Items.Add("Modern Slate");
             cmbTheme.Items.Add("Executive Blue");
             cmbTheme.Items.Add("Clean Gray");
             cmbTheme.SelectedIndex = 0;
             gbTheme.Controls.Add(cmbTheme);
 
-            var lstThemes = new ListBox
-            {
-                Location = new Point(15, 78),
-                Size = new Size(250, 72),
-                Font = UiHelper.NormalFont,
-                IntegralHeight = true
+            string[] names = { "Professional Navy", "Modern Slate", "Executive Blue", "Clean Gray" };
+            Color[] navs = {
+                Color.FromArgb(0x17, 0x32, 0x4D),
+                Color.FromArgb(0x33, 0x41, 0x55),
+                Color.FromArgb(0x1E, 0x40, 0xAF),
+                Color.FromArgb(0x37, 0x41, 0x51)
             };
-            lstThemes.Items.Add("Professional Navy (default)");
-            lstThemes.Items.Add("Modern Slate");
-            lstThemes.Items.Add("Executive Blue");
-            lstThemes.Items.Add("Clean Gray");
-            lstThemes.SelectedIndex = 0;
-            lstThemes.SelectedIndexChanged += (s, e) =>
-            {
-                if (lstThemes.SelectedIndex < 0) return;
-                if (lstThemes.SelectedIndex < cmbTheme.Items.Count)
-                    cmbTheme.SelectedIndex = lstThemes.SelectedIndex;
+            Color[] accents = {
+                Color.FromArgb(0x25, 0x63, 0xEB),
+                Color.FromArgb(0x3B, 0x82, 0xF6),
+                Color.FromArgb(0x25, 0x63, 0xEB),
+                Color.FromArgb(0x25, 0x63, 0xEB)
             };
-            cmbTheme.SelectedIndexChanged += (s, e) =>
-            {
-                if (cmbTheme.SelectedIndex >= 0 && cmbTheme.SelectedIndex < lstThemes.Items.Count)
-                    lstThemes.SelectedIndex = cmbTheme.SelectedIndex;
+            Color[] bgs = {
+                Color.FromArgb(0xF5, 0xF7, 0xFA),
+                Color.FromArgb(0xF8, 0xFA, 0xFC),
+                Color.FromArgb(0xF5, 0xF7, 0xFB),
+                Color.FromArgb(0xF3, 0xF4, 0xF6)
             };
-            gbTheme.Controls.Add(lstThemes);
 
-            gbTheme.Controls.Add(new Label { Text = "Font Size:", Font = UiHelper.NormalFont, Location = new Point(280, 44), Size = new Size(90, 22) });
-            cmbFontSize = new ComboBox { Location = new Point(280, 68), Size = new Size(100, 26), DropDownStyle = ComboBoxStyle.DropDownList };
+            int cardX = 12;
+            for (int ti = 0; ti < names.Length; ti++)
+            {
+                int idx = ti;
+                var card = new Panel
+                {
+                    Location = new Point(cardX, 28),
+                    Size = new Size(210, 110),
+                    BackColor = Color.White,
+                    BorderStyle = BorderStyle.FixedSingle,
+                    Cursor = Cursors.Hand,
+                    Tag = "themeCard"
+                };
+                var swNav = new Panel { Location = new Point(10, 10), Size = new Size(40, 40), BackColor = navs[ti] };
+                var swAccent = new Panel { Location = new Point(56, 10), Size = new Size(40, 40), BackColor = accents[ti] };
+                var swBg = new Panel { Location = new Point(102, 10), Size = new Size(40, 40), BackColor = bgs[ti], BorderStyle = BorderStyle.FixedSingle };
+                var lblName = new Label { Text = names[ti], Font = UiHelper.SmallFont, ForeColor = Color.FromArgb(0x1F, 0x29, 0x37), Location = new Point(10, 58), AutoSize = true };
+                var lblHint = new Label { Text = "Nav  ·  Accent  ·  Bg", Font = new Font("Segoe UI", 7.5f), ForeColor = Color.Gray, Location = new Point(10, 80), AutoSize = true };
+                card.Controls.AddRange(new Control[] { swNav, swAccent, swBg, lblName, lblHint });
+                EventHandler pick = (s2, e2) =>
+                {
+                    cmbTheme.SelectedIndex = idx;
+                    foreach (Control c in gbTheme.Controls)
+                    {
+                        var p = c as Panel;
+                        if (p != null && p.Tag != null && p.Tag.ToString() == "themeCard")
+                            p.BackColor = Color.White;
+                    }
+                    card.BackColor = Color.FromArgb(0xDB, 0xEA, 0xFE);
+                };
+                card.Click += pick;
+                foreach (Control ch in card.Controls) ch.Click += pick;
+                gbTheme.Controls.Add(card);
+                cardX += 218;
+            }
+
+            gbTheme.Controls.Add(new Label { Text = "Font:", Font = UiHelper.NormalFont, Location = new Point(12, 150), AutoSize = true });
+            cmbFontSize = new ComboBox { Location = new Point(55, 148), Size = new Size(70, 26), DropDownStyle = ComboBoxStyle.DropDownList };
             UiHelper.StyleComboBox(cmbFontSize);
-            cmbFontSize.Items.Add("9");
-            cmbFontSize.Items.Add("10");
-            cmbFontSize.Items.Add("11");
-            cmbFontSize.Items.Add("12");
-            cmbFontSize.Items.Add("14");
+            foreach (var fs in new[] { "9", "10", "11", "12", "14" }) cmbFontSize.Items.Add(fs);
             cmbFontSize.SelectedItem = "10";
             gbTheme.Controls.Add(cmbFontSize);
 
-            gbTheme.Controls.Add(new Label { Text = "Form Size:", Font = UiHelper.NormalFont, Location = new Point(280, 100), Size = new Size(90, 22) });
-            cmbResolution = new ComboBox { Location = new Point(280, 124), Size = new Size(120, 26), DropDownStyle = ComboBoxStyle.DropDownList };
+            gbTheme.Controls.Add(new Label { Text = "Form size:", Font = UiHelper.NormalFont, Location = new Point(140, 150), AutoSize = true });
+            cmbResolution = new ComboBox { Location = new Point(220, 148), Size = new Size(130, 26), DropDownStyle = ComboBoxStyle.DropDownList };
             UiHelper.StyleComboBox(cmbResolution);
             foreach (var r in new[] { "800 x 600", "1024 x 768", "1152 x 864", "1280 x 720", "1280 x 800", "1280 x 960", "1280 x 1024" })
                 cmbResolution.Items.Add(r);
             cmbResolution.SelectedItem = "1024 x 768";
             gbTheme.Controls.Add(cmbResolution);
 
-            Button btnApply = new Button { Text = "Apply Live", Location = new Point(15, 160), Size = new Size(160, 36) };
+            Button btnApply = new Button { Text = "Apply Live", Location = new Point(370, 144), Size = new Size(140, 34) };
             UiHelper.StyleButton(btnApply);
             btnApply.Click += (s, e) =>
             {
@@ -138,20 +147,20 @@ namespace ApplianceManagement.Forms
 
             if (isAdmin)
             {
-                GroupBox gbDisc = new GroupBox { Text = "Max Discount % (Admin)", Font = UiHelper.HeaderFont, ForeColor = UiHelper.ThemeDark, Location = new Point(450, 10), Size = new Size(420, 190) };
-                gbDisc.Controls.Add(new Label { Text = "Admin %:", Font = UiHelper.NormalFont, Location = new Point(15, 30), Size = new Size(100, 22) });
-                txtMaxDiscAdmin = new TextBox { Location = new Point(130, 28), Size = new Size(100, 26), Text = "0" };
+                GroupBox gbDisc = new GroupBox { Text = "Max Discount % (Admin)", Font = UiHelper.HeaderFont, ForeColor = UiHelper.ThemeDark, Location = new Point(15, 220), Size = new Size(420, 100) };
+                gbDisc.Controls.Add(new Label { Text = "Admin %:", Font = UiHelper.NormalFont, Location = new Point(15, 28), Size = new Size(80, 22) });
+                txtMaxDiscAdmin = new TextBox { Location = new Point(100, 26), Size = new Size(80, 26), Text = "0" };
                 UiHelper.StyleTextBox(txtMaxDiscAdmin);
                 gbDisc.Controls.Add(txtMaxDiscAdmin);
-                gbDisc.Controls.Add(new Label { Text = "User %:", Font = UiHelper.NormalFont, Location = new Point(15, 65), Size = new Size(100, 22) });
-                txtMaxDiscUser = new TextBox { Location = new Point(130, 63), Size = new Size(100, 26), Text = "0" };
+                gbDisc.Controls.Add(new Label { Text = "User %:", Font = UiHelper.NormalFont, Location = new Point(200, 28), Size = new Size(70, 22) });
+                txtMaxDiscUser = new TextBox { Location = new Point(270, 26), Size = new Size(80, 26), Text = "0" };
                 UiHelper.StyleTextBox(txtMaxDiscUser);
                 gbDisc.Controls.Add(txtMaxDiscUser);
-                gbDisc.Controls.Add(new Label { Text = "Settings lock pwd:", Font = UiHelper.SmallFont, Location = new Point(15, 100), Size = new Size(110, 22) });
-                txtSettingsPwd = new TextBox { Location = new Point(130, 98), Size = new Size(160, 26), PasswordChar = '*' };
+                gbDisc.Controls.Add(new Label { Text = "Lock pwd:", Font = UiHelper.SmallFont, Location = new Point(15, 62), Size = new Size(70, 22) });
+                txtSettingsPwd = new TextBox { Location = new Point(100, 60), Size = new Size(120, 26), PasswordChar = '*' };
                 UiHelper.StyleTextBox(txtSettingsPwd);
                 gbDisc.Controls.Add(txtSettingsPwd);
-                Button btnDisc = new Button { Text = "Save Limits", Location = new Point(130, 140), Size = new Size(120, 36) };
+                Button btnDisc = new Button { Text = "Save Limits", Location = new Point(240, 56), Size = new Size(100, 30) };
                 UiHelper.StyleButton(btnDisc);
                 btnDisc.Click += (s, e) =>
                 {
@@ -162,8 +171,8 @@ namespace ApplianceManagement.Forms
                     DialogHelpers.Info(this, "Saved.");
                 };
                 gbDisc.Controls.Add(btnDisc);
-                Button btnBackup = new Button { Text = "Backup DB", Location = new Point(260, 140), Size = new Size(120, 36) };
-                UiHelper.StyleAccentButton(btnBackup, FormAccent.Settings, FormAccent.SettingsDark);
+                Button btnBackup = new Button { Text = "Backup DB", Location = new Point(350, 56), Size = new Size(55, 30) };
+                UiHelper.StyleButton(btnBackup);
                 btnBackup.Click += (s, e) =>
                 {
                     if (!DialogHelpers.Confirm(this, "Create a SQL Server backup of the current database?"))
@@ -173,31 +182,20 @@ namespace ApplianceManagement.Forms
                 gbDisc.Controls.Add(btnBackup);
                 top.Controls.Add(gbDisc);
 
-                GroupBox gbRights = new GroupBox { Text = "User Rights (menu access)", Font = UiHelper.HeaderFont, ForeColor = UiHelper.ThemeDark, Location = new Point(15, 270), Size = new Size(855, 70) };
-                cmbUsers = new ComboBox { Location = new Point(12, 28), Size = new Size(160, 26), DropDownStyle = ComboBoxStyle.DropDownList };
+                GroupBox gbRights = new GroupBox { Text = "User Rights", Font = UiHelper.HeaderFont, ForeColor = UiHelper.ThemeDark, Location = new Point(450, 220), Size = new Size(445, 100) };
+                cmbUsers = new ComboBox { Location = new Point(12, 28), Size = new Size(140, 26), DropDownStyle = ComboBoxStyle.DropDownList };
                 UiHelper.StyleComboBox(cmbUsers);
                 cmbUsers.SelectedIndexChanged += (s, e) => LoadPermChecks();
                 gbRights.Controls.Add(cmbUsers);
-                chkSale = MkChk("Sale", 185, 30); chkPurchase = MkChk("Purchase", 255, 30);
-                chkNewItem = MkChk("New Item", 350, 30); chkInventory = MkChk("Inventory", 445, 30);
-                chkReports = MkChk("Reports", 545, 30); chkSettings = MkChk("Settings", 640, 30);
+                chkSale = MkChk("Sale", 160, 30); chkPurchase = MkChk("Purchase", 215, 30);
+                chkNewItem = MkChk("Item", 295, 30); chkInventory = MkChk("Inv", 345, 30);
+                chkReports = MkChk("Rpt", 385, 30); chkSettings = MkChk("Set", 12, 58);
                 gbRights.Controls.AddRange(new Control[] { chkSale, chkPurchase, chkNewItem, chkInventory, chkReports, chkSettings });
-                Button btnPerm = new Button { Text = "Save Rights", Location = new Point(740, 24), Size = new Size(100, 32) };
+                Button btnPerm = new Button { Text = "Save Rights", Location = new Point(320, 55), Size = new Size(100, 30) };
                 UiHelper.StyleButton(btnPerm);
                 btnPerm.Click += (s, e) => SavePerms();
                 gbRights.Controls.Add(btnPerm);
                 top.Controls.Add(gbRights);
-            }
-            else
-            {
-                top.Controls.Add(new Label
-                {
-                    Text = "Discount limits and users are managed by Admin.",
-                    Font = UiHelper.SmallFont,
-                    ForeColor = Color.Gray,
-                    Location = new Point(450, 40),
-                    AutoSize = true
-                });
             }
 
             this.Controls.Add(top);
@@ -211,7 +209,7 @@ namespace ApplianceManagement.Forms
                     Font = UiHelper.HeaderFont,
                     ForeColor = UiHelper.ThemeDark,
                     Dock = DockStyle.Top,
-                    Height = 200
+                    Height = 180
                 };
                 gbUser.Controls.Add(new Label { Text = "Username", Font = UiHelper.SmallFont, Location = new Point(16, 28), AutoSize = true });
                 txtNewUser = new TextBox { Location = new Point(100, 24), Size = new Size(140, 26) }; UiHelper.StyleTextBox(txtNewUser); gbUser.Controls.Add(txtNewUser);
@@ -229,15 +227,14 @@ namespace ApplianceManagement.Forms
                 UiHelper.StyleButton(btnCreate);
                 btnCreate.Click += (s, e) => CreateUser();
                 gbUser.Controls.Add(btnCreate);
-
-                gbUser.Controls.Add(new Label { Text = "Change password for:", Font = UiHelper.SmallFont, Location = new Point(16, 148), AutoSize = true });
-                cmbChgUser = new ComboBox { Location = new Point(150, 144), Size = new Size(140, 26), DropDownStyle = ComboBoxStyle.DropDownList };
+                gbUser.Controls.Add(new Label { Text = "Change password:", Font = UiHelper.SmallFont, Location = new Point(16, 140), AutoSize = true });
+                cmbChgUser = new ComboBox { Location = new Point(130, 136), Size = new Size(140, 26), DropDownStyle = ComboBoxStyle.DropDownList };
                 UiHelper.StyleComboBox(cmbChgUser);
                 gbUser.Controls.Add(cmbChgUser);
-                txtChgPwd = new TextBox { Location = new Point(300, 144), Size = new Size(120, 26), PasswordChar = '*' };
+                txtChgPwd = new TextBox { Location = new Point(280, 136), Size = new Size(120, 26), PasswordChar = '*' };
                 UiHelper.StyleTextBox(txtChgPwd);
                 gbUser.Controls.Add(txtChgPwd);
-                Button btnChg = new Button { Text = "Set Pwd", Location = new Point(430, 142), Size = new Size(100, 30) };
+                Button btnChg = new Button { Text = "Set Pwd", Location = new Point(410, 134), Size = new Size(90, 30) };
                 UiHelper.StyleButton(btnChg);
                 btnChg.Click += (s, e) => ChangeUserPassword();
                 gbUser.Controls.Add(btnChg);
@@ -249,15 +246,9 @@ namespace ApplianceManagement.Forms
         private void CreateUser()
         {
             if (string.IsNullOrWhiteSpace(txtNewUser.Text) || string.IsNullOrWhiteSpace(txtNewPwd.Text))
-            {
-                DialogHelpers.Error(this, "Username and password required.");
-                return;
-            }
+            { DialogHelpers.Error(this, "Username and password required."); return; }
             if (userRepo.ExistsUserName(txtNewUser.Text.Trim()))
-            {
-                DialogHelpers.Error(this, "Username already exists.");
-                return;
-            }
+            { DialogHelpers.Error(this, "Username already exists."); return; }
             if (!DialogHelpers.Confirm(this, "Create user " + txtNewUser.Text.Trim() + "?")) return;
             userRepo.Insert(new User
             {
@@ -267,17 +258,13 @@ namespace ApplianceManagement.Forms
             }, txtNewPwd.Text);
             DialogHelpers.Info(this, "User created.");
             txtNewUser.Clear(); txtNewFull.Clear(); txtNewPwd.Clear();
-            LoadUsersForRights();
-            LoadUsersForManage();
+            LoadUsersForRights(); LoadUsersForManage();
         }
 
         private void ChangeUserPassword()
         {
             if (cmbChgUser == null || cmbChgUser.SelectedItem == null || string.IsNullOrWhiteSpace(txtChgPwd.Text))
-            {
-                DialogHelpers.Error(this, "Select user and enter new password.");
-                return;
-            }
+            { DialogHelpers.Error(this, "Select user and enter new password."); return; }
             string uname = cmbChgUser.SelectedItem.ToString();
             User target = null;
             foreach (var u in userRepo.GetAll())
@@ -338,7 +325,7 @@ namespace ApplianceManagement.Forms
             if (chkReports.Checked) parts.Add("REPORTS");
             if (chkSettings.Checked) parts.Add("SETTINGS");
             AppSettings.SetUserPermissions(cmbUsers.SelectedItem.ToString(), string.Join(",", parts.ToArray()));
-            DialogHelpers.Info(this, "Rights saved for " + cmbUsers.SelectedItem + ". User must re-login to apply menus.");
+            DialogHelpers.Info(this, "Rights saved for " + cmbUsers.SelectedItem + ".");
         }
 
         private void LoadValues()
