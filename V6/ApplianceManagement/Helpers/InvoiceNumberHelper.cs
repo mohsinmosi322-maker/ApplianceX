@@ -1,66 +1,34 @@
 using System;
 using System.Data.SqlClient;
-using ApplianceManagement.Helpers;
 
 namespace ApplianceManagement.Helpers
 {
     /// <summary>
-    /// Builds sale/purchase invoice numbers.
-    /// If prefix is empty → plain number starting at 1 ("1", "2", …).
-    /// If prefix set → prefix + zero-padded (e.g. INV-000001).
+    /// Invoice numbers are plain integers: 1, 2, 3… (no INV-/PUR- prefix).
+    /// Prefix settings and license InvoicePrefix are ignored by design.
     /// </summary>
     public static class InvoiceNumberHelper
     {
         public static string Format(string prefix, int number)
         {
             if (number < 1) number = 1;
-            if (string.IsNullOrWhiteSpace(prefix))
-                return number.ToString();
-            return prefix.Trim() + number.ToString("D6");
+            // Always plain number — user requirement: no prefix
+            return number.ToString();
         }
 
-        /// <summary>
-        /// Priority: Settings table → license.dat InvoicePrefix → empty (no forced INV-).
-        /// </summary>
         public static string ResolveSalePrefix(SqlConnection conn, SqlTransaction trans)
         {
-            string fromDb = ReadSetting(conn, trans, "InvoicePrefix");
-            if (!string.IsNullOrWhiteSpace(fromDb))
-                return fromDb.Trim();
-
-            if (LicenseReader.Current != null &&
-                !string.IsNullOrWhiteSpace(LicenseReader.Current.InvoicePrefix))
-                return LicenseReader.Current.InvoicePrefix.Trim();
-
-            return ""; // no prefix → numbers 1, 2, 3…
+            return "";
         }
 
         public static string ResolvePurchasePrefix(SqlConnection conn, SqlTransaction trans)
         {
-            string fromDb = ReadSetting(conn, trans, "PurchaseInvoicePrefix");
-            if (!string.IsNullOrWhiteSpace(fromDb))
-                return fromDb.Trim();
             return "";
         }
 
         public static string ResolveReturnPrefix(SqlConnection conn, SqlTransaction trans, string settingName)
         {
-            string fromDb = ReadSetting(conn, trans, settingName);
-            if (!string.IsNullOrWhiteSpace(fromDb))
-                return fromDb.Trim();
             return "";
-        }
-
-        private static string ReadSetting(SqlConnection conn, SqlTransaction trans, string name)
-        {
-            using (var cmd = DbHelper.CreateCommand(
-                "SELECT SettingValue FROM Settings WHERE SettingName=@N", conn, trans))
-            {
-                cmd.Parameters.AddWithValue("@N", name);
-                var r = cmd.ExecuteScalar();
-                if (r == null || r == DBNull.Value) return null;
-                return r.ToString();
-            }
         }
 
         public static int NextCounter(SqlConnection conn, SqlTransaction trans, string settingName)

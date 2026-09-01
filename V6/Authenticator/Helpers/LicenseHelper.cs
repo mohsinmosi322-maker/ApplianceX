@@ -61,11 +61,12 @@ namespace Authenticator.Helpers
 
         public static void SaveLicense(string filePath, LicenseInfo info)
         {
+            // InvoicePrefix intentionally empty — app uses plain 1,2,3… invoice numbers
             var xml = new XElement("License",
                 new XElement("Version", "2"),
                 new XElement("StoreName", info.StoreName ?? ""),
                 new XElement("ShopPhone", info.ShopPhone ?? ""),
-                new XElement("InvoicePrefix", info.InvoicePrefix ?? "INV-"),
+                new XElement("InvoicePrefix", ""),
                 new XElement("ExpiryDate", info.ExpiryDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)),
                 new XElement("AllowPrint", info.AllowPrint ? "1" : "0"),
                 new XElement("MaxDiscountAdmin", "0"),
@@ -88,7 +89,7 @@ namespace Authenticator.Helpers
             {
                 StoreName = (string)xml.Element("StoreName") ?? "",
                 ShopPhone = (string)xml.Element("ShopPhone") ?? "",
-                InvoicePrefix = (string)xml.Element("InvoicePrefix") ?? "INV-",
+                InvoicePrefix = "",
                 ExpiryDate = DateTime.Parse((string)xml.Element("ExpiryDate") ?? "2099-12-31", CultureInfo.InvariantCulture),
                 AllowPrint = ((string)xml.Element("AllowPrint") ?? "1") == "1",
                 ConnectionString = (string)xml.Element("ConnectionString") ?? "",

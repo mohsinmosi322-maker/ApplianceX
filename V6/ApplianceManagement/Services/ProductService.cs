@@ -12,7 +12,7 @@ namespace ApplianceManagement.Services
 
         public string NextCode()
         {
-            // Concurrency-safe via Settings counter preferred; fallback to max+1
+            // Plain numbers: 1, 2, 3… (not 001)
             using (var conn = DbHelper.GetConnection())
             {
                 conn.Open();
@@ -28,7 +28,7 @@ namespace ApplianceManagement.Services
                         {
                             int n = Convert.ToInt32(cmd.ExecuteScalar());
                             trans.Commit();
-                            return n.ToString("D3");
+                            return n.ToString();
                         }
                     }
                     catch
@@ -72,7 +72,6 @@ namespace ApplianceManagement.Services
 
         public void Deactivate(int id)
         {
-            // Never hard-delete products with history
             _repo.SetActive(id, false);
         }
     }
