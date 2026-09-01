@@ -113,8 +113,8 @@ namespace ApplianceManagement.Forms
             dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "ProductName", DataPropertyName = "ProductName", HeaderText = "Description", FillWeight = 45 });
             dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "ProductCode", DataPropertyName = "ProductCode", HeaderText = "Code", FillWeight = 12 });
             dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "Quantity", DataPropertyName = "Quantity", HeaderText = "Qty (packs)", FillWeight = 12 });
-            dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "PurchasePrice", DataPropertyName = "PurchasePrice", HeaderText = "Purchase Price", DefaultCellStyle = { Format = "N2" }, FillWeight = 15 });
-            dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "Amount", DataPropertyName = "Amount", HeaderText = "Amount", DefaultCellStyle = { Format = "N2" }, FillWeight = 15 });
+            dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "PurchasePrice", DataPropertyName = "PurchasePrice", HeaderText = "Purchase Price", FillWeight = 15 });
+            dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "Amount", DataPropertyName = "Amount", HeaderText = "Amount", FillWeight = 15 });
             Controls.Add(dgv);
             Controls.SetChildIndex(dgv, 0);
 
@@ -295,7 +295,7 @@ namespace ApplianceManagement.Forms
             int packs = 1;
             int.TryParse(txtQty.Text, out packs);
             if (packs < 1) packs = 1;
-            decimal packPrice = PackMath.PackPurchasePrice(p);
+            decimal packPrice = p.PurchasePrice;
             var ex = cart.Find(line => line.ProductID == p.ProductID);
             if (ex != null)
             {
