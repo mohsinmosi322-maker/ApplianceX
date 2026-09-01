@@ -21,6 +21,30 @@ namespace ApplianceManagement
             try
             {
                 AppLog.Info("Application start");
+
+                // Hard gate: software must not open without a valid license.dat
+                if (!LicenseReader.TryLoad())
+                {
+                    MessageBox.Show(
+                        "license.dat not found.\n\n" +
+                        "Place a valid license.dat next to the application executable:\n" +
+                        LicenseReader.LicensePath +
+                        "\n\nGenerate the license with Authenticator.",
+                        "License Required",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+                if (!LicenseReader.IsValid())
+                {
+                    MessageBox.Show(
+                        "License expired on " +
+                        LicenseReader.Current.ExpiryDate.ToString("dd/MM/yyyy") +
+                        ".\n\nContact vendor for renewal.",
+                        "License Expired",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+
                 Application.Run(new LoginForm());
             }
             catch (Exception ex)
