@@ -4,10 +4,6 @@ using System.Windows.Forms;
 
 namespace ApplianceManagement.Helpers
 {
-    /// <summary>
-    /// Form accents follow the active global theme (coherent POS look).
-    /// Semantic-only exception: LowStock uses Danger.
-    /// </summary>
     public static class FormAccent
     {
         public static Color Sale { get { return UiHelper.ThemeColor; } }
@@ -42,7 +38,8 @@ namespace ApplianceManagement.Helpers
             "Professional Navy",
             "Modern Slate",
             "Executive Blue",
-            "Clean Gray"
+            "Clean Gray",
+            "Custom"
         };
 
         public const string DefaultTheme = "Professional Navy";
@@ -56,7 +53,7 @@ namespace ApplianceManagement.Helpers
         public static Color ThemeColor { get; private set; } = Color.FromArgb(0x17, 0x32, 0x4D);
         public static Color ThemeDark { get; private set; } = Color.FromArgb(0x10, 0x26, 0x3A);
         public static Color ThemeLight { get; private set; } = Color.FromArgb(0xDC, 0xEA, 0xF5);
-        public static Color ThemeAltRow { get; private set; } = Color.FromArgb(0xF1, 0xF5, 0xF9);
+        public static Color ThemeAltRow { get; private set; } = Color.FromArgb(0xF8, 0xFA, 0xFC);
         public static Color ThemeSelection { get; private set; } = Color.FromArgb(0xDB, 0xEA, 0xFE);
 
         public static Color BgColor { get; private set; } = Color.FromArgb(0xF5, 0xF7, 0xFA);
@@ -107,12 +104,87 @@ namespace ApplianceManagement.Helpers
             }
         }
 
+        public static string ColorToHex(Color c)
+        {
+            return string.Format("#{0:X2}{1:X2}{2:X2}", c.R, c.G, c.B);
+        }
+
+        public static Color HexToColor(string hex, Color fallback)
+        {
+            if (string.IsNullOrWhiteSpace(hex)) return fallback;
+            string h = hex.Trim().TrimStart('#');
+            if (h.Length != 6) return fallback;
+            try
+            {
+                int r = Convert.ToInt32(h.Substring(0, 2), 16);
+                int g = Convert.ToInt32(h.Substring(2, 2), 16);
+                int b = Convert.ToInt32(h.Substring(4, 2), 16);
+                return Color.FromArgb(r, g, b);
+            }
+            catch { return fallback; }
+        }
+
+        public static Color DarkenColor(Color c, float factor)
+        {
+            if (factor < 0f) factor = 0f;
+            if (factor > 1f) factor = 1f;
+            return Color.FromArgb((int)(c.R * factor), (int)(c.G * factor), (int)(c.B * factor));
+        }
+
+        public static Color LightenColor(Color c, float mix)
+        {
+            if (mix < 0f) mix = 0f;
+            if (mix > 1f) mix = 1f;
+            return Color.FromArgb(
+                (int)(c.R + (255 - c.R) * mix),
+                (int)(c.G + (255 - c.G) * mix),
+                (int)(c.B + (255 - c.B) * mix));
+        }
+
+        public static void ApplyCustomColors(Color nav, Color accent, Color bg, Color text)
+        {
+            ThemeColor = nav;
+            ThemeDark = DarkenColor(nav, 0.72f);
+            ThemeLight = LightenColor(nav, 0.88f);
+            AccentColor = accent;
+            AccentDark = DarkenColor(accent, 0.82f);
+            BgColor = bg;
+            PanelColor = Color.White;
+            TextColor = text;
+            SecondaryTextColor = Color.FromArgb(0x6B, 0x72, 0x80);
+            BorderColor = Color.FromArgb(0xD1, 0xD5, 0xDB);
+            GridHeaderColor = nav;
+            ThemeSelection = LightenColor(accent, 0.82f);
+            ThemeAltRow = Color.FromArgb(0xF8, 0xFA, 0xFC);
+            SuccessColor = Color.FromArgb(0x16, 0xA3, 0x4A);
+            WarningColor = Color.FromArgb(0xD9, 0x77, 0x06);
+            DangerColor = Color.FromArgb(0xDC, 0x26, 0x26);
+            DangerDark = Color.FromArgb(0xB9, 0x1C, 0x1C);
+            CurrentThemeName = "Custom";
+        }
+
+        public static void SaveCustomColors(Color nav, Color accent, Color bg, Color text)
+        {
+            AppSettings.Set("Custom_Nav", ColorToHex(nav));
+            AppSettings.Set("Custom_Accent", ColorToHex(accent));
+            AppSettings.Set("Custom_Bg", ColorToHex(bg));
+            AppSettings.Set("Custom_Text", ColorToHex(text));
+            AppSettings.Set("Theme", "Custom");
+        }
+
+        public static void LoadAndApplyCustomFromSettings()
+        {
+            Color nav = HexToColor(AppSettings.Get("Custom_Nav"), Color.FromArgb(0x17, 0x32, 0x4D));
+            Color accent = HexToColor(AppSettings.Get("Custom_Accent"), Color.FromArgb(0x25, 0x63, 0xEB));
+            Color bg = HexToColor(AppSettings.Get("Custom_Bg"), Color.FromArgb(0xF5, 0xF7, 0xFA));
+            Color text = HexToColor(AppSettings.Get("Custom_Text"), Color.FromArgb(0x1F, 0x29, 0x37));
+            ApplyCustomColors(nav, accent, bg, text);
+        }
+
         public static Panel CreateFormBanner(string title, string description, Color accent, Color accentDark)
         {
-            Color bg = ThemeColor;
-            Color edge = ThemeDark;
-            Panel banner = new Panel { Dock = DockStyle.Top, Height = 52, BackColor = bg };
-            banner.Controls.Add(new Panel { Dock = DockStyle.Left, Width = 6, BackColor = edge });
+            Panel banner = new Panel { Dock = DockStyle.Top, Height = 52, BackColor = ThemeColor };
+            banner.Controls.Add(new Panel { Dock = DockStyle.Left, Width = 6, BackColor = ThemeDark });
             banner.Controls.Add(new Label
             {
                 Text = title,
@@ -134,10 +206,7 @@ namespace ApplianceManagement.Helpers
             return banner;
         }
 
-        public static void StyleAccentButton(Button btn, Color accent, Color accentDark)
-        {
-            StylePrimaryButton(btn);
-        }
+        public static void StyleAccentButton(Button btn, Color accent, Color accentDark) { StylePrimaryButton(btn); }
 
         public static void StylePrimaryButton(Button btn)
         {
@@ -192,10 +261,7 @@ namespace ApplianceManagement.Helpers
             btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(0x15, 0x80, 0x3D);
         }
 
-        public static void StyleGridWithAccent(DataGridView dgv, Color headerColor)
-        {
-            StyleGrid(dgv);
-        }
+        public static void StyleGridWithAccent(DataGridView dgv, Color headerColor) { StyleGrid(dgv); }
 
         public static string NormalizeThemeName(string theme)
         {
@@ -204,18 +270,16 @@ namespace ApplianceManagement.Helpers
             foreach (var name in ThemeNames)
                 if (string.Equals(name, t, StringComparison.OrdinalIgnoreCase))
                     return name;
-
             switch (t.ToLowerInvariant())
             {
+                case "custom": return "Custom";
                 case "blue":
                 case "green":
                 case "teal":
                 case "purple":
                 case "dark":
-                case "navy":
-                    return DefaultTheme;
-                default:
-                    return DefaultTheme;
+                case "navy": return DefaultTheme;
+                default: return DefaultTheme;
             }
         }
 
@@ -224,7 +288,6 @@ namespace ApplianceManagement.Helpers
             string theme = AppSettings.Get("Theme");
             theme = NormalizeThemeName(theme);
             ApplyThemeName(theme);
-
             string fs = AppSettings.Get("FontSize");
             int size = 10;
             if (!string.IsNullOrEmpty(fs)) int.TryParse(fs, out size);
@@ -237,7 +300,6 @@ namespace ApplianceManagement.Helpers
         {
             theme = NormalizeThemeName(theme);
             CurrentThemeName = theme;
-
             switch (theme)
             {
                 case "Modern Slate":
@@ -259,7 +321,6 @@ namespace ApplianceManagement.Helpers
                     DangerColor = Color.FromArgb(0xDC, 0x26, 0x26);
                     DangerDark = Color.FromArgb(0xB9, 0x1C, 0x1C);
                     break;
-
                 case "Executive Blue":
                     ThemeColor = Color.FromArgb(0x1E, 0x40, 0xAF);
                     ThemeDark = Color.FromArgb(0x1E, 0x3A, 0x8A);
@@ -279,7 +340,6 @@ namespace ApplianceManagement.Helpers
                     DangerColor = Color.FromArgb(0xB9, 0x1C, 0x1C);
                     DangerDark = Color.FromArgb(0x99, 0x1B, 0x1B);
                     break;
-
                 case "Clean Gray":
                     ThemeColor = Color.FromArgb(0x37, 0x41, 0x51);
                     ThemeDark = Color.FromArgb(0x1F, 0x29, 0x37);
@@ -299,7 +359,9 @@ namespace ApplianceManagement.Helpers
                     DangerColor = Color.FromArgb(0xDC, 0x26, 0x26);
                     DangerDark = Color.FromArgb(0xB9, 0x1C, 0x1C);
                     break;
-
+                case "Custom":
+                    LoadAndApplyCustomFromSettings();
+                    break;
                 case "Professional Navy":
                 default:
                     ThemeColor = Color.FromArgb(0x17, 0x32, 0x4D);
@@ -314,7 +376,7 @@ namespace ApplianceManagement.Helpers
                     BorderColor = Color.FromArgb(0xD1, 0xD5, 0xDB);
                     GridHeaderColor = Color.FromArgb(0x17, 0x32, 0x4D);
                     ThemeSelection = Color.FromArgb(0xDB, 0xEA, 0xFE);
-                    ThemeAltRow = Color.FromArgb(0xF1, 0xF5, 0xF9);
+                    ThemeAltRow = Color.FromArgb(0xF8, 0xFA, 0xFC);
                     SuccessColor = Color.FromArgb(0x16, 0xA3, 0x4A);
                     WarningColor = Color.FromArgb(0xD9, 0x77, 0x06);
                     DangerColor = Color.FromArgb(0xDC, 0x26, 0x26);
@@ -373,10 +435,7 @@ namespace ApplianceManagement.Helpers
             if (root.IsMdiContainer)
             {
                 foreach (Control c in root.Controls)
-                {
-                    if (c is MdiClient mdi)
-                        mdi.BackColor = BgColor;
-                }
+                    if (c is MdiClient mdi) mdi.BackColor = BgColor;
                 foreach (Form child in root.MdiChildren)
                 {
                     child.BackColor = BgColor;
@@ -421,16 +480,8 @@ namespace ApplianceManagement.Helpers
         {
             if (btn == null) return;
             string t = (btn.Text ?? "").ToUpperInvariant();
-            if (t.Contains("DELETE") || t.Contains("REMOVE") || t.Contains("VOID"))
-            {
-                StyleDangerButton(btn);
-                return;
-            }
-            if (t.Contains("CANCEL") || t.Contains("CLOSE") || t == "NO" || t.Contains("BACK"))
-            {
-                StyleSecondaryButton(btn);
-                return;
-            }
+            if (t.Contains("DELETE") || t.Contains("REMOVE") || t.Contains("VOID")) { StyleDangerButton(btn); return; }
+            if (t.Contains("CANCEL") || t.Contains("CLOSE") || t == "NO" || t.Contains("BACK")) { StyleSecondaryButton(btn); return; }
             StylePrimaryButton(btn);
         }
 
@@ -449,12 +500,7 @@ namespace ApplianceManagement.Helpers
         {
             if (tb == null || tb.IsDisposed) return;
             if (tb.IsHandleCreated)
-            {
-                tb.BeginInvoke(new Action(() =>
-                {
-                    if (!tb.IsDisposed) tb.SelectAll();
-                }));
-            }
+                tb.BeginInvoke(new Action(() => { if (!tb.IsDisposed) tb.SelectAll(); }));
             else tb.SelectAll();
         }
 
@@ -470,58 +516,26 @@ namespace ApplianceManagement.Helpers
             var tb = c as TextBox;
             if (tb != null)
             {
-                tb.Enter -= AutoSelect_TextEnter;
-                tb.Enter += AutoSelect_TextEnter;
-                tb.Click -= AutoSelect_TextClick;
-                tb.Click += AutoSelect_TextClick;
+                tb.Enter -= AutoSelect_TextEnter; tb.Enter += AutoSelect_TextEnter;
+                tb.Click -= AutoSelect_TextClick; tb.Click += AutoSelect_TextClick;
             }
             var cb = c as ComboBox;
             if (cb != null && cb.DropDownStyle != ComboBoxStyle.DropDownList)
-            {
-                cb.Enter -= AutoSelect_ComboEnter;
-                cb.Enter += AutoSelect_ComboEnter;
-            }
+            { cb.Enter -= AutoSelect_ComboEnter; cb.Enter += AutoSelect_ComboEnter; }
             var nud = c as NumericUpDown;
-            if (nud != null)
-            {
-                nud.Enter -= AutoSelect_NudEnter;
-                nud.Enter += AutoSelect_NudEnter;
-            }
-            foreach (Control child in c.Controls)
-                WireAutoSelect(child);
+            if (nud != null) { nud.Enter -= AutoSelect_NudEnter; nud.Enter += AutoSelect_NudEnter; }
+            foreach (Control child in c.Controls) WireAutoSelect(child);
         }
 
-        private static void AutoSelect_TextEnter(object sender, EventArgs e)
-        {
-            var tb = sender as TextBox;
-            if (tb != null) BeginInvokeSelectAll(tb);
-        }
-
-        private static void AutoSelect_TextClick(object sender, EventArgs e)
-        {
-            var tb = sender as TextBox;
-            if (tb != null && tb.SelectionLength == 0) BeginInvokeSelectAll(tb);
-        }
-
-        private static void AutoSelect_ComboEnter(object sender, EventArgs e)
-        {
-            var cb = sender as ComboBox;
-            if (cb != null) { try { cb.SelectAll(); } catch { } }
-        }
-
-        private static void AutoSelect_NudEnter(object sender, EventArgs e)
-        {
-            var nud = sender as NumericUpDown;
-            if (nud != null) { try { nud.Select(0, nud.Text.Length); } catch { } }
-        }
+        private static void AutoSelect_TextEnter(object sender, EventArgs e) { var tb = sender as TextBox; if (tb != null) BeginInvokeSelectAll(tb); }
+        private static void AutoSelect_TextClick(object sender, EventArgs e) { var tb = sender as TextBox; if (tb != null && tb.SelectionLength == 0) BeginInvokeSelectAll(tb); }
+        private static void AutoSelect_ComboEnter(object sender, EventArgs e) { var cb = sender as ComboBox; if (cb != null) { try { cb.SelectAll(); } catch { } } }
+        private static void AutoSelect_NudEnter(object sender, EventArgs e) { var nud = sender as NumericUpDown; if (nud != null) { try { nud.Select(0, nud.Text.Length); } catch { } } }
 
         public static void StyleComboBox(ComboBox cmb)
         {
             if (cmb == null) return;
-            cmb.Font = NormalFont;
-            cmb.FlatStyle = FlatStyle.Flat;
-            cmb.BackColor = Color.White;
-            cmb.ForeColor = TextColor;
+            cmb.Font = NormalFont; cmb.FlatStyle = FlatStyle.Flat; cmb.BackColor = Color.White; cmb.ForeColor = TextColor;
         }
 
         public static void StyleGrid(DataGridView dgv)
@@ -538,7 +552,6 @@ namespace ApplianceManagement.Helpers
             dgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             dgv.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
             dgv.EnableHeadersVisualStyles = false;
-
             dgv.ColumnHeadersDefaultCellStyle.BackColor = GridHeaderColor;
             dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
             dgv.ColumnHeadersDefaultCellStyle.Font = HeaderFont;
@@ -547,18 +560,15 @@ namespace ApplianceManagement.Helpers
             dgv.ColumnHeadersDefaultCellStyle.SelectionForeColor = Color.White;
             dgv.ColumnHeadersHeight = 36;
             dgv.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
-
             dgv.DefaultCellStyle.BackColor = PanelColor;
             dgv.DefaultCellStyle.ForeColor = TextColor;
             dgv.DefaultCellStyle.Font = NormalFont;
             dgv.DefaultCellStyle.SelectionBackColor = ThemeSelection;
             dgv.DefaultCellStyle.SelectionForeColor = TextColor;
-
             dgv.AlternatingRowsDefaultCellStyle.BackColor = ThemeAltRow;
             dgv.AlternatingRowsDefaultCellStyle.ForeColor = TextColor;
             dgv.AlternatingRowsDefaultCellStyle.SelectionBackColor = ThemeSelection;
             dgv.AlternatingRowsDefaultCellStyle.SelectionForeColor = TextColor;
-
             dgv.RowTemplate.Height = 30;
             dgv.GridColor = BorderColor;
         }
@@ -575,11 +585,7 @@ namespace ApplianceManagement.Helpers
         {
             form.Opacity = 0;
             var t = new Timer { Interval = 12 };
-            t.Tick += (s, e) =>
-            {
-                if (form.Opacity >= 1) { t.Stop(); t.Dispose(); }
-                else form.Opacity += 0.12;
-            };
+            t.Tick += (s, e) => { if (form.Opacity >= 1) { t.Stop(); t.Dispose(); } else form.Opacity += 0.12; };
             t.Start();
         }
 
@@ -592,19 +598,8 @@ namespace ApplianceManagement.Helpers
         public static void AttachF4Close(Form form, bool confirmOnClose = true)
         {
             form.KeyPreview = true;
-            form.KeyDown += (s, e) =>
-            {
-                if (e.KeyCode == Keys.F4)
-                {
-                    e.SuppressKeyPress = true;
-                    form.Close();
-                }
-            };
-            if (!confirmOnClose)
-            {
-                form.Tag = "NOSAVECONFIRM";
-                return;
-            }
+            form.KeyDown += (s, e) => { if (e.KeyCode == Keys.F4) { e.SuppressKeyPress = true; form.Close(); } };
+            if (!confirmOnClose) { form.Tag = "NOSAVECONFIRM"; return; }
             form.FormClosing += (s, e) =>
             {
                 if (e.CloseReason == CloseReason.UserClosing)
@@ -615,10 +610,7 @@ namespace ApplianceManagement.Helpers
             };
         }
 
-        public static void AttachF4Close(Form form)
-        {
-            AttachF4Close(form, true);
-        }
+        public static void AttachF4Close(Form form) { AttachF4Close(form, true); }
 
         public static void AttachEnterNavigation(Form form)
         {
@@ -642,9 +634,7 @@ namespace ApplianceManagement.Helpers
         {
             string key = role == "Admin" ? "MaxDiscountAdmin" : "MaxDiscountUser";
             string val = AppSettings.Get(key);
-            decimal d = 0;
-            decimal.TryParse(val, out d);
-            return d;
+            decimal d = 0; decimal.TryParse(val, out d); return d;
         }
 
         public static bool IsPrintAllowed()
