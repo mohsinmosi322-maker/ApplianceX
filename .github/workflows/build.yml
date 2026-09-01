@@ -36,56 +36,45 @@ jobs:
             }
           }
 
-      - name: Build ApplianceManagement (Release)
+      - name: Build ApplianceManagement (Release, no PDB)
         shell: cmd
         run: |
-          msbuild "V6\ApplianceManagement\ApplianceManagement.csproj" /t:Rebuild /p:Configuration=Release /p:Platform=AnyCPU /v:minimal /nologo
+          msbuild "V6\ApplianceManagement\ApplianceManagement.csproj" /t:Rebuild /p:Configuration=Release /p:Platform=AnyCPU /p:DebugType=none /p:DebugSymbols=false /v:minimal /nologo
 
-      - name: Build Authenticator (Release)
+      - name: Build Authenticator (Release, no PDB)
         shell: cmd
         run: |
-          msbuild "V6\Authenticator\Authenticator.csproj" /t:Rebuild /p:Configuration=Release /p:Platform=AnyCPU /v:minimal /nologo
+          msbuild "V6\Authenticator\Authenticator.csproj" /t:Rebuild /p:Configuration=Release /p:Platform=AnyCPU /p:DebugType=none /p:DebugSymbols=false /v:minimal /nologo
 
-      - name: Package separate exe folders
+      - name: Package separate exe folders (strip symbols)
         shell: pwsh
         run: |
-          # Final layout:
-          #   V6/Release/ApplianceManagement/  -> ApplianceManagement.exe + related files
-          #   V6/Release/Authenticator/        -> Authenticator.exe + related files
-
           $root = "V6\Release"
           New-Item -ItemType Directory -Force -Path "$root\ApplianceManagement" | Out-Null
           New-Item -ItemType Directory -Force -Path "$root\Authenticator" | Out-Null
 
           $amSrc = "V6\ApplianceManagement\bin\Release"
           $auSrc = "V6\Authenticator\bin\Release"
-
           if (-not (Test-Path $amSrc)) { throw "Missing build output: $amSrc" }
           if (-not (Test-Path $auSrc)) { throw "Missing build output: $auSrc" }
 
-          # Copy only runtime files (exe, config, dll) — skip .pdb optional keep
+          # Ship only runtime files — never PDB / XML docs
           Get-ChildItem $amSrc -File | Where-Object {
-            $_.Extension -in '.exe','.dll','.config','.json','.xml','.pdb' -or $_.Name -like '*.dat'
+            $_.Extension -in '.exe','.dll','.config' -or $_.Name -like '*.dat'
           } | Copy-Item -Destination "$root\ApplianceManagement" -Force
 
           Get-ChildItem $auSrc -File | Where-Object {
-            $_.Extension -in '.exe','.dll','.config','.json','.xml','.pdb' -or $_.Name -like '*.dat'
+            $_.Extension -in '.exe','.dll','.config' -or $_.Name -like '*.dat'
           } | Copy-Item -Destination "$root\Authenticator" -Force
-
-          # Also mirror under artifacts for GitHub Actions upload
-          New-Item -ItemType Directory -Force -Path "artifacts\ApplianceManagement" | Out-Null
-          New-Item -ItemType Directory -Force -Path "artifacts\Authenticator" | Out-Null
-          Copy-Item "$root\ApplianceManagement\*" "artifacts\ApplianceManagement\" -Force
-          Copy-Item "$root\Authenticator\*" "artifacts\Authenticator\" -Force
 
           Write-Host "=== Package layout ==="
           Get-ChildItem -Path $root -Recurse | Select-Object FullName
 
           if (-not (Test-Path "$root\ApplianceManagement\ApplianceManagement.exe")) {
-            throw "ApplianceManagement.exe not found in package folder"
+            throw "ApplianceManagement.exe not found"
           }
           if (-not (Test-Path "$root\Authenticator\Authenticator.exe")) {
-            throw "Authenticator.exe not found in package folder"
+            throw "Authenticator.exe not found"
           }
 
       - name: Upload build artifacts
