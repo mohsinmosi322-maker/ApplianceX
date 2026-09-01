@@ -15,7 +15,6 @@ namespace ApplianceManagement.Services
             if (string.IsNullOrWhiteSpace(invoiceNo))
                 throw new InvalidOperationException("Enter original sale invoice number.");
 
-            // Migrates ReturnID → SaleReturnID and adds OriginalSaleDetailID if missing
             SchemaBootstrap.EnsureSaleReturnTables();
 
             var list = new List<SaleInvoiceLine>();
@@ -69,8 +68,6 @@ namespace ApplianceManagement.Services
         public void Validate(SaleReturnHeader ret)
         {
             if (ret == null) throw new ArgumentNullException("ret");
-            if (ret.OriginalSaleID <= 0)
-                throw new InvalidOperationException("Load an original sale invoice first.");
             if (ret.Details == null || ret.Details.Count == 0)
                 throw new InvalidOperationException("Select at least one line to return.");
             if (string.IsNullOrWhiteSpace(ret.Remarks))
@@ -116,8 +113,8 @@ namespace ApplianceManagement.Services
                         {
                             cmd.Parameters.AddWithValue("@No", ret.ReturnNo);
                             cmd.Parameters.AddWithValue("@Dt", ret.ReturnDate);
-                            cmd.Parameters.AddWithValue("@Sid", ret.OriginalSaleID);
-                            cmd.Parameters.AddWithValue("@Cid", ret.CustomerID);
+                            cmd.Parameters.AddWithValue("@Sid", ret.OriginalSaleID > 0 ? (object)ret.OriginalSaleID : DBNull.Value);
+                            cmd.Parameters.AddWithValue("@Cid", ret.CustomerID > 0 ? (object)ret.CustomerID : DBNull.Value);
                             cmd.Parameters.AddWithValue("@Tot", ret.TotalAmount);
                             cmd.Parameters.AddWithValue("@Disc", ret.Discount);
                             cmd.Parameters.AddWithValue("@Net", ret.NetAmount);
@@ -131,21 +128,21 @@ namespace ApplianceManagement.Services
                         foreach (var d in ret.Details)
                         {
                             int originalDetailId = d.OriginalSaleDetailID.HasValue ? d.OriginalSaleDetailID.Value : 0;
-                            if (originalDetailId <= 0)
-                                throw new InvalidOperationException("Original sale line is required for return of " + (d.ProductName ?? d.ProductCode));
-
-                            int returnable = GetReturnable(conn, trans, originalDetailId);
-                            if (d.Quantity > returnable)
-                                throw new InvalidOperationException(
-                                    "Return qty exceeds remaining for " + (d.ProductName ?? d.ProductCode) +
-                                    ". Returnable: " + returnable);
+                            if (originalDetailId > 0)
+                            {
+                                int returnable = GetReturnable(conn, trans, originalDetailId);
+                                if (d.Quantity > returnable)
+                                    throw new InvalidOperationException(
+                                        "Return qty exceeds remaining for " + (d.ProductName ?? d.ProductCode) +
+                                        ". Returnable: " + returnable);
+                            }
 
                             using (var cmd = DbHelper.CreateCommand(
                                 "INSERT INTO SaleReturnDetail(SaleReturnID,OriginalSaleDetailID,ProductID,Quantity,SalePrice,Amount) " +
                                 "VALUES(@Rid,@Osd,@Pid,@Qty,@Pr,@Amt)", conn, trans))
                             {
                                 cmd.Parameters.AddWithValue("@Rid", returnId);
-                                cmd.Parameters.AddWithValue("@Osd", originalDetailId);
+                                cmd.Parameters.AddWithValue("@Osd", originalDetailId > 0 ? (object)originalDetailId : DBNull.Value);
                                 cmd.Parameters.AddWithValue("@Pid", d.ProductID);
                                 cmd.Parameters.AddWithValue("@Qty", d.Quantity);
                                 cmd.Parameters.AddWithValue("@Pr", d.SalePrice);
@@ -153,7 +150,6 @@ namespace ApplianceManagement.Services
                                 cmd.ExecuteNonQuery();
                             }
 
-                            // Sale return INCREASES stock (QuantityIn)
                             decimal unitCost = ReadUnitCost(conn, trans, d.ProductID);
                             _inv.Post(
                                 conn, trans, d.ProductID,
