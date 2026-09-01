@@ -130,7 +130,11 @@ namespace ApplianceManagement.Services
 
                         foreach (var d in ret.Details)
                         {
-                            int returnable = GetReturnable(conn, trans, d.OriginalSaleDetailID);
+                            int originalDetailId = d.OriginalSaleDetailID.HasValue ? d.OriginalSaleDetailID.Value : 0;
+                            if (originalDetailId <= 0)
+                                throw new InvalidOperationException("Original sale line is required for return of " + (d.ProductName ?? d.ProductCode));
+
+                            int returnable = GetReturnable(conn, trans, originalDetailId);
                             if (d.Quantity > returnable)
                                 throw new InvalidOperationException(
                                     "Return qty exceeds remaining for " + (d.ProductName ?? d.ProductCode) +
@@ -141,7 +145,7 @@ namespace ApplianceManagement.Services
                                 "VALUES(@Rid,@Osd,@Pid,@Qty,@Pr,@Amt)", conn, trans))
                             {
                                 cmd.Parameters.AddWithValue("@Rid", returnId);
-                                cmd.Parameters.AddWithValue("@Osd", d.OriginalSaleDetailID > 0 ? (object)d.OriginalSaleDetailID : DBNull.Value);
+                                cmd.Parameters.AddWithValue("@Osd", originalDetailId);
                                 cmd.Parameters.AddWithValue("@Pid", d.ProductID);
                                 cmd.Parameters.AddWithValue("@Qty", d.Quantity);
                                 cmd.Parameters.AddWithValue("@Pr", d.SalePrice);
@@ -149,17 +153,20 @@ namespace ApplianceManagement.Services
                                 cmd.ExecuteNonQuery();
                             }
 
+                            // InventoryService.Post signature:
+                            // (conn, trans, productId, type, referenceId, quantityIn, quantityOut, unitCost, remarks, when?)
                             decimal unitCost = ReadUnitCost(conn, trans, d.ProductID);
                             _inv.Post(
-                                conn, trans,
+                                conn,
+                                trans,
                                 d.ProductID,
                                 InventoryTransactionType.SaleReturn,
                                 returnId,
-                                ret.ReturnNo,
-                                quantityIn: d.Quantity,
-                                quantityOut: 0,
-                                unitCost: unitCost,
-                                remarks: "Sale return " + ret.ReturnNo);
+                                d.Quantity,
+                                0,
+                                unitCost,
+                                "Sale return " + ret.ReturnNo,
+                                ret.ReturnDate);
                         }
 
                         if (ret.CustomerID > 0 && ret.RefundAmount > 0)
