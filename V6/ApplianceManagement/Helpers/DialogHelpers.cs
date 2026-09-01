@@ -24,6 +24,11 @@ namespace ApplianceManagement.Helpers
             MessageBox.Show(owner, message, title, MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
+        public static void Warn(IWin32Window owner, string message, string title = "Warning")
+        {
+            MessageBox.Show(owner, message, title, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+
         public static string Prompt(IWin32Window owner, string label, string title, string defaultValue = "")
         {
             using (var f = new Form())
