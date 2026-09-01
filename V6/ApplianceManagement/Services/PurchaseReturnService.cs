@@ -65,7 +65,6 @@ namespace ApplianceManagement.Services
             if (string.IsNullOrWhiteSpace(invoiceNo))
                 throw new InvalidOperationException("Enter original purchase invoice number.");
 
-            // Creates PurchaseReturnHeader/Detail if missing
             SchemaBootstrap.EnsurePurchaseReturnTables();
 
             var list = new List<PurchaseInvoiceLine>();
@@ -114,8 +113,6 @@ namespace ApplianceManagement.Services
         public void Validate(PurchaseReturnHeader ret)
         {
             if (ret == null) throw new ArgumentNullException("ret");
-            if (ret.OriginalPurchaseID <= 0)
-                throw new InvalidOperationException("Load an original purchase invoice first.");
             if (ret.Details == null || ret.Details.Count == 0)
                 throw new InvalidOperationException("Select at least one line to return.");
             if (string.IsNullOrWhiteSpace(ret.Remarks))
@@ -162,8 +159,8 @@ namespace ApplianceManagement.Services
                         {
                             cmd.Parameters.AddWithValue("@No", returnNo);
                             cmd.Parameters.AddWithValue("@Dt", ret.ReturnDate);
-                            cmd.Parameters.AddWithValue("@Oid", ret.OriginalPurchaseID);
-                            cmd.Parameters.AddWithValue("@Sid", ret.SupplierID);
+                            cmd.Parameters.AddWithValue("@Oid", ret.OriginalPurchaseID > 0 ? (object)ret.OriginalPurchaseID : DBNull.Value);
+                            cmd.Parameters.AddWithValue("@Sid", ret.SupplierID > 0 ? (object)ret.SupplierID : DBNull.Value);
                             cmd.Parameters.AddWithValue("@Tot", ret.TotalAmount);
                             cmd.Parameters.AddWithValue("@Disc", ret.Discount);
                             cmd.Parameters.AddWithValue("@Net", ret.NetAmount);
@@ -177,21 +174,21 @@ namespace ApplianceManagement.Services
                         foreach (var d in ret.Details)
                         {
                             int originalDetailId = d.OriginalPurchaseDetailID.HasValue ? d.OriginalPurchaseDetailID.Value : 0;
-                            if (originalDetailId <= 0)
-                                throw new InvalidOperationException("Original purchase line required for " + (d.ProductName ?? d.ProductCode));
-
-                            int returnable = GetReturnable(conn, trans, originalDetailId);
-                            if (d.Quantity > returnable)
-                                throw new InvalidOperationException(
-                                    "Return qty exceeds remaining for " + (d.ProductName ?? d.ProductCode) +
-                                    ". Returnable: " + returnable);
+                            if (originalDetailId > 0)
+                            {
+                                int returnable = GetReturnable(conn, trans, originalDetailId);
+                                if (d.Quantity > returnable)
+                                    throw new InvalidOperationException(
+                                        "Return qty exceeds remaining for " + (d.ProductName ?? d.ProductCode) +
+                                        ". Returnable: " + returnable);
+                            }
 
                             using (var cmd = DbHelper.CreateCommand(
                                 "INSERT INTO PurchaseReturnDetail(PurchaseReturnID,OriginalPurchaseDetailID,ProductID,Quantity,PurchasePrice,Amount) " +
                                 "VALUES(@Rid,@Oid,@Pid,@Qty,@Pr,@Amt)", conn, trans))
                             {
                                 cmd.Parameters.AddWithValue("@Rid", id);
-                                cmd.Parameters.AddWithValue("@Oid", originalDetailId);
+                                cmd.Parameters.AddWithValue("@Oid", originalDetailId > 0 ? (object)originalDetailId : DBNull.Value);
                                 cmd.Parameters.AddWithValue("@Pid", d.ProductID);
                                 cmd.Parameters.AddWithValue("@Qty", d.Quantity);
                                 cmd.Parameters.AddWithValue("@Pr", d.PurchasePrice);
@@ -199,7 +196,6 @@ namespace ApplianceManagement.Services
                                 cmd.ExecuteNonQuery();
                             }
 
-                            // Purchase return DECREASES stock (pack → base units)
                             decimal pack = d.PackSize > 0 ? d.PackSize : 1m;
                             int unitsOut = (int)Math.Round(d.Quantity * pack);
                             if (unitsOut < 1) unitsOut = d.Quantity;
@@ -232,7 +228,7 @@ namespace ApplianceManagement.Services
                                     cmd.ExecuteNonQuery();
                                 }
                             }
-                            catch (SqlException) { /* ledger optional */ }
+                            catch (SqlException) { }
                         }
 
                         trans.Commit();
