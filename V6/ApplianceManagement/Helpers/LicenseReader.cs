@@ -9,8 +9,6 @@ namespace ApplianceManagement.Helpers
 {
     public static class LicenseReader
     {
-        // NOTE: Hardcoded key is a known limitation of the current soft-license design.
-        // Enterprise follow-up: replace with asymmetric signatures (vendor private key).
         private static readonly byte[] Key = Encoding.UTF8.GetBytes("AppLicKey16Bytes");
         private static readonly byte[] IV = Encoding.UTF8.GetBytes("AppLicIV16Bytes!");
 
@@ -54,7 +52,7 @@ namespace ApplianceManagement.Helpers
                 {
                     StoreName = (string)xml.Element("StoreName") ?? "",
                     ShopPhone = (string)xml.Element("ShopPhone") ?? "",
-                    InvoicePrefix = (string)xml.Element("InvoicePrefix") ?? "INV-",
+                    InvoicePrefix = "",
                     ExpiryDate = DateTime.Parse((string)xml.Element("ExpiryDate") ?? "2099-12-31", CultureInfo.InvariantCulture),
                     AllowPrint = ((string)xml.Element("AllowPrint") ?? "1") == "1",
                     MaxDiscountAdmin = 0,

@@ -15,6 +15,7 @@ namespace ApplianceManagement.Services
             if (string.IsNullOrWhiteSpace(invoiceNo))
                 throw new InvalidOperationException("Enter original sale invoice number.");
 
+            // Migrates ReturnID → SaleReturnID and adds OriginalSaleDetailID if missing
             SchemaBootstrap.EnsureSaleReturnTables();
 
             var list = new List<SaleInvoiceLine>();
@@ -105,9 +106,8 @@ namespace ApplianceManagement.Services
                 {
                     try
                     {
-                        int n = NextCounter(conn, trans, "NextSaleReturnNumber");
-                        string prefix = GetSetting(conn, trans, "SaleReturnPrefix", "RET-");
-                        ret.ReturnNo = prefix + n.ToString("000000");
+                        int n = InvoiceNumberHelper.NextCounter(conn, trans, "NextSaleReturnNumber");
+                        ret.ReturnNo = InvoiceNumberHelper.Format("", n);
 
                         int returnId;
                         using (var cmd = DbHelper.CreateCommand(
@@ -153,18 +153,13 @@ namespace ApplianceManagement.Services
                                 cmd.ExecuteNonQuery();
                             }
 
-                            // InventoryService.Post signature:
-                            // (conn, trans, productId, type, referenceId, quantityIn, quantityOut, unitCost, remarks, when?)
+                            // Sale return INCREASES stock (QuantityIn)
                             decimal unitCost = ReadUnitCost(conn, trans, d.ProductID);
                             _inv.Post(
-                                conn,
-                                trans,
-                                d.ProductID,
+                                conn, trans, d.ProductID,
                                 InventoryTransactionType.SaleReturn,
                                 returnId,
-                                d.Quantity,
-                                0,
-                                unitCost,
+                                d.Quantity, 0, unitCost,
                                 "Sale return " + ret.ReturnNo,
                                 ret.ReturnDate);
                         }
@@ -181,7 +176,7 @@ namespace ApplianceManagement.Services
                                 cmd.Parameters.AddWithValue("@Cr", ret.RefundAmount);
                                 cmd.Parameters.AddWithValue("@Rm", (object)ret.Remarks ?? DBNull.Value);
                                 cmd.Parameters.AddWithValue("@By", AppSession.UserId > 0 ? (object)AppSession.UserId : DBNull.Value);
-                                try { cmd.ExecuteNonQuery(); } catch { /* ledger table may be absent */ }
+                                try { cmd.ExecuteNonQuery(); } catch { }
                             }
                         }
 
@@ -217,32 +212,6 @@ namespace ApplianceManagement.Services
                 cmd.Parameters.AddWithValue("@P", productId);
                 var o = cmd.ExecuteScalar();
                 return o == null || o == DBNull.Value ? 0m : Convert.ToDecimal(o);
-            }
-        }
-
-        private static string GetSetting(SqlConnection conn, SqlTransaction trans, string name, string defaultValue)
-        {
-            using (var cmd = DbHelper.CreateCommand("SELECT SettingValue FROM Settings WHERE SettingName=@N", conn, trans))
-            {
-                cmd.Parameters.AddWithValue("@N", name);
-                var r = cmd.ExecuteScalar();
-                if (r == null || r == DBNull.Value || string.IsNullOrWhiteSpace(r.ToString()))
-                    return defaultValue;
-                return r.ToString();
-            }
-        }
-
-        private static int NextCounter(SqlConnection conn, SqlTransaction trans, string settingName)
-        {
-            using (var cmd = DbHelper.CreateCommand(
-                "IF NOT EXISTS (SELECT 1 FROM Settings WITH (UPDLOCK, HOLDLOCK) WHERE SettingName=@N) " +
-                "INSERT INTO Settings(SettingName,SettingValue) VALUES(@N,'1'); " +
-                "UPDATE Settings WITH (UPDLOCK, ROWLOCK) SET SettingValue = CAST(CAST(ISNULL(NULLIF(SettingValue,''),'0') AS INT) + 1 AS NVARCHAR(50)) " +
-                "WHERE SettingName=@N; " +
-                "SELECT CAST(SettingValue AS INT) - 1 FROM Settings WHERE SettingName=@N;", conn, trans))
-            {
-                cmd.Parameters.AddWithValue("@N", settingName);
-                return Convert.ToInt32(cmd.ExecuteScalar());
             }
         }
     }
