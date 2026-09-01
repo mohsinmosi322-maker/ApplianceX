@@ -60,6 +60,7 @@
     <Compile Include="Forms\CustomerMasterForm.cs"><SubType>Form</SubType></Compile>
     <Compile Include="Forms\SupplierMasterForm.cs"><SubType>Form</SubType></Compile>
     <Compile Include="Forms\CategoryMasterForm.cs"><SubType>Form</SubType></Compile>
+    <Compile Include="Forms\UserMasterForm.cs"><SubType>Form</SubType></Compile>
     <Compile Include="Forms\LowStockForm.cs"><SubType>Form</SubType></Compile>
     <Compile Include="Forms\LogViewerForm.cs"><SubType>Form</SubType></Compile>
     <Compile Include="Forms\ReportsForm.cs"><SubType>Form</SubType></Compile>
