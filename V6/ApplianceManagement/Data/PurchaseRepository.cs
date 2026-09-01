@@ -21,9 +21,9 @@ namespace ApplianceManagement.Data
                 {
                     try
                     {
-                        string prefix = GetSetting(conn, trans, "PurchaseInvoicePrefix", "PUR-");
-                        int num = NextCounter(conn, trans, "NextPurchaseInvoiceNumber");
-                        string invoiceNo = prefix + num.ToString("D6");
+                        string prefix = InvoiceNumberHelper.ResolvePurchasePrefix(conn, trans);
+                        int num = InvoiceNumberHelper.NextCounter(conn, trans, "NextPurchaseInvoiceNumber");
+                        string invoiceNo = InvoiceNumberHelper.Format(prefix, num);
                         purchase.InvoiceNo = invoiceNo;
 
                         int purchaseId;
@@ -48,11 +48,9 @@ namespace ApplianceManagement.Data
                         {
                             decimal packSize = ReadPackSize(conn, trans, d.ProductID);
                             int packs = d.Quantity < 1 ? 1 : d.Quantity;
-                            // Line PurchasePrice = PACK price (domain model)
                             decimal packPrice = d.PurchasePrice;
                             if (packPrice < 0) packPrice = 0;
                             int unitsIn = PackMath.PacksToUnits(packs, packSize);
-                            // Ledger / COGS uses unit cost only
                             decimal unitCost = PackMath.UnitCost(packPrice, packSize);
 
                             using (var cmd = DbHelper.CreateCommand(
@@ -67,8 +65,6 @@ namespace ApplianceManagement.Data
                                 cmd.ExecuteNonQuery();
                             }
 
-                            // CRITICAL: Products.PurchasePrice must remain PACK price (never unit cost).
-                            // Dividing and storing unit cost here was the fatal bug that corrupted every purchase.
                             try
                             {
                                 using (var cmd = DbHelper.CreateCommand(
@@ -81,16 +77,10 @@ namespace ApplianceManagement.Data
                             }
                             catch (SqlException) { }
 
-                            _inv.Post(
-                                conn, trans,
-                                d.ProductID,
-                                InventoryTransactionType.Purchase,
-                                purchaseId,
-                                quantityIn: unitsIn,
-                                quantityOut: 0,
-                                unitCost: unitCost,
-                                remarks: "Purchase: " + invoiceNo + " packs=" + packs + " packSize=" + packSize + " packPrice=" + packPrice + " unitCost=" + unitCost,
-                                when: purchase.PurchaseDate);
+                            _inv.Post(conn, trans, d.ProductID, InventoryTransactionType.Purchase, purchaseId,
+                                unitsIn, 0, unitCost,
+                                "Purchase: " + invoiceNo + " packs=" + packs + " packSize=" + packSize,
+                                purchase.PurchaseDate);
                         }
 
                         _acct.PostPurchase(conn, trans, purchase.SupplierID, purchaseId, invoiceNo, purchase.NetAmount);
@@ -132,14 +122,12 @@ namespace ApplianceManagement.Data
         {
             try
             {
-                using (var cmd = DbHelper.CreateCommand(
-                    "SELECT ISNULL(PackSize,1) FROM Products WHERE ProductID=@P", conn, trans))
+                using (var cmd = DbHelper.CreateCommand("SELECT ISNULL(PackSize,1) FROM Products WHERE ProductID=@P", conn, trans))
                 {
                     cmd.Parameters.AddWithValue("@P", productId);
                     var o = cmd.ExecuteScalar();
                     if (o == null || o == DBNull.Value) return 1m;
-                    decimal p = Convert.ToDecimal(o);
-                    return PackMath.NormalizePackSize(p);
+                    return PackMath.NormalizePackSize(Convert.ToDecimal(o));
                 }
             }
             catch (SqlException) { return 1m; }
@@ -154,8 +142,7 @@ namespace ApplianceManagement.Data
                 using (var cmd = DbHelper.CreateCommand(
                     "SELECT h.PurchaseDate, h.InvoiceNo, s.SupplierName, d.Quantity, d.PurchasePrice, d.Amount " +
                     "FROM PurchaseDetail d INNER JOIN PurchaseHeader h ON d.PurchaseID=h.PurchaseID " +
-                    "INNER JOIN Suppliers s ON h.SupplierID=s.SupplierID " +
-                    "WHERE d.ProductID=@P ORDER BY h.PurchaseDate DESC", conn))
+                    "INNER JOIN Suppliers s ON h.SupplierID=s.SupplierID WHERE d.ProductID=@P ORDER BY h.PurchaseDate DESC", conn))
                 {
                     cmd.Parameters.AddWithValue("@P", productId);
                     using (var r = cmd.ExecuteReader())
@@ -220,32 +207,6 @@ namespace ApplianceManagement.Data
                     cmd.Parameters.AddWithValue("@ID", id);
                     cmd.ExecuteNonQuery();
                 }
-            }
-        }
-
-        private static string GetSetting(SqlConnection conn, SqlTransaction trans, string name, string defaultValue)
-        {
-            using (var cmd = DbHelper.CreateCommand("SELECT SettingValue FROM Settings WHERE SettingName=@N", conn, trans))
-            {
-                cmd.Parameters.AddWithValue("@N", name);
-                var r = cmd.ExecuteScalar();
-                if (r == null || r == DBNull.Value || string.IsNullOrWhiteSpace(r.ToString()))
-                    return defaultValue;
-                return r.ToString();
-            }
-        }
-
-        private static int NextCounter(SqlConnection conn, SqlTransaction trans, string settingName)
-        {
-            using (var cmd = DbHelper.CreateCommand(
-                "IF NOT EXISTS (SELECT 1 FROM Settings WITH (UPDLOCK, HOLDLOCK) WHERE SettingName=@N) " +
-                "INSERT INTO Settings(SettingName,SettingValue) VALUES(@N,'1'); " +
-                "UPDATE Settings WITH (UPDLOCK, ROWLOCK) SET SettingValue = CAST(CAST(ISNULL(NULLIF(SettingValue,''),'0') AS INT) + 1 AS NVARCHAR(50)) " +
-                "WHERE SettingName=@N; " +
-                "SELECT CAST(SettingValue AS INT) - 1 FROM Settings WHERE SettingName=@N;", conn, trans))
-            {
-                cmd.Parameters.AddWithValue("@N", settingName);
-                return Convert.ToInt32(cmd.ExecuteScalar());
             }
         }
     }
