@@ -4,50 +4,78 @@ using System.Windows.Forms;
 
 namespace ApplianceManagement.Helpers
 {
+    /// <summary>
+    /// Form accents follow the active global theme (coherent POS look).
+    /// Semantic-only exception: LowStock uses Danger.
+    /// </summary>
     public static class FormAccent
     {
-        public static readonly Color Sale = Color.FromArgb(25, 118, 210);
-        public static readonly Color SaleDark = Color.FromArgb(13, 71, 161);
-        public static readonly Color Purchase = Color.FromArgb(46, 125, 50);
-        public static readonly Color PurchaseDark = Color.FromArgb(27, 94, 32);
-        public static readonly Color SaleReturn = Color.FromArgb(230, 126, 34);
-        public static readonly Color SaleReturnDark = Color.FromArgb(175, 90, 20);
-        public static readonly Color PurchaseReturn = Color.FromArgb(121, 85, 72);
-        public static readonly Color PurchaseReturnDark = Color.FromArgb(78, 52, 46);
-        public static readonly Color NewItem = Color.FromArgb(123, 31, 162);
-        public static readonly Color NewItemDark = Color.FromArgb(74, 20, 140);
-        public static readonly Color Inventory = Color.FromArgb(0, 121, 107);
-        public static readonly Color InventoryDark = Color.FromArgb(0, 77, 64);
-        public static readonly Color Reports = Color.FromArgb(55, 71, 79);
-        public static readonly Color ReportsDark = Color.FromArgb(38, 50, 56);
-        public static readonly Color Settings = Color.FromArgb(57, 73, 171);
-        public static readonly Color SettingsDark = Color.FromArgb(40, 53, 147);
-        public static readonly Color LowStock = Color.FromArgb(198, 40, 40);
-        public static readonly Color LowStockDark = Color.FromArgb(150, 30, 30);
-        public static readonly Color Login = Color.FromArgb(33, 33, 33);
-        public static readonly Color Masters = Color.FromArgb(0, 105, 92);
-        public static readonly Color MastersDark = Color.FromArgb(0, 77, 64);
-        public static readonly Color Accounts = Color.FromArgb(69, 90, 100);
-        public static readonly Color AccountsDark = Color.FromArgb(48, 63, 71);
+        public static Color Sale { get { return UiHelper.ThemeColor; } }
+        public static Color SaleDark { get { return UiHelper.ThemeDark; } }
+        public static Color Purchase { get { return UiHelper.ThemeColor; } }
+        public static Color PurchaseDark { get { return UiHelper.ThemeDark; } }
+        public static Color SaleReturn { get { return UiHelper.ThemeColor; } }
+        public static Color SaleReturnDark { get { return UiHelper.ThemeDark; } }
+        public static Color PurchaseReturn { get { return UiHelper.ThemeColor; } }
+        public static Color PurchaseReturnDark { get { return UiHelper.ThemeDark; } }
+        public static Color NewItem { get { return UiHelper.ThemeColor; } }
+        public static Color NewItemDark { get { return UiHelper.ThemeDark; } }
+        public static Color Inventory { get { return UiHelper.ThemeColor; } }
+        public static Color InventoryDark { get { return UiHelper.ThemeDark; } }
+        public static Color Reports { get { return UiHelper.ThemeColor; } }
+        public static Color ReportsDark { get { return UiHelper.ThemeDark; } }
+        public static Color Settings { get { return UiHelper.ThemeColor; } }
+        public static Color SettingsDark { get { return UiHelper.ThemeDark; } }
+        public static Color LowStock { get { return UiHelper.DangerColor; } }
+        public static Color LowStockDark { get { return UiHelper.DangerDark; } }
+        public static Color Login { get { return UiHelper.ThemeDark; } }
+        public static Color Masters { get { return UiHelper.ThemeColor; } }
+        public static Color MastersDark { get { return UiHelper.ThemeDark; } }
+        public static Color Accounts { get { return UiHelper.ThemeColor; } }
+        public static Color AccountsDark { get { return UiHelper.ThemeDark; } }
     }
 
     public static class UiHelper
     {
+        public static readonly string[] ThemeNames = new[]
+        {
+            "Professional Navy",
+            "Modern Slate",
+            "Executive Blue",
+            "Clean Gray"
+        };
+
+        public const string DefaultTheme = "Professional Navy";
+
         public static Font TitleFont { get; private set; } = new Font("Segoe UI", 14F, FontStyle.Bold);
         public static Font HeaderFont { get; private set; } = new Font("Segoe UI", 11F, FontStyle.Bold);
         public static Font NormalFont { get; private set; } = new Font("Segoe UI", 10F, FontStyle.Regular);
         public static Font ButtonFont { get; private set; } = new Font("Segoe UI", 10F, FontStyle.Bold);
         public static Font SmallFont { get; private set; } = new Font("Segoe UI", 8.5F, FontStyle.Regular);
 
-        public static Color ThemeColor { get; private set; } = Color.FromArgb(41, 128, 185);
-        public static Color ThemeDark { get; private set; } = Color.FromArgb(30, 100, 150);
-        public static Color ThemeLight { get; private set; } = Color.FromArgb(174, 214, 241);
-        public static Color ThemeAltRow { get; private set; } = Color.FromArgb(235, 245, 255);
-        public static Color ThemeSelection { get; private set; } = Color.FromArgb(100, 160, 210);
-        public static Color BgColor { get; private set; } = Color.FromArgb(245, 247, 250);
+        public static Color ThemeColor { get; private set; } = Color.FromArgb(0x17, 0x32, 0x4D);
+        public static Color ThemeDark { get; private set; } = Color.FromArgb(0x10, 0x26, 0x3A);
+        public static Color ThemeLight { get; private set; } = Color.FromArgb(0xDC, 0xEA, 0xF5);
+        public static Color ThemeAltRow { get; private set; } = Color.FromArgb(0xF1, 0xF5, 0xF9);
+        public static Color ThemeSelection { get; private set; } = Color.FromArgb(0xDB, 0xEA, 0xFE);
+
+        public static Color BgColor { get; private set; } = Color.FromArgb(0xF5, 0xF7, 0xFA);
         public static Color PanelColor { get; private set; } = Color.White;
-        public static Color GridHeaderColor { get; private set; } = Color.FromArgb(41, 128, 185);
-        public static Color DangerColor { get; private set; } = Color.FromArgb(192, 57, 43);
+        public static Color GridHeaderColor { get; private set; } = Color.FromArgb(0x17, 0x32, 0x4D);
+
+        public static Color TextColor { get; private set; } = Color.FromArgb(0x1F, 0x29, 0x37);
+        public static Color SecondaryTextColor { get; private set; } = Color.FromArgb(0x6B, 0x72, 0x80);
+        public static Color BorderColor { get; private set; } = Color.FromArgb(0xD1, 0xD5, 0xDB);
+
+        public static Color AccentColor { get; private set; } = Color.FromArgb(0x25, 0x63, 0xEB);
+        public static Color AccentDark { get; private set; } = Color.FromArgb(0x1D, 0x4E, 0xD8);
+
+        public static Color SuccessColor { get; private set; } = Color.FromArgb(0x16, 0xA3, 0x4A);
+        public static Color WarningColor { get; private set; } = Color.FromArgb(0xD9, 0x77, 0x06);
+        public static Color DangerColor { get; private set; } = Color.FromArgb(0xDC, 0x26, 0x26);
+        public static Color DangerDark { get; private set; } = Color.FromArgb(0xB9, 0x1C, 0x1C);
+
+        public static string CurrentThemeName { get; private set; } = DefaultTheme;
 
         public static string AppName
         {
@@ -81,8 +109,10 @@ namespace ApplianceManagement.Helpers
 
         public static Panel CreateFormBanner(string title, string description, Color accent, Color accentDark)
         {
-            Panel banner = new Panel { Dock = DockStyle.Top, Height = 52, BackColor = accent };
-            banner.Controls.Add(new Panel { Dock = DockStyle.Left, Width = 6, BackColor = accentDark });
+            Color bg = ThemeColor;
+            Color edge = ThemeDark;
+            Panel banner = new Panel { Dock = DockStyle.Top, Height = 52, BackColor = bg };
+            banner.Controls.Add(new Panel { Dock = DockStyle.Left, Width = 6, BackColor = edge });
             banner.Controls.Add(new Label
             {
                 Text = title,
@@ -96,7 +126,7 @@ namespace ApplianceManagement.Helpers
             {
                 Text = description,
                 Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
-                ForeColor = Color.FromArgb(230, 240, 250),
+                ForeColor = Color.FromArgb(220, 230, 240),
                 Location = new Point(18, 30),
                 AutoSize = true,
                 BackColor = Color.Transparent
@@ -106,67 +136,191 @@ namespace ApplianceManagement.Helpers
 
         public static void StyleAccentButton(Button btn, Color accent, Color accentDark)
         {
+            StylePrimaryButton(btn);
+        }
+
+        public static void StylePrimaryButton(Button btn)
+        {
+            if (btn == null) return;
             btn.FlatStyle = FlatStyle.Flat;
             btn.FlatAppearance.BorderSize = 0;
-            btn.BackColor = accent;
+            btn.BackColor = AccentColor;
             btn.ForeColor = Color.White;
             btn.Font = ButtonFont;
             btn.Cursor = Cursors.Hand;
             if (btn.Height < 30) btn.Height = 34;
-            btn.FlatAppearance.MouseOverBackColor = accentDark;
+            btn.FlatAppearance.MouseOverBackColor = AccentDark;
+        }
+
+        public static void StyleSecondaryButton(Button btn)
+        {
+            if (btn == null) return;
+            btn.FlatStyle = FlatStyle.Flat;
+            btn.FlatAppearance.BorderSize = 1;
+            btn.FlatAppearance.BorderColor = BorderColor;
+            btn.BackColor = PanelColor;
+            btn.ForeColor = TextColor;
+            btn.Font = ButtonFont;
+            btn.Cursor = Cursors.Hand;
+            if (btn.Height < 30) btn.Height = 34;
+            btn.FlatAppearance.MouseOverBackColor = ThemeLight;
+        }
+
+        public static void StyleDangerButton(Button btn)
+        {
+            if (btn == null) return;
+            btn.FlatStyle = FlatStyle.Flat;
+            btn.FlatAppearance.BorderSize = 0;
+            btn.BackColor = DangerColor;
+            btn.ForeColor = Color.White;
+            btn.Font = ButtonFont;
+            btn.Cursor = Cursors.Hand;
+            if (btn.Height < 30) btn.Height = 34;
+            btn.FlatAppearance.MouseOverBackColor = DangerDark;
+        }
+
+        public static void StyleSuccessButton(Button btn)
+        {
+            if (btn == null) return;
+            btn.FlatStyle = FlatStyle.Flat;
+            btn.FlatAppearance.BorderSize = 0;
+            btn.BackColor = SuccessColor;
+            btn.ForeColor = Color.White;
+            btn.Font = ButtonFont;
+            btn.Cursor = Cursors.Hand;
+            if (btn.Height < 30) btn.Height = 34;
+            btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(0x15, 0x80, 0x3D);
         }
 
         public static void StyleGridWithAccent(DataGridView dgv, Color headerColor)
         {
             StyleGrid(dgv);
-            dgv.ColumnHeadersDefaultCellStyle.BackColor = headerColor;
-            dgv.ColumnHeadersDefaultCellStyle.SelectionBackColor = headerColor;
-            dgv.GridColor = Color.FromArgb(
-                Math.Min(255, headerColor.R + 80),
-                Math.Min(255, headerColor.G + 80),
-                Math.Min(255, headerColor.B + 80));
+        }
+
+        public static string NormalizeThemeName(string theme)
+        {
+            if (string.IsNullOrWhiteSpace(theme)) return DefaultTheme;
+            string t = theme.Trim();
+            foreach (var name in ThemeNames)
+                if (string.Equals(name, t, StringComparison.OrdinalIgnoreCase))
+                    return name;
+
+            switch (t.ToLowerInvariant())
+            {
+                case "blue":
+                case "green":
+                case "teal":
+                case "purple":
+                case "dark":
+                case "navy":
+                    return DefaultTheme;
+                default:
+                    return DefaultTheme;
+            }
         }
 
         public static void InitializeTheme()
         {
             string theme = AppSettings.Get("Theme");
-            if (string.IsNullOrEmpty(theme)) theme = "Blue";
+            theme = NormalizeThemeName(theme);
             ApplyThemeName(theme);
+
+            string fs = AppSettings.Get("FontSize");
             int size = 10;
-            int.TryParse(AppSettings.Get("FontSize"), out size);
-            if (size < 8) size = 10;
-            if (size > 18) size = 18;
+            if (!string.IsNullOrEmpty(fs)) int.TryParse(fs, out size);
+            if (size < 9) size = 9;
+            if (size > 14) size = 14;
             ApplyFontSize(size);
         }
 
         public static void ApplyThemeName(string theme)
         {
-            switch ((theme ?? "Blue").Trim())
+            theme = NormalizeThemeName(theme);
+            CurrentThemeName = theme;
+
+            switch (theme)
             {
-                case "Green":
-                    ThemeColor = Color.FromArgb(39, 174, 96); ThemeDark = Color.FromArgb(30, 132, 73);
-                    ThemeLight = Color.FromArgb(171, 235, 198); ThemeAltRow = Color.FromArgb(232, 248, 238);
-                    ThemeSelection = Color.FromArgb(82, 190, 128); break;
-                case "Dark":
-                    ThemeColor = Color.FromArgb(52, 73, 94); ThemeDark = Color.FromArgb(33, 47, 61);
-                    ThemeLight = Color.FromArgb(174, 182, 191); ThemeAltRow = Color.FromArgb(236, 240, 241);
-                    ThemeSelection = Color.FromArgb(93, 109, 126); break;
-                case "Purple":
-                    ThemeColor = Color.FromArgb(142, 68, 173); ThemeDark = Color.FromArgb(108, 52, 131);
-                    ThemeLight = Color.FromArgb(215, 189, 226); ThemeAltRow = Color.FromArgb(245, 238, 248);
-                    ThemeSelection = Color.FromArgb(165, 105, 189); break;
-                case "Teal":
-                    ThemeColor = Color.FromArgb(22, 160, 133); ThemeDark = Color.FromArgb(17, 122, 101);
-                    ThemeLight = Color.FromArgb(163, 228, 215); ThemeAltRow = Color.FromArgb(232, 248, 245);
-                    ThemeSelection = Color.FromArgb(69, 179, 157); break;
+                case "Modern Slate":
+                    ThemeColor = Color.FromArgb(0x33, 0x41, 0x55);
+                    ThemeDark = Color.FromArgb(0x1E, 0x29, 0x3B);
+                    ThemeLight = Color.FromArgb(0xE2, 0xE8, 0xF0);
+                    AccentColor = Color.FromArgb(0x3B, 0x82, 0xF6);
+                    AccentDark = Color.FromArgb(0x25, 0x63, 0xEB);
+                    BgColor = Color.FromArgb(0xF8, 0xFA, 0xFC);
+                    PanelColor = Color.White;
+                    TextColor = Color.FromArgb(0x0F, 0x17, 0x2A);
+                    SecondaryTextColor = Color.FromArgb(0x64, 0x74, 0x8B);
+                    BorderColor = Color.FromArgb(0xCB, 0xD5, 0xE1);
+                    GridHeaderColor = Color.FromArgb(0x33, 0x41, 0x55);
+                    ThemeSelection = Color.FromArgb(0xDB, 0xEA, 0xFE);
+                    ThemeAltRow = Color.FromArgb(0xF1, 0xF5, 0xF9);
+                    SuccessColor = Color.FromArgb(0x16, 0xA3, 0x4A);
+                    WarningColor = Color.FromArgb(0xD9, 0x77, 0x06);
+                    DangerColor = Color.FromArgb(0xDC, 0x26, 0x26);
+                    DangerDark = Color.FromArgb(0xB9, 0x1C, 0x1C);
+                    break;
+
+                case "Executive Blue":
+                    ThemeColor = Color.FromArgb(0x1E, 0x40, 0xAF);
+                    ThemeDark = Color.FromArgb(0x1E, 0x3A, 0x8A);
+                    ThemeLight = Color.FromArgb(0xDB, 0xEA, 0xFE);
+                    AccentColor = Color.FromArgb(0x25, 0x63, 0xEB);
+                    AccentDark = Color.FromArgb(0x1D, 0x4E, 0xD8);
+                    BgColor = Color.FromArgb(0xF5, 0xF7, 0xFB);
+                    PanelColor = Color.White;
+                    TextColor = Color.FromArgb(0x17, 0x20, 0x33);
+                    SecondaryTextColor = Color.FromArgb(0x64, 0x74, 0x8B);
+                    BorderColor = Color.FromArgb(0xD6, 0xDC, 0xE5);
+                    GridHeaderColor = Color.FromArgb(0x1E, 0x40, 0xAF);
+                    ThemeSelection = Color.FromArgb(0xDB, 0xEA, 0xFE);
+                    ThemeAltRow = Color.FromArgb(0xEE, 0xF2, 0xFF);
+                    SuccessColor = Color.FromArgb(0x15, 0x80, 0x3D);
+                    WarningColor = Color.FromArgb(0xB4, 0x53, 0x09);
+                    DangerColor = Color.FromArgb(0xB9, 0x1C, 0x1C);
+                    DangerDark = Color.FromArgb(0x99, 0x1B, 0x1B);
+                    break;
+
+                case "Clean Gray":
+                    ThemeColor = Color.FromArgb(0x37, 0x41, 0x51);
+                    ThemeDark = Color.FromArgb(0x1F, 0x29, 0x37);
+                    ThemeLight = Color.FromArgb(0xE5, 0xE7, 0xEB);
+                    AccentColor = Color.FromArgb(0x25, 0x63, 0xEB);
+                    AccentDark = Color.FromArgb(0x1D, 0x4E, 0xD8);
+                    BgColor = Color.FromArgb(0xF3, 0xF4, 0xF6);
+                    PanelColor = Color.White;
+                    TextColor = Color.FromArgb(0x11, 0x18, 0x27);
+                    SecondaryTextColor = Color.FromArgb(0x6B, 0x72, 0x80);
+                    BorderColor = Color.FromArgb(0xD1, 0xD5, 0xDB);
+                    GridHeaderColor = Color.FromArgb(0x37, 0x41, 0x51);
+                    ThemeSelection = Color.FromArgb(0xE5, 0xE7, 0xEB);
+                    ThemeAltRow = Color.FromArgb(0xF9, 0xFA, 0xFB);
+                    SuccessColor = Color.FromArgb(0x16, 0xA3, 0x4A);
+                    WarningColor = Color.FromArgb(0xD9, 0x77, 0x06);
+                    DangerColor = Color.FromArgb(0xDC, 0x26, 0x26);
+                    DangerDark = Color.FromArgb(0xB9, 0x1C, 0x1C);
+                    break;
+
+                case "Professional Navy":
                 default:
-                    ThemeColor = Color.FromArgb(41, 128, 185); ThemeDark = Color.FromArgb(30, 100, 150);
-                    ThemeLight = Color.FromArgb(174, 214, 241); ThemeAltRow = Color.FromArgb(235, 245, 255);
-                    ThemeSelection = Color.FromArgb(100, 160, 210); break;
+                    ThemeColor = Color.FromArgb(0x17, 0x32, 0x4D);
+                    ThemeDark = Color.FromArgb(0x10, 0x26, 0x3A);
+                    ThemeLight = Color.FromArgb(0xDC, 0xEA, 0xF5);
+                    AccentColor = Color.FromArgb(0x25, 0x63, 0xEB);
+                    AccentDark = Color.FromArgb(0x1D, 0x4E, 0xD8);
+                    BgColor = Color.FromArgb(0xF5, 0xF7, 0xFA);
+                    PanelColor = Color.White;
+                    TextColor = Color.FromArgb(0x1F, 0x29, 0x37);
+                    SecondaryTextColor = Color.FromArgb(0x6B, 0x72, 0x80);
+                    BorderColor = Color.FromArgb(0xD1, 0xD5, 0xDB);
+                    GridHeaderColor = Color.FromArgb(0x17, 0x32, 0x4D);
+                    ThemeSelection = Color.FromArgb(0xDB, 0xEA, 0xFE);
+                    ThemeAltRow = Color.FromArgb(0xF1, 0xF5, 0xF9);
+                    SuccessColor = Color.FromArgb(0x16, 0xA3, 0x4A);
+                    WarningColor = Color.FromArgb(0xD9, 0x77, 0x06);
+                    DangerColor = Color.FromArgb(0xDC, 0x26, 0x26);
+                    DangerDark = Color.FromArgb(0xB9, 0x1C, 0x1C);
+                    break;
             }
-            GridHeaderColor = ThemeColor;
-            BgColor = Color.FromArgb(245, 247, 250);
-            PanelColor = Color.White;
         }
 
         public static void ApplyFontSize(int size)
@@ -175,7 +329,7 @@ namespace ApplianceManagement.Helpers
             HeaderFont = new Font("Segoe UI", size + 1, FontStyle.Bold);
             NormalFont = new Font("Segoe UI", size, FontStyle.Regular);
             ButtonFont = new Font("Segoe UI", size, FontStyle.Bold);
-            SmallFont = new Font("Segoe UI", Math.Max(8, size - 1.5f), FontStyle.Regular);
+            SmallFont = new Font("Segoe UI", Math.Max(8f, size - 1.5f), FontStyle.Regular);
         }
 
         public static Size GetPreferredFormSize()
@@ -217,7 +371,18 @@ namespace ApplianceManagement.Helpers
             root.BackColor = BgColor;
             ApplyToControlTree(root);
             if (root.IsMdiContainer)
-                foreach (Form child in root.MdiChildren) { child.BackColor = BgColor; ApplyToControlTree(child); }
+            {
+                foreach (Control c in root.Controls)
+                {
+                    if (c is MdiClient mdi)
+                        mdi.BackColor = BgColor;
+                }
+                foreach (Form child in root.MdiChildren)
+                {
+                    child.BackColor = BgColor;
+                    ApplyToControlTree(child);
+                }
+            }
         }
 
         private static void ApplyToControlTree(Control c)
@@ -237,23 +402,36 @@ namespace ApplianceManagement.Helpers
             else if (c is CheckBox chk) chk.Font = NormalFont;
             else if (c is RadioButton rb) rb.Font = NormalFont;
             else if (c is DateTimePicker dtp) StyleDatePicker(dtp);
-            else if (c is ListBox lb) lb.Font = NormalFont;
+            else if (c is ListBox lb) { lb.Font = NormalFont; lb.BackColor = PanelColor; lb.ForeColor = TextColor; }
             else if (c is MenuStrip ms) { ms.BackColor = ThemeColor; ms.ForeColor = Color.White; ms.Font = NormalFont; }
             else if (c is StatusStrip ss) { ss.BackColor = ThemeDark; ss.Font = SmallFont; }
             else if (c is ToolStrip ts && !(c is MenuStrip) && !(c is StatusStrip)) ts.Font = ButtonFont;
+            else if (c is Panel p && p.Dock == DockStyle.Top && p.Height >= 48 && p.Height <= 56)
+            {
+                if (p.Controls.Count > 0 && p.Controls[0] is Panel edge && edge.Dock == DockStyle.Left && edge.Width <= 8)
+                {
+                    p.BackColor = ThemeColor;
+                    edge.BackColor = ThemeDark;
+                }
+            }
             foreach (Control child in c.Controls) ApplyToControlTree(child);
         }
 
         public static void StyleButton(Button btn)
         {
-            btn.FlatStyle = FlatStyle.Flat;
-            btn.FlatAppearance.BorderSize = 0;
-            btn.BackColor = ThemeColor;
-            btn.ForeColor = Color.White;
-            btn.Font = ButtonFont;
-            btn.Cursor = Cursors.Hand;
-            if (btn.Height < 30) btn.Height = 34;
-            btn.FlatAppearance.MouseOverBackColor = ThemeDark;
+            if (btn == null) return;
+            string t = (btn.Text ?? "").ToUpperInvariant();
+            if (t.Contains("DELETE") || t.Contains("REMOVE") || t.Contains("VOID"))
+            {
+                StyleDangerButton(btn);
+                return;
+            }
+            if (t.Contains("CANCEL") || t.Contains("CLOSE") || t == "NO" || t.Contains("BACK"))
+            {
+                StyleSecondaryButton(btn);
+                return;
+            }
+            StylePrimaryButton(btn);
         }
 
         public static void StyleTextBox(TextBox txt)
@@ -262,6 +440,7 @@ namespace ApplianceManagement.Helpers
             txt.Font = NormalFont;
             txt.BorderStyle = BorderStyle.FixedSingle;
             txt.BackColor = Color.White;
+            txt.ForeColor = TextColor;
             txt.Enter += (s, e) => BeginInvokeSelectAll(txt);
             txt.Click += (s, e) => { if (txt.SelectionLength == 0) BeginInvokeSelectAll(txt); };
         }
@@ -338,44 +517,55 @@ namespace ApplianceManagement.Helpers
 
         public static void StyleComboBox(ComboBox cmb)
         {
+            if (cmb == null) return;
             cmb.Font = NormalFont;
             cmb.FlatStyle = FlatStyle.Flat;
             cmb.BackColor = Color.White;
+            cmb.ForeColor = TextColor;
         }
 
         public static void StyleGrid(DataGridView dgv)
         {
-            dgv.AllowUserToResizeColumns = true;
-            dgv.AllowUserToResizeRows = false;
-            dgv.AllowUserToAddRows = false;
-            dgv.AllowUserToDeleteRows = false;
-            dgv.ReadOnly = true;
-            dgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-            dgv.MultiSelect = false;
-            dgv.RowHeadersVisible = false;
-            dgv.BackgroundColor = Color.White;
-            dgv.Font = NormalFont;
-            dgv.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            if (dgv == null) return;
+            dgv.BackgroundColor = PanelColor;
             dgv.BorderStyle = BorderStyle.None;
             dgv.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
+            dgv.RowHeadersVisible = false;
+            dgv.AllowUserToAddRows = false;
+            dgv.AllowUserToDeleteRows = false;
+            dgv.AllowUserToResizeRows = false;
+            dgv.MultiSelect = false;
+            dgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            dgv.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            dgv.EnableHeadersVisualStyles = false;
+
             dgv.ColumnHeadersDefaultCellStyle.BackColor = GridHeaderColor;
             dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
             dgv.ColumnHeadersDefaultCellStyle.Font = HeaderFont;
             dgv.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
             dgv.ColumnHeadersDefaultCellStyle.SelectionBackColor = ThemeDark;
+            dgv.ColumnHeadersDefaultCellStyle.SelectionForeColor = Color.White;
             dgv.ColumnHeadersHeight = 36;
             dgv.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
-            dgv.EnableHeadersVisualStyles = false;
-            dgv.AlternatingRowsDefaultCellStyle.BackColor = ThemeAltRow;
-            dgv.DefaultCellStyle.SelectionBackColor = ThemeSelection;
-            dgv.DefaultCellStyle.SelectionForeColor = Color.White;
+
+            dgv.DefaultCellStyle.BackColor = PanelColor;
+            dgv.DefaultCellStyle.ForeColor = TextColor;
             dgv.DefaultCellStyle.Font = NormalFont;
-            dgv.RowTemplate.Height = 28;
-            dgv.GridColor = ThemeLight;
+            dgv.DefaultCellStyle.SelectionBackColor = ThemeSelection;
+            dgv.DefaultCellStyle.SelectionForeColor = TextColor;
+
+            dgv.AlternatingRowsDefaultCellStyle.BackColor = ThemeAltRow;
+            dgv.AlternatingRowsDefaultCellStyle.ForeColor = TextColor;
+            dgv.AlternatingRowsDefaultCellStyle.SelectionBackColor = ThemeSelection;
+            dgv.AlternatingRowsDefaultCellStyle.SelectionForeColor = TextColor;
+
+            dgv.RowTemplate.Height = 30;
+            dgv.GridColor = BorderColor;
         }
 
         public static void StyleDatePicker(DateTimePicker dtp)
         {
+            if (dtp == null) return;
             dtp.Format = DateTimePickerFormat.Custom;
             dtp.CustomFormat = "dd/MM/yyyy";
             dtp.Font = NormalFont;
@@ -423,6 +613,11 @@ namespace ApplianceManagement.Helpers
                     if (!ConfirmExit()) e.Cancel = true;
                 }
             };
+        }
+
+        public static void AttachF4Close(Form form)
+        {
+            AttachF4Close(form, true);
         }
 
         public static void AttachEnterNavigation(Form form)
