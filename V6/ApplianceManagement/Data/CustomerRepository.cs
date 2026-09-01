@@ -96,6 +96,26 @@ namespace ApplianceManagement.Data
             }
         }
 
+        /// <summary>Soft-delete. Walk-in customer cannot be deactivated.</summary>
+        public void SetActive(int id, bool active)
+        {
+            var c = GetById(id);
+            if (c != null && string.Equals(c.CustomerName, "Walk-in Customer", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Walk-in Customer cannot be deactivated.");
+
+            using (var conn = DbHelper.GetConnection())
+            {
+                conn.Open();
+                using (var cmd = DbHelper.CreateCommand(
+                    "UPDATE Customers SET IsActive=@A WHERE CustomerID=@Id", conn))
+                {
+                    cmd.Parameters.AddWithValue("@A", active);
+                    cmd.Parameters.AddWithValue("@Id", id);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
         private static Customer Map(SqlDataReader r)
         {
             return new Customer
