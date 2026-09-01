@@ -39,18 +39,18 @@ namespace ApplianceManagement.Forms
             this.Controls.Add(UiHelper.CreateFormBanner(
                 "SETTINGS",
                 isAdmin
-                    ? "Appearance · discount limits · users · menu rights · backup  ·  Suppliers: Masters menu"
-                    : "Appearance only  ·  Suppliers: Masters → Suppliers",
+                    ? "Appearance · discount limits · users · menu rights · backup"
+                    : "Appearance only",
                 FormAccent.Settings, FormAccent.SettingsDark));
 
             Panel top = new Panel { Dock = DockStyle.Top, Height = isAdmin ? 300 : 210, BackColor = UiHelper.BgColor, Padding = new Padding(10) };
 
-            GroupBox gbTheme = new GroupBox { Text = "Appearance (live)", Font = UiHelper.HeaderFont, ForeColor = UiHelper.ThemeDark, Location = new Point(15, 10), Size = new Size(420, 190) };
+            GroupBox gbTheme = new GroupBox { Text = "Theme Manager (live)", Font = UiHelper.HeaderFont, ForeColor = UiHelper.ThemeDark, Location = new Point(15, 10), Size = new Size(420, 190) };
             gbTheme.Controls.Add(new Label { Text = "Theme:", Font = UiHelper.NormalFont, Location = new Point(15, 30), Size = new Size(90, 22) });
-            cmbTheme = new ComboBox { Location = new Point(120, 28), Size = new Size(180, 26), DropDownStyle = ComboBoxStyle.DropDownList };
+            cmbTheme = new ComboBox { Location = new Point(120, 28), Size = new Size(220, 26), DropDownStyle = ComboBoxStyle.DropDownList };
             UiHelper.StyleComboBox(cmbTheme);
-            cmbTheme.Items.AddRange(new object[] { "Blue", "Green", "Dark", "Purple", "Teal" });
-            cmbTheme.SelectedIndex = 0;
+            cmbTheme.Items.AddRange(UiHelper.ThemeNames);
+            cmbTheme.SelectedItem = UiHelper.DefaultTheme;
             gbTheme.Controls.Add(cmbTheme);
 
             gbTheme.Controls.Add(new Label { Text = "Font Size:", Font = UiHelper.NormalFont, Location = new Point(15, 65), Size = new Size(90, 22) });
@@ -73,7 +73,8 @@ namespace ApplianceManagement.Forms
             UiHelper.StyleButton(btnApply);
             btnApply.Click += (s, e) =>
             {
-                AppSettings.Set("Theme", cmbTheme.SelectedItem.ToString());
+                string theme = UiHelper.NormalizeThemeName(cmbTheme.SelectedItem != null ? cmbTheme.SelectedItem.ToString() : UiHelper.DefaultTheme);
+                AppSettings.Set("Theme", theme);
                 AppSettings.Set("FontSize", cmbFontSize.SelectedItem.ToString());
                 AppSettings.Set("FormResolution", cmbResolution.SelectedItem.ToString());
                 if (MainForm.Instance != null)
@@ -84,7 +85,7 @@ namespace ApplianceManagement.Forms
                 }
                 UiHelper.ApplyThemeLive(this);
                 UiHelper.ApplyFormSize(this);
-                DialogHelpers.Info(this, "Theme, font and form size applied.");
+                DialogHelpers.Info(this, "Theme applied: " + theme);
             };
             gbTheme.Controls.Add(btnApply);
             top.Controls.Add(gbTheme);
@@ -145,7 +146,7 @@ namespace ApplianceManagement.Forms
             {
                 top.Controls.Add(new Label
                 {
-                    Text = "Discount limits and users are managed by Admin.\nSuppliers: Masters → Suppliers",
+                    Text = "Discount limits and users are managed by Admin.",
                     Font = UiHelper.SmallFont,
                     ForeColor = Color.Gray,
                     Location = new Point(450, 40),
@@ -296,8 +297,9 @@ namespace ApplianceManagement.Forms
 
         private void LoadValues()
         {
-            string t = AppSettings.Get("Theme");
-            if (!string.IsNullOrEmpty(t) && cmbTheme.Items.Contains(t)) cmbTheme.SelectedItem = t;
+            string t = UiHelper.NormalizeThemeName(AppSettings.Get("Theme"));
+            if (cmbTheme.Items.Contains(t)) cmbTheme.SelectedItem = t;
+            else cmbTheme.SelectedItem = UiHelper.DefaultTheme;
             string f = AppSettings.Get("FontSize");
             if (!string.IsNullOrEmpty(f) && cmbFontSize.Items.Contains(f)) cmbFontSize.SelectedItem = f;
             string r = AppSettings.Get("FormResolution");
