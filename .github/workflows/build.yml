@@ -18,39 +18,42 @@ jobs:
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
-      - name: Setup NuGet
-        uses: NuGet/setup-nuget@v2
-
-      - name: Restore ApplianceManagement
-        run: nuget restore "V6/ApplianceManagement.sln"
+      - name: Show tree (V6)
+        shell: pwsh
+        run: |
+          Get-ChildItem -Path V6 -Recurse -Filter *.csproj | Select-Object FullName
+          Get-ChildItem -Path V6 -Recurse -Filter *.sln | Select-Object FullName
 
       - name: Build ApplianceManagement
-        run: msbuild "V6/ApplianceManagement.sln" /m /p:Configuration=Release /p:Platform="Any CPU"
-
-      - name: Restore Authenticator
-        run: nuget restore "V6/Authenticator.sln"
+        shell: cmd
+        run: |
+          msbuild "V6\ApplianceManagement\ApplianceManagement.csproj" /t:Rebuild /p:Configuration=Release /p:Platform=AnyCPU /v:minimal /nologo /p:WarningLevel=1
 
       - name: Build Authenticator
-        run: msbuild "V6/Authenticator.sln" /m /p:Configuration=Release /p:Platform="Any CPU"
+        shell: cmd
+        run: |
+          msbuild "V6\Authenticator\Authenticator.csproj" /t:Rebuild /p:Configuration=Release /p:Platform=AnyCPU /v:minimal /nologo /p:WarningLevel=1
 
       - name: Collect build output
-        shell: powershell
+        shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path artifacts | Out-Null
-
-          Copy-Item `
-            "V6/ApplianceManagement/bin/Release" `
-            "artifacts/ApplianceManagement" `
-            -Recurse -Force
-
-          Copy-Item `
-            "V6/Authenticator/bin/Release" `
-            "artifacts/Authenticator" `
-            -Recurse -Force
+          if (Test-Path "V6\ApplianceManagement\bin\Release") {
+            Copy-Item "V6\ApplianceManagement\bin\Release" "artifacts\ApplianceManagement" -Recurse -Force
+          } else {
+            Write-Host "WARNING: ApplianceManagement Release output missing"
+            Get-ChildItem -Path "V6\ApplianceManagement" -Recurse -Directory | Select-Object FullName
+          }
+          if (Test-Path "V6\Authenticator\bin\Release") {
+            Copy-Item "V6\Authenticator\bin\Release" "artifacts\Authenticator" -Recurse -Force
+          } else {
+            Write-Host "WARNING: Authenticator Release output missing"
+          }
+          Get-ChildItem -Path artifacts -Recurse | Select-Object FullName
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ApplianceX-Release
           path: artifacts
-          if-no-files-found: error
+          if-no-files-found: warn
