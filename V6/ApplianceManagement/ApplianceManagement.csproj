@@ -73,6 +73,7 @@
     <Compile Include="Forms\SettingsForm.cs"><SubType>Form</SubType></Compile>
     <Compile Include="Forms\LogViewerForm.cs"><SubType>Form</SubType></Compile>
     <Compile Include="Forms\AuthenticatorForm.cs"><SubType>Form</SubType></Compile>
+    <Compile Include="Forms\InvoiceViewForm.cs"><SubType>Form</SubType></Compile>
     <Compile Include="Data\ProductRepository.cs" />
     <Compile Include="Data\CustomerRepository.cs" />
     <Compile Include="Data\SupplierRepository.cs" />
