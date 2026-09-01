@@ -23,6 +23,27 @@ namespace ApplianceManagement.Data
             return null;
         }
 
+        public List<Supplier> Search(string q)
+        {
+            q = (q ?? "").Trim();
+            var list = new List<Supplier>();
+            using (var conn = DbHelper.GetConnection())
+            {
+                conn.Open();
+                string sql = string.IsNullOrEmpty(q)
+                    ? "SELECT TOP 50 * FROM Suppliers WHERE IsActive=1 ORDER BY SupplierName"
+                    : "SELECT TOP 50 * FROM Suppliers WHERE IsActive=1 AND (SupplierName LIKE @Q OR ISNULL(Phone,'') LIKE @Q) ORDER BY SupplierName";
+                using (var cmd = DbHelper.CreateCommand(sql, conn))
+                {
+                    if (!string.IsNullOrEmpty(q))
+                        cmd.Parameters.AddWithValue("@Q", "%" + q + "%");
+                    using (var r = cmd.ExecuteReader())
+                        while (r.Read()) list.Add(Map(r));
+                }
+            }
+            return list;
+        }
+
         public List<Supplier> GetAllActive()
         {
             var list = new List<Supplier>();
