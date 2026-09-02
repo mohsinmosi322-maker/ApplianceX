@@ -51,7 +51,8 @@ namespace ApplianceManagement.Forms
             MinimumSize = new Size(900, 560);
             BackColor = UiHelper.BgColor;
             KeyPreview = true;
-            UiHelper.AttachF4Close(this, false);
+            UiHelper.AttachF4Close(this, true);
+            UiHelper.AttachEnterNavigation(this);
 
             dgv = new DataGridView { Dock = DockStyle.Fill };
             UiHelper.StyleGrid(dgv);
@@ -149,6 +150,7 @@ namespace ApplianceManagement.Forms
             lstCustomer = new ListBox
             {
                 Visible = false,
+                Location = new Point(-2000, -2000),
                 Font = UiHelper.NormalFont,
                 IntegralHeight = false,
                 Size = new Size(360, 140),
@@ -165,6 +167,7 @@ namespace ApplianceManagement.Forms
             lstProduct = new ListBox
             {
                 Visible = false,
+                Location = new Point(-2000, -2000),
                 Font = UiHelper.NormalFont,
                 IntegralHeight = false,
                 Size = new Size(520, 160)
@@ -498,7 +501,20 @@ namespace ApplianceManagement.Forms
                 {
                     selectedProduct = productRepo.GetById(p.ProductID) ?? p;
                     if (selectedProduct != null)
+                    {
                         txtDescription.Text = (selectedProduct.ProductCode ?? "") + " - " + (selectedProduct.ProductName ?? "");
+                        decimal unit = selectedProduct.UnitSalePrice;
+                        foreach (var line in cart)
+                        {
+                            if (line.ProductID == selectedProduct.ProductID)
+                            {
+                                line.ProductName = selectedProduct.ProductName;
+                                line.SalePrice = unit;
+                                line.Amount = Math.Round(line.Quantity * unit, 2);
+                            }
+                        }
+                        RefreshGrid();
+                    }
                 }
             }
         }
