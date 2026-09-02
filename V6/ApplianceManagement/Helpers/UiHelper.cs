@@ -36,7 +36,7 @@ namespace ApplianceManagement.Helpers
         public static readonly string[] ThemeNames = new[]
         {
             "Professional Navy",
-            "Modern slate",
+            "Modern Slate",
             "Executive Blue",
             "Clean Gray",
             "Custom"
@@ -331,6 +331,7 @@ namespace ApplianceManagement.Helpers
             CurrentThemeName = theme;
             switch (theme)
             {
+                case "Modern slate":
                 case "Modern Slate":
                     ThemeColor = Color.FromArgb(0x33, 0x41, 0x55);
                     ThemeDark = Color.FromArgb(0x1E, 0x29, 0x3B);
@@ -656,7 +657,6 @@ namespace ApplianceManagement.Helpers
             form.KeyPreview = true;
             form.KeyDown += (s, e) =>
             {
-                // Enter moves next. Tab remapped to same (no pure Tab workflow).
                 if (e.KeyCode != Keys.Enter && e.KeyCode != Keys.Tab) return;
                 Control c = form.ActiveControl;
                 if (c is TextBox || c is ComboBox || c is NumericUpDown || c is CheckBox || c is DateTimePicker)
