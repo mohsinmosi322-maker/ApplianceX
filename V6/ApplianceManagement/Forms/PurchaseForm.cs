@@ -18,6 +18,7 @@ namespace ApplianceManagement.Forms
 
         private Supplier selectedSupplier;
         private Product selectedProduct;
+        private bool suppressProductSuggest;
 
         private TextBox txtInvoice, txtSupplier, txtDescription, txtQty;
         private TextBox txtDiscount, txtDiscAmt, txtPaid, txtTotal, txtNet;
@@ -90,13 +91,14 @@ namespace ApplianceManagement.Forms
             entry.Controls.Add(new Label { Text = "Description (Product Name / Code)", Font = UiHelper.SmallFont, AutoSize = true }, 0, 0);
             entry.Controls.Add(new Label { Text = "Qty (packs)", Font = UiHelper.SmallFont, AutoSize = true }, 1, 0);
 
-            txtDescription = new TextBox { Dock = DockStyle.Fill };
+            // PosEntry: Enter handled by Description_KeyDown / Qty_KeyDown (not global Enter→Tab)
+            txtDescription = new TextBox { Dock = DockStyle.Fill, Tag = "PosEntry" };
             UiHelper.StyleTextBox(txtDescription);
-            txtDescription.TextChanged += (s, e) => ShowProductSuggestions();
+            txtDescription.TextChanged += (s, e) => { if (!suppressProductSuggest) ShowProductSuggestions(); };
             txtDescription.KeyDown += Description_KeyDown;
             entry.Controls.Add(txtDescription, 0, 1);
 
-            txtQty = new TextBox { Dock = DockStyle.Fill, Text = "1", TextAlign = HorizontalAlignment.Center };
+            txtQty = new TextBox { Dock = DockStyle.Fill, Text = "1", TextAlign = HorizontalAlignment.Center, Tag = "PosEntry" };
             UiHelper.StyleTextBox(txtQty);
             txtQty.KeyDown += Qty_KeyDown;
             entry.Controls.Add(txtQty, 1, 1);
@@ -343,18 +345,40 @@ namespace ApplianceManagement.Forms
             if (e.KeyCode == Keys.Escape) { lstProduct.Visible = false; return; }
             if (e.KeyCode != Keys.Enter) return;
             e.SuppressKeyPress = true;
+            e.Handled = true;
             if (lstProduct.Visible && lstProduct.SelectedItem != null) { SelectProductSug(); return; }
             string q = (txtDescription.Text ?? "").Trim();
-            Product p = null;
-            try { p = productRepo.GetByCode(q) ?? productRepo.GetByBarcode(q); } catch { }
-            if (p == null)
-            {
-                try { var list = productRepo.Search(q); if (list != null && list.Count > 0) p = list[0]; } catch { }
-            }
+            Product p = ResolveProduct(q);
             if (p == null) { DialogHelpers.Warn(this, "Product not found."); return; }
             SetSelectedProduct(p);
             txtQty.Focus();
             txtQty.SelectAll();
+        }
+
+        private Product ResolveProduct(string q)
+        {
+            if (string.IsNullOrWhiteSpace(q)) return null;
+            Product p = null;
+            try { p = productRepo.GetByCode(q) ?? productRepo.GetByBarcode(q); } catch { }
+            if (p == null)
+            {
+                int dash = q.IndexOf(" - ");
+                if (dash > 0)
+                {
+                    string code = q.Substring(0, dash).Trim();
+                    try { p = productRepo.GetByCode(code); } catch { }
+                }
+            }
+            if (p == null)
+            {
+                try
+                {
+                    var list = productRepo.Search(q);
+                    if (list != null && list.Count > 0) p = list[0];
+                }
+                catch { }
+            }
+            return p;
         }
 
         private void SelectProductSug()
@@ -370,14 +394,21 @@ namespace ApplianceManagement.Forms
         private void SetSelectedProduct(Product p)
         {
             selectedProduct = p;
-            txtDescription.Text = (p.ProductCode ?? "") + " - " + (p.ProductName ?? "");
-            txtQty.Text = "1";
+            suppressProductSuggest = true;
+            try
+            {
+                txtDescription.Text = (p.ProductCode ?? "") + " - " + (p.ProductName ?? "");
+                txtQty.Text = "1";
+                lstProduct.Visible = false;
+            }
+            finally { suppressProductSuggest = false; }
         }
 
         private void Qty_KeyDown(object sender, KeyEventArgs e)
         {
             if (e.KeyCode != Keys.Enter) return;
             e.SuppressKeyPress = true;
+            e.Handled = true;
             AddLine();
         }
 
@@ -385,19 +416,22 @@ namespace ApplianceManagement.Forms
         {
             if (selectedProduct == null)
             {
-                Description_KeyDown(txtDescription, new KeyEventArgs(Keys.Enter));
-                if (selectedProduct == null) return;
+                Product p0 = ResolveProduct(txtDescription.Text);
+                if (p0 == null)
+                {
+                    DialogHelpers.Warn(this, "Product not found.");
+                    txtDescription.Focus();
+                    return;
+                }
+                selectedProduct = p0;
             }
 
-            // Always re-read product so PackSize / latest PurchasePrice are current
             Product p = productRepo.GetById(selectedProduct.ProductID) ?? selectedProduct;
-            selectedProduct = p;
 
             int packs = 1;
             if (!int.TryParse((txtQty.Text ?? "").Trim(), out packs) || packs < 1)
                 packs = 1;
 
-            // Pack purchase price (domain: line qty = packs, price = pack price)
             decimal packPrice = p.PurchasePrice;
             if (packPrice < 0) packPrice = 0;
 
@@ -405,7 +439,6 @@ namespace ApplianceManagement.Forms
             if (ex != null)
             {
                 ex.Quantity += packs;
-                // Always refresh name + pack price from master on merge
                 ex.ProductName = p.ProductName;
                 ex.ProductCode = p.ProductCode;
                 ex.PurchasePrice = packPrice;
@@ -426,9 +459,14 @@ namespace ApplianceManagement.Forms
             }
 
             selectedProduct = null;
-            txtDescription.Clear();
-            txtQty.Text = "1";
-            lstProduct.Visible = false;
+            suppressProductSuggest = true;
+            try
+            {
+                txtDescription.Clear();
+                txtQty.Text = "1";
+                lstProduct.Visible = false;
+            }
+            finally { suppressProductSuggest = false; }
             RefreshGrid();
             txtDescription.Focus();
         }
@@ -500,7 +538,9 @@ namespace ApplianceManagement.Forms
                     selectedProduct = productRepo.GetById(p.ProductID) ?? p;
                     if (selectedProduct != null)
                     {
-                        txtDescription.Text = (selectedProduct.ProductCode ?? "") + " - " + (selectedProduct.ProductName ?? "");
+                        suppressProductSuggest = true;
+                        try { txtDescription.Text = (selectedProduct.ProductCode ?? "") + " - " + (selectedProduct.ProductName ?? ""); }
+                        finally { suppressProductSuggest = false; }
                         decimal packPrice = selectedProduct.PurchasePrice;
                         if (packPrice < 0) packPrice = 0;
                         foreach (var line in cart)
