@@ -183,7 +183,6 @@ namespace ApplianceManagement.Helpers
 
         public static Panel CreateFormBanner(string title, string description, Color accent, Color accentDark)
         {
-            // Paint-only banner: NO child controls (avoids white-box gaps on MDI)
             string t = title ?? "";
             string d = description ?? "";
             Panel banner = new Panel
@@ -195,7 +194,6 @@ namespace ApplianceManagement.Helpers
                 Margin = new Padding(0),
                 Tag = "FormBanner"
             };
-            // Force solid paint under MDI — prevents white holes
             typeof(Control).GetMethod("SetStyle",
                 System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
                 ?.Invoke(banner, new object[] {
@@ -631,6 +629,10 @@ namespace ApplianceManagement.Helpers
 
         public static void AttachF4Close(Form form) { AttachF4Close(form, true); }
 
+        /// <summary>
+        /// Enter acts like Tab for normal fields.
+        /// Controls tagged "PosEntry" keep their own Enter handlers (product search / qty add-to-cart).
+        /// </summary>
         public static void AttachEnterNavigation(Form form)
         {
             if (form == null) return;
@@ -639,6 +641,13 @@ namespace ApplianceManagement.Helpers
             {
                 if (e.KeyCode != Keys.Enter && e.KeyCode != Keys.Tab) return;
                 Control c = form.ActiveControl;
+                if (c == null) return;
+                // POS entry fields handle Enter themselves (select product / add line)
+                if (c.Tag != null)
+                {
+                    string tag = c.Tag.ToString();
+                    if (tag == "PosEntry" || tag == "NoEnterNav") return;
+                }
                 if (c is TextBox || c is ComboBox || c is NumericUpDown || c is CheckBox || c is DateTimePicker)
                 {
                     if (c is TextBox tb && tb.Multiline && e.KeyCode == Keys.Enter) return;
