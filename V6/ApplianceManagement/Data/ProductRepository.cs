@@ -246,11 +246,31 @@ namespace ApplianceManagement.Data
             return list;
         }
 
+        /// <summary>
+        /// Quick update (F1 / simple edit): name + prices + min + active only.
+        /// NEVER touches PackSize or UnitOfMeasure — those are managed only via full product form.
+        /// Previous bug: Update called UpdateFull(..., null, 1m) which reset PackSize to 1 and broke purchase stock (packs × PackSize).
+        /// </summary>
         public void Update(int id, string name, decimal pur, decimal sale, int minStock, bool active)
         {
-            UpdateFull(id, name, pur, sale, minStock, active, null, 1m);
+            using (var conn = DbHelper.GetConnection())
+            {
+                conn.Open();
+                using (var cmd = DbHelper.CreateCommand(
+                    "UPDATE Products SET ProductName=@N, PurchasePrice=@P, SalePrice=@S, MinimumStock=@M, IsActive=@A WHERE ProductID=@ID", conn))
+                {
+                    cmd.Parameters.AddWithValue("@N", name);
+                    cmd.Parameters.AddWithValue("@P", pur);
+                    cmd.Parameters.AddWithValue("@S", sale);
+                    cmd.Parameters.AddWithValue("@M", minStock);
+                    cmd.Parameters.AddWithValue("@A", active);
+                    cmd.Parameters.AddWithValue("@ID", id);
+                    cmd.ExecuteNonQuery();
+                }
+            }
         }
 
+        /// <summary>Full update including UOM and PackSize (product manage form only).</summary>
         public void UpdateFull(int id, string name, decimal pur, decimal sale, int minStock, bool active, string uom, decimal packSize)
         {
             using (var conn = DbHelper.GetConnection())
