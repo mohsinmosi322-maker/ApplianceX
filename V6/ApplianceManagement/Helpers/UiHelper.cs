@@ -36,7 +36,7 @@ namespace ApplianceManagement.Helpers
         public static readonly string[] ThemeNames = new[]
         {
             "Professional Navy",
-            "Modern Slate",
+            "Modern slate",
             "Executive Blue",
             "Clean Gray",
             "Custom"
@@ -192,8 +192,6 @@ namespace ApplianceManagement.Helpers
                 Margin = new Padding(0),
                 Tag = "FormBanner"
             };
-            Panel edge = new Panel { Dock = DockStyle.Left, Width = 5, BackColor = ThemeDark, Margin = new Padding(0) };
-            banner.Controls.Add(edge);
             Label lblTitle = new Label
             {
                 Text = title ?? "",
@@ -202,7 +200,7 @@ namespace ApplianceManagement.Helpers
                 BackColor = ThemeColor,
                 AutoSize = false,
                 Location = new Point(14, 4),
-                Size = new Size(800, 22)
+                Size = new Size(900, 22)
             };
             Label lblDesc = new Label
             {
@@ -212,25 +210,28 @@ namespace ApplianceManagement.Helpers
                 BackColor = ThemeColor,
                 AutoSize = false,
                 Location = new Point(14, 26),
-                Size = new Size(800, 18)
+                Size = new Size(900, 18)
             };
             banner.Controls.Add(lblTitle);
             banner.Controls.Add(lblDesc);
-            banner.Paint += (s, e) =>
+            Action refresh = () =>
             {
-                using (var b = new SolidBrush(ThemeColor))
-                    e.Graphics.FillRectangle(b, banner.ClientRectangle);
-            };
-            banner.Resize += (s, e) =>
-            {
-                int w = Math.Max(200, banner.ClientSize.Width - 24);
-                lblTitle.Width = w;
-                lblDesc.Width = w;
+                banner.BackColor = ThemeColor;
                 lblTitle.BackColor = ThemeColor;
                 lblDesc.BackColor = ThemeColor;
-                banner.BackColor = ThemeColor;
-                edge.BackColor = ThemeDark;
+                lblTitle.ForeColor = Color.White;
+                int w = Math.Max(200, banner.ClientSize.Width - 20);
+                if (w > 0) { lblTitle.Width = w; lblDesc.Width = w; }
             };
+            banner.Paint += (s, e) =>
+            {
+                e.Graphics.Clear(ThemeColor);
+                using (var b = new SolidBrush(ThemeDark))
+                    e.Graphics.FillRectangle(b, 0, 0, 5, banner.Height);
+            };
+            banner.Resize += (s, e) => refresh();
+            banner.VisibleChanged += (s, e) => refresh();
+            refresh();
             return banner;
         }
 
@@ -500,10 +501,12 @@ namespace ApplianceManagement.Helpers
                     p.BackColor = ThemeColor;
                     foreach (Control ch in p.Controls)
                     {
-                        if (ch is Panel edge && edge.Dock == DockStyle.Left)
-                            edge.BackColor = ThemeDark;
-                        else if (ch is Label)
+                        if (ch is Label)
+                        {
                             ch.BackColor = ThemeColor;
+                            if (ch.Font != null && ch.Font.Bold)
+                                ch.ForeColor = Color.White;
+                        }
                     }
                 }
             }
@@ -597,6 +600,7 @@ namespace ApplianceManagement.Helpers
             dgv.DefaultCellStyle.BackColor = PanelColor;
             dgv.DefaultCellStyle.ForeColor = TextColor;
             dgv.DefaultCellStyle.Font = NormalFont;
+            dgv.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft;
             dgv.DefaultCellStyle.SelectionBackColor = ThemeSelection;
             dgv.DefaultCellStyle.SelectionForeColor = TextColor;
             dgv.AlternatingRowsDefaultCellStyle.BackColor = ThemeAltRow;
@@ -652,12 +656,14 @@ namespace ApplianceManagement.Helpers
             form.KeyPreview = true;
             form.KeyDown += (s, e) =>
             {
-                if (e.KeyCode != Keys.Enter) return;
+                // Enter moves next. Tab remapped to same (no pure Tab workflow).
+                if (e.KeyCode != Keys.Enter && e.KeyCode != Keys.Tab) return;
                 Control c = form.ActiveControl;
-                if (c is TextBox || c is ComboBox || c is NumericUpDown)
+                if (c is TextBox || c is ComboBox || c is NumericUpDown || c is CheckBox || c is DateTimePicker)
                 {
-                    if (c is TextBox tb && tb.Multiline) return;
+                    if (c is TextBox tb && tb.Multiline && e.KeyCode == Keys.Enter) return;
                     e.SuppressKeyPress = true;
+                    e.Handled = true;
                     form.SelectNextControl(c, true, true, true, true);
                 }
             };
