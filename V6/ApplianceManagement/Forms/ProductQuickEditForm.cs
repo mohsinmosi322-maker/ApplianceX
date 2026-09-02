@@ -7,12 +7,19 @@ using ApplianceManagement.Models;
 
 namespace ApplianceManagement.Forms
 {
+    /// <summary>
+    /// Quick product edit (F1 from Sale/Purchase).
+    /// Margin: RP = TP / ((100 - Disc%) / 100)
+    ///         TP = RP * ((100 - Disc%) / 100)
+    /// </summary>
     public class ProductQuickEditForm : Form
     {
         private readonly ProductRepository productRepo = new ProductRepository();
         private readonly Product product;
         private TextBox txtName, txtTp, txtDisc, txtRp;
         private bool busy;
+
+        public bool Saved { get; private set; }
 
         public ProductQuickEditForm(Product p)
         {
@@ -35,7 +42,7 @@ namespace ApplianceManagement.Forms
             KeyPreview = true;
             BackColor = UiHelper.BgColor;
 
-            Controls.Add(UiHelper.CreateFormBanner("EDIT PRODUCT", "F1 quick edit - margin Disc%", FormAccent.NewItem, FormAccent.NewItemDark));
+            Controls.Add(UiHelper.CreateFormBanner("EDIT PRODUCT", "F1 quick edit · margin Disc%", FormAccent.NewItem, FormAccent.NewItemDark));
 
             var body = new TableLayoutPanel
             {
@@ -163,6 +170,7 @@ namespace ApplianceManagement.Forms
             try
             {
                 productRepo.Update(product);
+                Saved = true;
                 DialogResult = DialogResult.OK;
                 Close();
             }
