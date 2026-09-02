@@ -99,7 +99,7 @@ namespace ApplianceManagement.Forms
 
             entry.Controls.Add(new Label
             {
-                Text = "Enter = add   F8 remove   F9 history   F12 discount",
+                Text = "Enter = add   F1 edit product   F8 remove   F9 history   F12 discount",
                 Font = UiHelper.SmallFont,
                 ForeColor = Color.Gray,
                 AutoSize = true
@@ -144,7 +144,7 @@ namespace ApplianceManagement.Forms
             head.Controls.Add(txtCustomer, 4, 0);
             Controls.Add(head);
 
-            Controls.Add(UiHelper.CreateFormBanner("SALE", "Point of Sale", FormAccent.Sale, FormAccent.SaleDark));
+            Controls.Add(UiHelper.CreateFormBanner("SALE", "Point of Sale · F1 edit product", FormAccent.Sale, FormAccent.SaleDark));
 
             lstCustomer = new ListBox
             {
@@ -253,6 +253,7 @@ namespace ApplianceManagement.Forms
             if (e.KeyCode == Keys.F12) { e.Handled = true; txtDiscount.Focus(); txtDiscount.SelectAll(); }
             if (e.KeyCode == Keys.F8) { e.Handled = true; RemoveSelectedLine(); }
             if (e.KeyCode == Keys.F9) { e.Handled = true; ShowProductHistory(); }
+            if (e.KeyCode == Keys.F1) { e.Handled = true; EditSelectedProduct(); }
         }
 
         private void ShowCustomerSuggestions()
@@ -479,6 +480,27 @@ namespace ApplianceManagement.Forms
             if (dgv.CurrentRow == null || dgv.CurrentRow.Index < 0 || dgv.CurrentRow.Index >= cart.Count) return;
             cart.RemoveAt(dgv.CurrentRow.Index);
             RefreshGrid();
+        }
+
+        private void EditSelectedProduct()
+        {
+            Product p = selectedProduct;
+            if (p == null && dgv.CurrentRow != null && dgv.CurrentRow.Index >= 0 && dgv.CurrentRow.Index < cart.Count)
+                p = productRepo.GetById(cart[dgv.CurrentRow.Index].ProductID);
+            if (p == null)
+            {
+                DialogHelpers.Warn(this, "Select or search a product first, then press F1.");
+                return;
+            }
+            using (var f = new ProductQuickEditForm(p))
+            {
+                if (f.ShowDialog(this) == DialogResult.OK && f.Saved)
+                {
+                    selectedProduct = productRepo.GetById(p.ProductID) ?? p;
+                    if (selectedProduct != null)
+                        txtDescription.Text = (selectedProduct.ProductCode ?? "") + " - " + (selectedProduct.ProductName ?? "");
+                }
+            }
         }
 
         private void ShowProductHistory()
