@@ -183,26 +183,54 @@ namespace ApplianceManagement.Helpers
 
         public static Panel CreateFormBanner(string title, string description, Color accent, Color accentDark)
         {
-            Panel banner = new Panel { Dock = DockStyle.Top, Height = 52, BackColor = ThemeColor };
-            banner.Controls.Add(new Panel { Dock = DockStyle.Left, Width = 6, BackColor = ThemeDark });
-            banner.Controls.Add(new Label
+            Panel banner = new Panel
             {
-                Text = title,
-                Font = new Font("Segoe UI", 13F, FontStyle.Bold),
+                Dock = DockStyle.Top,
+                Height = 48,
+                BackColor = ThemeColor,
+                Padding = new Padding(0),
+                Margin = new Padding(0),
+                Tag = "FormBanner"
+            };
+            Panel edge = new Panel { Dock = DockStyle.Left, Width = 5, BackColor = ThemeDark, Margin = new Padding(0) };
+            banner.Controls.Add(edge);
+            Label lblTitle = new Label
+            {
+                Text = title ?? "",
+                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
                 ForeColor = Color.White,
-                Location = new Point(18, 6),
-                AutoSize = true,
-                BackColor = Color.Transparent
-            });
-            banner.Controls.Add(new Label
+                BackColor = ThemeColor,
+                AutoSize = false,
+                Location = new Point(14, 4),
+                Size = new Size(800, 22)
+            };
+            Label lblDesc = new Label
             {
-                Text = description,
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
-                ForeColor = Color.FromArgb(220, 230, 240),
-                Location = new Point(18, 30),
-                AutoSize = true,
-                BackColor = Color.Transparent
-            });
+                Text = description ?? "",
+                Font = new Font("Segoe UI", 8.25F, FontStyle.Regular),
+                ForeColor = Color.FromArgb(210, 220, 230),
+                BackColor = ThemeColor,
+                AutoSize = false,
+                Location = new Point(14, 26),
+                Size = new Size(800, 18)
+            };
+            banner.Controls.Add(lblTitle);
+            banner.Controls.Add(lblDesc);
+            banner.Paint += (s, e) =>
+            {
+                using (var b = new SolidBrush(ThemeColor))
+                    e.Graphics.FillRectangle(b, banner.ClientRectangle);
+            };
+            banner.Resize += (s, e) =>
+            {
+                int w = Math.Max(200, banner.ClientSize.Width - 24);
+                lblTitle.Width = w;
+                lblDesc.Width = w;
+                lblTitle.BackColor = ThemeColor;
+                lblDesc.BackColor = ThemeColor;
+                banner.BackColor = ThemeColor;
+                edge.BackColor = ThemeDark;
+            };
             return banner;
         }
 
@@ -465,12 +493,18 @@ namespace ApplianceManagement.Helpers
             else if (c is MenuStrip ms) { ms.BackColor = ThemeColor; ms.ForeColor = Color.White; ms.Font = NormalFont; }
             else if (c is StatusStrip ss) { ss.BackColor = ThemeDark; ss.Font = SmallFont; }
             else if (c is ToolStrip ts && !(c is MenuStrip) && !(c is StatusStrip)) ts.Font = ButtonFont;
-            else if (c is Panel p && p.Dock == DockStyle.Top && p.Height >= 48 && p.Height <= 56)
+            else if (c is Panel p)
             {
-                if (p.Controls.Count > 0 && p.Controls[0] is Panel edge && edge.Dock == DockStyle.Left && edge.Width <= 8)
+                if (p.Tag != null && p.Tag.ToString() == "FormBanner")
                 {
                     p.BackColor = ThemeColor;
-                    edge.BackColor = ThemeDark;
+                    foreach (Control ch in p.Controls)
+                    {
+                        if (ch is Panel edge && edge.Dock == DockStyle.Left)
+                            edge.BackColor = ThemeDark;
+                        else if (ch is Label)
+                            ch.BackColor = ThemeColor;
+                    }
                 }
             }
             foreach (Control child in c.Controls) ApplyToControlTree(child);
