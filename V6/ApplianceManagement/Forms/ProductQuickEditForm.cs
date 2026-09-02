@@ -8,8 +8,8 @@ using ApplianceManagement.Services;
 namespace ApplianceManagement.Forms
 {
     /// <summary>
-    /// F1 quick edit: Name, TP (purchase), Disc%, RP (sale).
-    /// RP = TP * (1 + Disc%/100). Editing RP recalculates Disc%.
+    /// F1 quick edit: Name, TP, Disc%, RP.
+    /// RP = TP / ((100-Disc%)/100). Disc% = 100*(1 - TP/RP).
     /// </summary>
     public class ProductQuickEditForm : Form
     {
@@ -31,13 +31,14 @@ namespace ApplianceManagement.Forms
         private void InitializeComponent()
         {
             Text = "Edit Product (F1)";
-            Size = new Size(440, 340);
+            Size = new Size(460, 340);
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
             MinimizeBox = false;
             StartPosition = FormStartPosition.CenterParent;
             BackColor = UiHelper.BgColor;
             KeyPreview = true;
+            UiHelper.AttachEnterNavigation(this);
             KeyDown += (s, e) =>
             {
                 if (e.KeyCode == Keys.F12) { e.Handled = true; Save(); }
@@ -46,7 +47,7 @@ namespace ApplianceManagement.Forms
 
             Controls.Add(UiHelper.CreateFormBanner(
                 "EDIT PRODUCT",
-                "TP + Disc% → RP   ·   Edit RP to recalc Disc%",
+                "Margin: RP = TP / ((100-Disc%)/100)",
                 FormAccent.NewItem, FormAccent.NewItemDark));
 
             var card = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(20, 12, 20, 12) };
@@ -84,7 +85,7 @@ namespace ApplianceManagement.Forms
             card.Controls.Add(txtDisc);
             card.Controls.Add(new Label
             {
-                Text = "RP = TP × (1 + Disc%/100)",
+                Text = "RP = TP / ((100-Disc%)/100)",
                 Location = new Point(210, y + 6),
                 AutoSize = true,
                 Font = UiHelper.SmallFont,
@@ -118,35 +119,41 @@ namespace ApplianceManagement.Forms
             txtTp.Text = tp.ToString("0.00");
             txtRp.Text = rp.ToString("0.00");
             decimal disc = 0;
-            if (tp > 0) disc = Math.Round((rp - tp) * 100m / tp, 2);
+            if (rp > 0) disc = Math.Round(100m * (1m - tp / rp), 2);
             if (disc < 0) disc = 0;
+            if (disc >= 100) disc = 99.99m;
             txtDisc.Text = disc.ToString("0.##");
             calcBusy = false;
         }
 
         private void OnTpOrDiscChanged()
         {
+            // RP = TP / ((100 - Disc%) / 100) = TP * 100 / (100 - Disc%)
             if (calcBusy) return;
             calcBusy = true;
             decimal tp = 0, disc = 0;
             decimal.TryParse(txtTp.Text, out tp);
             decimal.TryParse(txtDisc.Text, out disc);
             if (disc < 0) disc = 0;
-            decimal rp = Math.Round(tp * (1m + disc / 100m), 2);
+            if (disc >= 100) disc = 99.99m;
+            decimal factor = (100m - disc) / 100m;
+            decimal rp = factor > 0 ? Math.Round(tp / factor, 2) : 0;
             txtRp.Text = rp.ToString("0.00");
             calcBusy = false;
         }
 
         private void OnRpChanged()
         {
+            // Disc% = 100 * (1 - TP/RP)
             if (calcBusy) return;
             calcBusy = true;
             decimal tp = 0, rp = 0;
             decimal.TryParse(txtTp.Text, out tp);
             decimal.TryParse(txtRp.Text, out rp);
             decimal disc = 0;
-            if (tp > 0) disc = Math.Round((rp - tp) * 100m / tp, 2);
+            if (rp > 0) disc = Math.Round(100m * (1m - tp / rp), 2);
             if (disc < 0) disc = 0;
+            if (disc >= 100) disc = 99.99m;
             txtDisc.Text = disc.ToString("0.##");
             calcBusy = false;
         }
