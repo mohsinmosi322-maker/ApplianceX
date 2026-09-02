@@ -388,17 +388,28 @@ namespace ApplianceManagement.Forms
                 Description_KeyDown(txtDescription, new KeyEventArgs(Keys.Enter));
                 if (selectedProduct == null) return;
             }
-            Product p = selectedProduct;
+
+            // Always re-read product so PackSize / latest PurchasePrice are current
+            Product p = productRepo.GetById(selectedProduct.ProductID) ?? selectedProduct;
+            selectedProduct = p;
+
             int packs = 1;
-            int.TryParse(txtQty.Text, out packs);
-            if (packs < 1) packs = 1;
+            if (!int.TryParse((txtQty.Text ?? "").Trim(), out packs) || packs < 1)
+                packs = 1;
+
+            // Pack purchase price (domain: line qty = packs, price = pack price)
             decimal packPrice = p.PurchasePrice;
             if (packPrice < 0) packPrice = 0;
+
             var ex = cart.Find(line => line.ProductID == p.ProductID);
             if (ex != null)
             {
                 ex.Quantity += packs;
-                ex.Amount = Math.Round(ex.Quantity * ex.PurchasePrice, 2);
+                // Always refresh name + pack price from master on merge
+                ex.ProductName = p.ProductName;
+                ex.ProductCode = p.ProductCode;
+                ex.PurchasePrice = packPrice;
+                ex.Amount = Math.Round(ex.Quantity * packPrice, 2);
             }
             else
             {
@@ -409,9 +420,11 @@ namespace ApplianceManagement.Forms
                     ProductName = p.ProductName,
                     Quantity = packs,
                     PurchasePrice = packPrice,
+                    Discount = 0,
                     Amount = Math.Round(packs * packPrice, 2)
                 });
             }
+
             selectedProduct = null;
             txtDescription.Clear();
             txtQty.Text = "1";
@@ -489,11 +502,13 @@ namespace ApplianceManagement.Forms
                     {
                         txtDescription.Text = (selectedProduct.ProductCode ?? "") + " - " + (selectedProduct.ProductName ?? "");
                         decimal packPrice = selectedProduct.PurchasePrice;
+                        if (packPrice < 0) packPrice = 0;
                         foreach (var line in cart)
                         {
                             if (line.ProductID == selectedProduct.ProductID)
                             {
                                 line.ProductName = selectedProduct.ProductName;
+                                line.ProductCode = selectedProduct.ProductCode;
                                 line.PurchasePrice = packPrice;
                                 line.Amount = Math.Round(line.Quantity * packPrice, 2);
                             }
@@ -547,6 +562,7 @@ namespace ApplianceManagement.Forms
             decimal.TryParse(txtPaid.Text, out paid);
             decimal.TryParse(txtNet.Text, out net);
             discAmt = Math.Round(discAmt, 2);
+            if (paid < 0) paid = 0;
             if (net <= 0) net = Math.Round(total - discAmt, 2);
 
             if (!DialogHelpers.Confirm(this, "Save this purchase?")) return;
