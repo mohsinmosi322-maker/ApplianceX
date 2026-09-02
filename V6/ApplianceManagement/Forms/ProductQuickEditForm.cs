@@ -1,161 +1,143 @@
 using System;
 using System.Drawing;
 using System.Windows.Forms;
+using ApplianceManagement.Data;
 using ApplianceManagement.Helpers;
 using ApplianceManagement.Models;
-using ApplianceManagement.Services;
 
 namespace ApplianceManagement.Forms
 {
-    /// <summary>
-    /// F1 quick edit: Name, TP, Disc%, RP.
-    /// RP = TP / ((100-Disc%)/100). Disc% = 100*(1 - TP/RP).
-    /// </summary>
     public class ProductQuickEditForm : Form
     {
-        private readonly ProductService _svc = new ProductService();
-        private readonly Product _product;
-
+        private readonly ProductRepository productRepo = new ProductRepository();
+        private readonly Product product;
         private TextBox txtName, txtTp, txtDisc, txtRp;
-        private bool calcBusy;
-        public bool Saved { get; private set; }
+        private bool busy;
 
-        public ProductQuickEditForm(Product product)
+        public ProductQuickEditForm(Product p)
         {
-            if (product == null) throw new ArgumentNullException("product");
-            _product = product;
+            product = p ?? throw new ArgumentNullException(nameof(p));
             InitializeComponent();
             LoadProduct();
+            UiHelper.AttachEnterNavigation(this);
+            UiHelper.AttachF4Close(this, true);
         }
 
         private void InitializeComponent()
         {
-            Text = "Edit Product (F1)";
-            Size = new Size(460, 340);
+            Text = "Quick Edit Product";
+            Size = new Size(420, 280);
+            MinimumSize = new Size(380, 260);
+            StartPosition = FormStartPosition.CenterParent;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
             MinimizeBox = false;
-            StartPosition = FormStartPosition.CenterParent;
-            BackColor = UiHelper.BgColor;
             KeyPreview = true;
-            UiHelper.AttachEnterNavigation(this);
-            KeyDown += (s, e) =>
+            BackColor = UiHelper.BgColor;
+
+            Controls.Add(UiHelper.CreateFormBanner("EDIT PRODUCT", "F1 quick edit - margin Disc%", FormAccent.NewItem, FormAccent.NewItemDark));
+
+            var body = new TableLayoutPanel
             {
-                if (e.KeyCode == Keys.F12) { e.Handled = true; Save(); }
-                if (e.KeyCode == Keys.Escape) { e.Handled = true; DialogResult = DialogResult.Cancel; Close(); }
+                Dock = DockStyle.Fill,
+                ColumnCount = 2,
+                RowCount = 5,
+                Padding = new Padding(16, 12, 16, 8)
             };
+            body.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 90f));
+            body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+            for (int i = 0; i < 4; i++)
+                body.RowStyles.Add(new RowStyle(SizeType.Absolute, 36f));
+            body.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
 
-            Controls.Add(UiHelper.CreateFormBanner(
-                "EDIT PRODUCT",
-                "Margin: RP = TP / ((100-Disc%)/100)",
-                FormAccent.NewItem, FormAccent.NewItemDark));
-
-            var card = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(20, 12, 20, 12) };
-            Controls.Add(card);
-            Controls.SetChildIndex(card, 0);
-
-            int y = 12;
-            card.Controls.Add(new Label { Text = "Code", Location = new Point(0, y + 4), AutoSize = true, Font = UiHelper.SmallFont, ForeColor = Color.Gray });
-            card.Controls.Add(new Label
-            {
-                Text = _product.ProductCode ?? "",
-                Location = new Point(120, y + 2),
-                AutoSize = true,
-                Font = UiHelper.HeaderFont
-            });
-            y += 36;
-
-            card.Controls.Add(new Label { Text = "Name", Location = new Point(0, y + 4), Size = new Size(110, 22), Font = UiHelper.NormalFont });
-            txtName = new TextBox { Location = new Point(120, y), Size = new Size(260, 28) };
+            body.Controls.Add(new Label { Text = "Name", Font = UiHelper.NormalFont, AutoSize = true, Anchor = AnchorStyles.Left }, 0, 0);
+            txtName = new TextBox { Dock = DockStyle.Fill };
             UiHelper.StyleTextBox(txtName);
-            card.Controls.Add(txtName);
-            y += 40;
+            body.Controls.Add(txtName, 1, 0);
 
-            card.Controls.Add(new Label { Text = "TP (Purchase)", Location = new Point(0, y + 4), Size = new Size(110, 22), Font = UiHelper.NormalFont });
-            txtTp = new TextBox { Location = new Point(120, y), Size = new Size(120, 28), TextAlign = HorizontalAlignment.Right };
+            body.Controls.Add(new Label { Text = "TP (Cost)", Font = UiHelper.NormalFont, AutoSize = true, Anchor = AnchorStyles.Left }, 0, 1);
+            txtTp = new TextBox { Dock = DockStyle.Fill, TextAlign = HorizontalAlignment.Right };
             UiHelper.StyleTextBox(txtTp);
             txtTp.TextChanged += (s, e) => OnTpOrDiscChanged();
-            card.Controls.Add(txtTp);
-            y += 40;
+            body.Controls.Add(txtTp, 1, 1);
 
-            card.Controls.Add(new Label { Text = "Disc %", Location = new Point(0, y + 4), Size = new Size(110, 22), Font = UiHelper.NormalFont });
-            txtDisc = new TextBox { Location = new Point(120, y), Size = new Size(80, 28), TextAlign = HorizontalAlignment.Right };
+            body.Controls.Add(new Label { Text = "Disc %", Font = UiHelper.NormalFont, AutoSize = true, Anchor = AnchorStyles.Left }, 0, 2);
+            txtDisc = new TextBox { Dock = DockStyle.Fill, TextAlign = HorizontalAlignment.Right };
             UiHelper.StyleTextBox(txtDisc);
             txtDisc.TextChanged += (s, e) => OnTpOrDiscChanged();
-            card.Controls.Add(txtDisc);
-            card.Controls.Add(new Label
-            {
-                Text = "RP = TP / ((100-Disc%)/100)",
-                Location = new Point(210, y + 6),
-                AutoSize = true,
-                Font = UiHelper.SmallFont,
-                ForeColor = Color.Gray
-            });
-            y += 40;
+            body.Controls.Add(txtDisc, 1, 2);
 
-            card.Controls.Add(new Label { Text = "RP (Sale)", Location = new Point(0, y + 4), Size = new Size(110, 22), Font = UiHelper.NormalFont });
-            txtRp = new TextBox { Location = new Point(120, y), Size = new Size(120, 28), TextAlign = HorizontalAlignment.Right };
+            body.Controls.Add(new Label { Text = "RP (Sale)", Font = UiHelper.NormalFont, AutoSize = true, Anchor = AnchorStyles.Left }, 0, 3);
+            txtRp = new TextBox { Dock = DockStyle.Fill, TextAlign = HorizontalAlignment.Right };
             UiHelper.StyleTextBox(txtRp);
             txtRp.TextChanged += (s, e) => OnRpChanged();
-            card.Controls.Add(txtRp);
-            y += 48;
+            body.Controls.Add(txtRp, 1, 3);
 
-            var btnSave = new Button { Text = "SAVE (F12)", Location = new Point(120, y), Size = new Size(120, 36) };
-            var btnClose = new Button { Text = "CLOSE", Location = new Point(250, y), Size = new Size(100, 36) };
-            UiHelper.StyleButton(btnSave);
-            UiHelper.StyleButton(btnClose);
+            Controls.Add(body);
+
+            var foot = new Panel { Dock = DockStyle.Bottom, Height = 52, Padding = new Padding(16, 8, 16, 8) };
+            var btnSave = new Button { Text = "SAVE", Size = new Size(100, 34), Anchor = AnchorStyles.Top | AnchorStyles.Right };
+            var btnCancel = new Button { Text = "CANCEL (F4)", Size = new Size(120, 34), Anchor = AnchorStyles.Top | AnchorStyles.Right };
+            UiHelper.StylePrimaryButton(btnSave);
+            UiHelper.StyleSecondaryButton(btnCancel);
             btnSave.Click += (s, e) => Save();
-            btnClose.Click += (s, e) => { DialogResult = DialogResult.Cancel; Close(); };
-            card.Controls.Add(btnSave);
-            card.Controls.Add(btnClose);
+            btnCancel.Click += (s, e) => { DialogResult = DialogResult.Cancel; Close(); };
+            foot.Resize += (s, e) =>
+            {
+                btnCancel.Location = new Point(foot.ClientSize.Width - btnCancel.Width - 16, 8);
+                btnSave.Location = new Point(btnCancel.Left - btnSave.Width - 8, 8);
+            };
+            foot.Controls.Add(btnSave);
+            foot.Controls.Add(btnCancel);
+            Controls.Add(foot);
+
+            AcceptButton = btnSave;
+            CancelButton = btnCancel;
         }
 
         private void LoadProduct()
         {
-            calcBusy = true;
-            txtName.Text = _product.ProductName ?? "";
-            decimal tp = _product.PurchasePrice;
-            decimal rp = _product.SalePrice;
-            txtTp.Text = tp.ToString("0.00");
-            txtRp.Text = rp.ToString("0.00");
+            busy = true;
+            txtName.Text = product.ProductName ?? "";
+            decimal tp = product.PurchasePrice;
+            decimal rp = product.UnitSalePrice;
+            txtTp.Text = tp.ToString("0.##");
+            txtRp.Text = rp.ToString("0.##");
             decimal disc = 0;
-            if (rp > 0) disc = Math.Round(100m * (1m - tp / rp), 2);
-            if (disc < 0) disc = 0;
-            if (disc >= 100) disc = 99.99m;
+            if (rp > 0 && tp >= 0 && tp <= rp)
+                disc = Math.Round(100m * (1m - tp / rp), 2);
             txtDisc.Text = disc.ToString("0.##");
-            calcBusy = false;
+            busy = false;
         }
 
         private void OnTpOrDiscChanged()
         {
-            // RP = TP / ((100 - Disc%) / 100) = TP * 100 / (100 - Disc%)
-            if (calcBusy) return;
-            calcBusy = true;
+            if (busy) return;
+            busy = true;
             decimal tp = 0, disc = 0;
             decimal.TryParse(txtTp.Text, out tp);
             decimal.TryParse(txtDisc.Text, out disc);
             if (disc < 0) disc = 0;
             if (disc >= 100) disc = 99.99m;
             decimal factor = (100m - disc) / 100m;
-            decimal rp = factor > 0 ? Math.Round(tp / factor, 2) : 0;
-            txtRp.Text = rp.ToString("0.00");
-            calcBusy = false;
+            decimal rp = factor > 0 ? Math.Round(tp / factor, 2) : tp;
+            txtRp.Text = rp.ToString("0.##");
+            busy = false;
         }
 
         private void OnRpChanged()
         {
-            // Disc% = 100 * (1 - TP/RP)
-            if (calcBusy) return;
-            calcBusy = true;
-            decimal tp = 0, rp = 0;
-            decimal.TryParse(txtTp.Text, out tp);
+            if (busy) return;
+            busy = true;
+            decimal rp = 0, disc = 0;
             decimal.TryParse(txtRp.Text, out rp);
-            decimal disc = 0;
-            if (rp > 0) disc = Math.Round(100m * (1m - tp / rp), 2);
+            decimal.TryParse(txtDisc.Text, out disc);
             if (disc < 0) disc = 0;
             if (disc >= 100) disc = 99.99m;
-            txtDisc.Text = disc.ToString("0.##");
-            calcBusy = false;
+            decimal factor = (100m - disc) / 100m;
+            decimal tp = Math.Round(rp * factor, 2);
+            txtTp.Text = tp.ToString("0.##");
+            busy = false;
         }
 
         private void Save()
@@ -163,37 +145,30 @@ namespace ApplianceManagement.Forms
             string name = (txtName.Text ?? "").Trim();
             if (string.IsNullOrEmpty(name))
             {
-                DialogHelpers.Warn(this, "Name required.");
+                DialogHelpers.Warn(this, "Product name is required.");
                 txtName.Focus();
                 return;
             }
             decimal tp = 0, rp = 0;
             decimal.TryParse(txtTp.Text, out tp);
             decimal.TryParse(txtRp.Text, out rp);
-            if (tp < 0) tp = 0;
-            if (rp < 0) rp = 0;
+            if (tp < 0 || rp < 0)
+            {
+                DialogHelpers.Warn(this, "Prices cannot be negative.");
+                return;
+            }
+            product.ProductName = name;
+            product.PurchasePrice = tp;
+            product.UnitSalePrice = rp;
             try
             {
-                _svc.Update(
-                    _product.ProductID,
-                    name,
-                    tp,
-                    rp,
-                    _product.MinimumStock,
-                    true,
-                    _product.UnitOfMeasure,
-                    _product.PackSize > 0 ? _product.PackSize : 1);
-                _product.ProductName = name;
-                _product.PurchasePrice = tp;
-                _product.SalePrice = rp;
-                Saved = true;
-                DialogHelpers.Info(this, "Product updated.\nTP: " + tp.ToString("0.00") + "  RP: " + rp.ToString("0.00"));
+                productRepo.Update(product);
                 DialogResult = DialogResult.OK;
                 Close();
             }
             catch (Exception ex)
             {
-                DialogHelpers.Error(this, ex.Message);
+                DialogHelpers.Error(this, "Save failed: " + ex.Message);
             }
         }
     }
