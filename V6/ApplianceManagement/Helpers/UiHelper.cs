@@ -183,6 +183,9 @@ namespace ApplianceManagement.Helpers
 
         public static Panel CreateFormBanner(string title, string description, Color accent, Color accentDark)
         {
+            // Paint-only banner: NO child controls (avoids white-box gaps on MDI)
+            string t = title ?? "";
+            string d = description ?? "";
             Panel banner = new Panel
             {
                 Dock = DockStyle.Top,
@@ -192,46 +195,23 @@ namespace ApplianceManagement.Helpers
                 Margin = new Padding(0),
                 Tag = "FormBanner"
             };
-            Label lblTitle = new Label
-            {
-                Text = title ?? "",
-                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
-                ForeColor = Color.White,
-                BackColor = ThemeColor,
-                AutoSize = false,
-                Location = new Point(14, 4),
-                Size = new Size(900, 22)
-            };
-            Label lblDesc = new Label
-            {
-                Text = description ?? "",
-                Font = new Font("Segoe UI", 8.25F, FontStyle.Regular),
-                ForeColor = Color.FromArgb(210, 220, 230),
-                BackColor = ThemeColor,
-                AutoSize = false,
-                Location = new Point(14, 26),
-                Size = new Size(900, 18)
-            };
-            banner.Controls.Add(lblTitle);
-            banner.Controls.Add(lblDesc);
-            Action refresh = () =>
-            {
-                banner.BackColor = ThemeColor;
-                lblTitle.BackColor = ThemeColor;
-                lblDesc.BackColor = ThemeColor;
-                lblTitle.ForeColor = Color.White;
-                int w = Math.Max(200, banner.ClientSize.Width - 20);
-                if (w > 0) { lblTitle.Width = w; lblDesc.Width = w; }
-            };
             banner.Paint += (s, e) =>
             {
-                e.Graphics.Clear(ThemeColor);
-                using (var b = new SolidBrush(ThemeDark))
-                    e.Graphics.FillRectangle(b, 0, 0, 5, banner.Height);
+                Rectangle r = banner.ClientRectangle;
+                using (var bg = new SolidBrush(ThemeColor))
+                    e.Graphics.FillRectangle(bg, r);
+                using (var edge = new SolidBrush(ThemeDark))
+                    e.Graphics.FillRectangle(edge, 0, 0, 5, r.Height);
+                using (var titleFont = new Font("Segoe UI", 12F, FontStyle.Bold))
+                using (var descFont = new Font("Segoe UI", 8.25F, FontStyle.Regular))
+                using (var titleBrush = new SolidBrush(Color.White))
+                using (var descBrush = new SolidBrush(Color.FromArgb(210, 220, 230)))
+                {
+                    e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+                    e.Graphics.DrawString(t, titleFont, titleBrush, 14, 4);
+                    e.Graphics.DrawString(d, descFont, descBrush, 14, 26);
+                }
             };
-            banner.Resize += (s, e) => refresh();
-            banner.VisibleChanged += (s, e) => refresh();
-            refresh();
             return banner;
         }
 
@@ -500,15 +480,7 @@ namespace ApplianceManagement.Helpers
                 if (p.Tag != null && p.Tag.ToString() == "FormBanner")
                 {
                     p.BackColor = ThemeColor;
-                    foreach (Control ch in p.Controls)
-                    {
-                        if (ch is Label)
-                        {
-                            ch.BackColor = ThemeColor;
-                            if (ch.Font != null && ch.Font.Bold)
-                                ch.ForeColor = Color.White;
-                        }
-                    }
+                    p.Invalidate();
                 }
             }
             foreach (Control child in c.Controls) ApplyToControlTree(child);
