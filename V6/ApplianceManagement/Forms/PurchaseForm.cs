@@ -55,38 +55,108 @@ namespace ApplianceManagement.Forms
             BackColor = UiHelper.BgColor;
             KeyPreview = true;
             UiHelper.AttachF4Close(this, false);
-            Controls.Add(UiHelper.CreateFormBanner("PURCHASE", "Stock in - pack quantities", FormAccent.Purchase, FormAccent.PurchaseDark));
 
-            var head = new Panel { Dock = DockStyle.Top, Height = 52, BackColor = Color.White };
-            head.Controls.Add(new Label { Text = "Invoice:", Font = UiHelper.SmallFont, Location = new Point(8, 14), AutoSize = true });
-            txtInvoice = new TextBox { Location = new Point(60, 10), Size = new Size(100, 28), Text = "Auto", ReadOnly = true };
-            UiHelper.StyleTextBox(txtInvoice);
-            head.Controls.Add(txtInvoice);
-            lblDate = new Label { Text = DateTime.Now.ToString("dd MMM yyyy  HH:mm"), Font = UiHelper.NormalFont, ForeColor = Color.Gray, Location = new Point(180, 14), AutoSize = true };
-            head.Controls.Add(lblDate);
-            head.Controls.Add(new Label { Text = "Supplier:", Font = UiHelper.SmallFont, Location = new Point(380, 14), AutoSize = true });
-            txtSupplier = new TextBox { Location = new Point(450, 10), Size = new Size(320, 28) };
-            UiHelper.StyleTextBox(txtSupplier);
-            txtSupplier.TextChanged += (s, e) => ShowSupplierSuggestions();
-            txtSupplier.KeyDown += Supplier_KeyDown;
-            head.Controls.Add(txtSupplier);
-            Controls.Add(head);
+            dgv = new DataGridView { Dock = DockStyle.Fill };
+            UiHelper.StyleGrid(dgv);
+            dgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            dgv.MultiSelect = false;
+            dgv.ReadOnly = true;
+            dgv.AutoGenerateColumns = false;
+            dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "ProductName", DataPropertyName = "ProductName", HeaderText = "Description", FillWeight = 42 });
+            dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "ProductCode", DataPropertyName = "ProductCode", HeaderText = "Code", FillWeight = 12 });
+            dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "Quantity", DataPropertyName = "Quantity", HeaderText = "Qty (packs)", FillWeight = 14 });
+            dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "PurchasePrice", DataPropertyName = "PurchasePrice", HeaderText = "Purchase Price", FillWeight = 16 });
+            dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "Amount", DataPropertyName = "Amount", HeaderText = "Amount", FillWeight = 16 });
+            Controls.Add(dgv);
 
-            var entry = new Panel { Dock = DockStyle.Top, Height = 56, BackColor = Color.White };
-            entry.Controls.Add(new Label { Text = "Description (Product Name / Code)", Font = UiHelper.SmallFont, Location = new Point(8, 4), AutoSize = true });
-            txtDescription = new TextBox { Location = new Point(8, 22), Size = new Size(520, 28) };
+            Controls.Add(BuildFooter());
+
+            var entry = new TableLayoutPanel
+            {
+                Dock = DockStyle.Top,
+                Height = 58,
+                BackColor = Color.White,
+                ColumnCount = 3,
+                RowCount = 2,
+                Padding = new Padding(12, 4, 12, 6)
+            };
+            entry.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 70f));
+            entry.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 110f));
+            entry.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 30f));
+            entry.RowStyles.Add(new RowStyle(SizeType.Absolute, 18f));
+            entry.RowStyles.Add(new RowStyle(SizeType.Absolute, 30f));
+
+            entry.Controls.Add(new Label { Text = "Description (Product Name / Code)", Font = UiHelper.SmallFont, AutoSize = true }, 0, 0);
+            entry.Controls.Add(new Label { Text = "Qty (packs)", Font = UiHelper.SmallFont, AutoSize = true }, 1, 0);
+
+            txtDescription = new TextBox { Dock = DockStyle.Fill };
             UiHelper.StyleTextBox(txtDescription);
             txtDescription.TextChanged += (s, e) => ShowProductSuggestions();
             txtDescription.KeyDown += Description_KeyDown;
-            entry.Controls.Add(txtDescription);
-            entry.Controls.Add(new Label { Text = "Qty (packs)", Font = UiHelper.SmallFont, Location = new Point(540, 4), AutoSize = true });
-            txtQty = new TextBox { Location = new Point(540, 22), Size = new Size(90, 28), Text = "1" };
+            entry.Controls.Add(txtDescription, 0, 1);
+
+            txtQty = new TextBox { Dock = DockStyle.Fill, Text = "1", TextAlign = HorizontalAlignment.Center };
             UiHelper.StyleTextBox(txtQty);
             txtQty.KeyDown += Qty_KeyDown;
-            entry.Controls.Add(txtQty);
+            entry.Controls.Add(txtQty, 1, 1);
+
+            entry.Controls.Add(new Label
+            {
+                Text = "Enter = add   F8 remove   F9 history   F12 discount",
+                Font = UiHelper.SmallFont,
+                ForeColor = Color.Gray,
+                AutoSize = true
+            }, 2, 1);
             Controls.Add(entry);
 
-            lstSupplier = new ListBox { Visible = false, Font = UiHelper.NormalFont, IntegralHeight = false, Size = new Size(320, 140), DisplayMember = "SupplierName" };
+            var head = new TableLayoutPanel
+            {
+                Dock = DockStyle.Top,
+                Height = 48,
+                BackColor = Color.White,
+                ColumnCount = 6,
+                RowCount = 1,
+                Padding = new Padding(12, 8, 12, 6)
+            };
+            head.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 58f));
+            head.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 100f));
+            head.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 160f));
+            head.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 72f));
+            head.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+            head.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 8f));
+
+            head.Controls.Add(new Label { Text = "Invoice", Font = UiHelper.SmallFont, AutoSize = true }, 0, 0);
+            txtInvoice = new TextBox { Dock = DockStyle.Fill, Text = "Auto", ReadOnly = true };
+            UiHelper.StyleTextBox(txtInvoice);
+            head.Controls.Add(txtInvoice, 1, 0);
+
+            lblDate = new Label
+            {
+                Text = DateTime.Now.ToString("dd MMM yyyy  HH:mm"),
+                Font = UiHelper.NormalFont,
+                ForeColor = Color.Gray,
+                AutoSize = true
+            };
+            head.Controls.Add(lblDate, 2, 0);
+
+            head.Controls.Add(new Label { Text = "Supplier", Font = UiHelper.SmallFont, AutoSize = true }, 3, 0);
+            txtSupplier = new TextBox { Dock = DockStyle.Fill };
+            UiHelper.StyleTextBox(txtSupplier);
+            txtSupplier.TextChanged += (s, e) => ShowSupplierSuggestions();
+            txtSupplier.KeyDown += Supplier_KeyDown;
+            head.Controls.Add(txtSupplier, 4, 0);
+            Controls.Add(head);
+
+            Controls.Add(UiHelper.CreateFormBanner("PURCHASE", "Stock in - pack quantities", FormAccent.Purchase, FormAccent.PurchaseDark));
+
+            lstSupplier = new ListBox
+            {
+                Visible = false,
+                Font = UiHelper.NormalFont,
+                IntegralHeight = false,
+                Size = new Size(360, 140),
+                DisplayMember = "SupplierName"
+            };
             lstSupplier.Click += (s, e) => SelectSupplierSug();
             lstSupplier.KeyDown += (s, e) =>
             {
@@ -95,7 +165,13 @@ namespace ApplianceManagement.Forms
             };
             Controls.Add(lstSupplier);
 
-            lstProduct = new ListBox { Visible = false, Font = UiHelper.NormalFont, IntegralHeight = false, Size = new Size(520, 160) };
+            lstProduct = new ListBox
+            {
+                Visible = false,
+                Font = UiHelper.NormalFont,
+                IntegralHeight = false,
+                Size = new Size(520, 160)
+            };
             lstProduct.Click += (s, e) => SelectProductSug();
             lstProduct.KeyDown += (s, e) =>
             {
@@ -104,37 +180,53 @@ namespace ApplianceManagement.Forms
             };
             Controls.Add(lstProduct);
 
-            dgv = new DataGridView { Dock = DockStyle.Fill };
-            UiHelper.StyleGrid(dgv);
-            dgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-            dgv.MultiSelect = false;
-            dgv.ReadOnly = true;
-            dgv.AutoGenerateColumns = false;
-            dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "ProductName", DataPropertyName = "ProductName", HeaderText = "Description", FillWeight = 45 });
-            dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "ProductCode", DataPropertyName = "ProductCode", HeaderText = "Code", FillWeight = 12 });
-            dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "Quantity", DataPropertyName = "Quantity", HeaderText = "Qty (packs)", FillWeight = 12 });
-            dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "PurchasePrice", DataPropertyName = "PurchasePrice", HeaderText = "Purchase Price", FillWeight = 15 });
-            dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "Amount", DataPropertyName = "Amount", HeaderText = "Amount", FillWeight = 15 });
-            Controls.Add(dgv);
-            Controls.SetChildIndex(dgv, 0);
+            KeyDown += Form_KeyDown;
+            Shown += (s, e) =>
+            {
+                lstSupplier.BringToFront();
+                lstProduct.BringToFront();
+                txtDescription.Focus();
+            };
+        }
 
-            var foot = new Panel { Dock = DockStyle.Bottom, Height = 90, BackColor = Color.White };
-            int x = 12;
-            foot.Controls.Add(new Label { Text = "Total", Font = UiHelper.SmallFont, Location = new Point(x, 10), AutoSize = true });
-            txtTotal = MakeFootBox(foot, x, 32, 100, "0.00", true); x += 110;
-            foot.Controls.Add(new Label { Text = "Disc %", Font = UiHelper.SmallFont, Location = new Point(x, 10), AutoSize = true });
-            txtDiscount = MakeFootBox(foot, x, 32, 70, "0"); x += 80;
-            foot.Controls.Add(new Label { Text = "Discount", Font = UiHelper.SmallFont, Location = new Point(x, 10), AutoSize = true });
-            txtDiscAmt = MakeFootBox(foot, x, 32, 90, "0.00"); x += 100;
-            foot.Controls.Add(new Label { Text = "Net", Font = UiHelper.SmallFont, Location = new Point(x, 10), AutoSize = true });
-            txtNet = MakeFootBox(foot, x, 32, 100, "0.00", true); x += 110;
-            foot.Controls.Add(new Label { Text = "Paid", Font = UiHelper.SmallFont, Location = new Point(x, 10), AutoSize = true });
-            txtPaid = MakeFootBox(foot, x, 32, 100, "0.00");
+        private Panel BuildFooter()
+        {
+            var foot = new Panel { Dock = DockStyle.Bottom, Height = 88, BackColor = Color.White };
+            var totals = new TableLayoutPanel
+            {
+                Dock = DockStyle.Left,
+                Width = 620,
+                ColumnCount = 5,
+                RowCount = 2,
+                Padding = new Padding(12, 6, 8, 6)
+            };
+            for (int i = 0; i < 5; i++)
+                totals.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20f));
+            totals.RowStyles.Add(new RowStyle(SizeType.Absolute, 18f));
+            totals.RowStyles.Add(new RowStyle(SizeType.Absolute, 30f));
+
+            string[] labels = { "Total", "Disc %", "Discount", "Net", "Paid" };
+            for (int i = 0; i < 5; i++)
+                totals.Controls.Add(new Label { Text = labels[i], Font = UiHelper.SmallFont, AutoSize = true }, i, 0);
+
+            txtTotal = FootBox("0.00", true);
+            txtDiscount = FootBox("0", false);
+            txtDiscAmt = FootBox("0.00", false);
+            txtNet = FootBox("0.00", true);
+            txtPaid = FootBox("0.00", false);
+            totals.Controls.Add(txtTotal, 0, 1);
+            totals.Controls.Add(txtDiscount, 1, 1);
+            totals.Controls.Add(txtDiscAmt, 2, 1);
+            totals.Controls.Add(txtNet, 3, 1);
+            totals.Controls.Add(txtPaid, 4, 1);
+
             txtDiscount.TextChanged += (s, e) => RecalcFromPct();
             txtDiscAmt.TextChanged += (s, e) => RecalcFromAmt();
             txtDiscount.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; txtDiscAmt.Focus(); txtDiscAmt.SelectAll(); } };
             txtDiscAmt.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; txtPaid.Text = txtNet.Text; txtPaid.Focus(); txtPaid.SelectAll(); } };
             txtPaid.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; Save(); } };
+
+            foot.Controls.Add(totals);
 
             var btnSave = new Button { Text = "SAVE (F12)", Size = new Size(130, 36), Anchor = AnchorStyles.Top | AnchorStyles.Right };
             var btnClose = new Button { Text = "CLOSE (F4)", Size = new Size(120, 36), Anchor = AnchorStyles.Top | AnchorStyles.Right };
@@ -149,17 +241,13 @@ namespace ApplianceManagement.Forms
                 btnClose.Location = new Point(foot.Width - 16 - btnClose.Width, 28);
                 btnSave.Location = new Point(btnClose.Left - 10 - btnSave.Width, 28);
             };
-            Controls.Add(foot);
-
-            KeyDown += Form_KeyDown;
-            Shown += (s, e) => { lstSupplier.BringToFront(); lstProduct.BringToFront(); txtDescription.Focus(); };
+            return foot;
         }
 
-        private static TextBox MakeFootBox(Control p, int x, int y, int w, string val, bool readOnly = false)
+        private static TextBox FootBox(string val, bool readOnly)
         {
-            var t = new TextBox { Location = new Point(x, y), Size = new Size(w, 28), Text = val, ReadOnly = readOnly };
+            var t = new TextBox { Dock = DockStyle.Fill, Text = val, ReadOnly = readOnly, TextAlign = HorizontalAlignment.Right };
             UiHelper.StyleTextBox(t);
-            p.Controls.Add(t);
             return t;
         }
 
@@ -188,11 +276,16 @@ namespace ApplianceManagement.Forms
             if (e.KeyCode == Keys.Escape) { lstSupplier.Visible = false; return; }
             if (e.KeyCode != Keys.Enter) return;
             e.SuppressKeyPress = true;
-            if (lstSupplier.Visible && lstSupplier.SelectedItem is Supplier) SelectSupplierSug();
+            if (lstSupplier.Visible && lstSupplier.SelectedItem is Supplier)
+                SelectSupplierSug();
             else
             {
                 var list = supplierRepo.Search(txtSupplier.Text);
-                if (list.Count > 0) { selectedSupplier = list[0]; txtSupplier.Text = selectedSupplier.SupplierName; }
+                if (list.Count > 0)
+                {
+                    selectedSupplier = list[0];
+                    txtSupplier.Text = selectedSupplier.SupplierName;
+                }
                 lstSupplier.Visible = false;
                 txtDescription.Focus();
             }
@@ -296,6 +389,7 @@ namespace ApplianceManagement.Forms
             int.TryParse(txtQty.Text, out packs);
             if (packs < 1) packs = 1;
             decimal packPrice = p.PurchasePrice;
+            if (packPrice < 0) packPrice = 0;
             var ex = cart.Find(line => line.ProductID == p.ProductID);
             if (ex != null)
             {
@@ -377,7 +471,11 @@ namespace ApplianceManagement.Forms
             Product p = selectedProduct;
             if (p == null && dgv.CurrentRow != null && dgv.CurrentRow.Index >= 0 && dgv.CurrentRow.Index < cart.Count)
                 p = productRepo.GetById(cart[dgv.CurrentRow.Index].ProductID);
-            if (p == null) { DialogHelpers.Warn(this, "Select or search a product first, then press F9."); return; }
+            if (p == null)
+            {
+                DialogHelpers.Warn(this, "Select or search a product first, then press F9.");
+                return;
+            }
             using (var f = new ProductHistoryForm(p, false))
                 f.ShowDialog(this);
         }
@@ -398,7 +496,12 @@ namespace ApplianceManagement.Forms
         private void Save()
         {
             if (cart.Count == 0) { DialogHelpers.Warn(this, "Add at least one product."); return; }
-            if (selectedSupplier == null) { DialogHelpers.Error(this, "Select a supplier."); txtSupplier.Focus(); return; }
+            if (selectedSupplier == null)
+            {
+                DialogHelpers.Error(this, "Select a supplier.");
+                txtSupplier.Focus();
+                return;
+            }
 
             decimal total = cartBaseTotal;
             decimal discAmt = 0, paid = 0, net = 0;
