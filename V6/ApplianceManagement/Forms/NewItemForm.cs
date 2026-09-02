@@ -13,7 +13,8 @@ namespace ApplianceManagement.Forms
         private readonly ProductRepository productRepo = new ProductRepository();
         private readonly CategoryRepository categoryRepo = new CategoryRepository();
         private readonly ProductService _productService = new ProductService();
-        private TextBox txtName, txtCode, txtBarcode, txtPurchase, txtSale, txtMinStock, txtPackSize;
+        private TextBox txtName, txtCode, txtBarcode, txtPurchase, txtSale, txtDisc, txtMinStock, txtPackSize;
+        private bool priceCalcBusy;
         private ComboBox cmbCategory, cmbUom;
         private CheckBox chkCategory, chkEditExisting, chkUom;
         private Label lblUnitPreview, lblMode;
@@ -40,8 +41,8 @@ namespace ApplianceManagement.Forms
         private void InitializeComponent()
         {
             this.Text = "New / Edit Item";
-            this.Size = new Size(640, 660);
-            this.MinimumSize = new Size(540, 560);
+            this.Size = new Size(640, 700);
+            this.MinimumSize = new Size(540, 600);
             this.BackColor = UiHelper.BgColor;
             this.KeyPreview = true;
             UiHelper.AttachF4Close(this);
@@ -49,7 +50,7 @@ namespace ApplianceManagement.Forms
 
             this.Controls.Add(UiHelper.CreateFormBanner(
                 "NEW / EDIT ITEM",
-                "Tick EDIT EXISTING to change name, rates, pack size  ·  Purchase & Sale prices are PACK prices",
+                "TP + Disc% auto-updates RP  ·  Tick EDIT EXISTING to load by code",
                 FormAccent.NewItem, FormAccent.NewItemDark));
 
             Panel card = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(28, 16, 28, 16) };
@@ -57,7 +58,6 @@ namespace ApplianceManagement.Forms
 
             int y = 8;
 
-            // Prominent edit mode bar
             Panel modeBar = new Panel
             {
                 Location = new Point(0, y),
@@ -160,19 +160,34 @@ namespace ApplianceManagement.Forms
             });
             y += 42;
 
-            AddL(card, "Purchase Price (pack)", 0, y); txtPurchase = AddT(card, 150, y, 160);
+            AddL(card, "TP Purchase (pack)", 0, y); txtPurchase = AddT(card, 150, y, 120);
             txtPurchase.KeyDown += Next;
-            txtPurchase.TextChanged += (s, e) => UpdateUnitPreview();
+            txtPurchase.TextChanged += (s, e) => { OnTpOrDiscChanged(); UpdateUnitPreview(); };
             y += 42;
-            AddL(card, "Sale Price (pack)", 0, y); txtSale = AddT(card, 150, y, 160);
+
+            AddL(card, "Disc %", 0, y); txtDisc = AddT(card, 150, y, 80);
+            txtDisc.Text = "0";
+            txtDisc.KeyDown += Next;
+            txtDisc.TextChanged += (s, e) => { OnTpOrDiscChanged(); UpdateUnitPreview(); };
+            card.Controls.Add(new Label
+            {
+                Text = "RP = TP × (1 + Disc%/100)  ·  edit RP to reverse-calc Disc%",
+                Font = UiHelper.SmallFont,
+                ForeColor = Color.Gray,
+                Location = new Point(250, y + 6),
+                AutoSize = true
+            });
+            y += 42;
+
+            AddL(card, "RP Sale (pack)", 0, y); txtSale = AddT(card, 150, y, 120);
             txtSale.KeyDown += Next;
-            txtSale.TextChanged += (s, e) => UpdateUnitPreview();
+            txtSale.TextChanged += (s, e) => { OnRpChanged(); UpdateUnitPreview(); };
             lblUnitPreview = new Label
             {
                 Text = "Unit sale / unit cost: —",
                 Font = UiHelper.HeaderFont,
                 ForeColor = FormAccent.NewItem,
-                Location = new Point(320, y + 2),
+                Location = new Point(280, y + 2),
                 AutoSize = true
             };
             card.Controls.Add(lblUnitPreview);
@@ -186,6 +201,33 @@ namespace ApplianceManagement.Forms
             UiHelper.StyleAccentButton(btnClose, FormAccent.NewItemDark, FormAccent.NewItem);
             btnClose.Click += (s, e) => this.Close();
             card.Controls.Add(btnSave); card.Controls.Add(btnClose);
+        }
+
+        private void OnTpOrDiscChanged()
+        {
+            if (priceCalcBusy || txtPurchase == null || txtDisc == null || txtSale == null) return;
+            priceCalcBusy = true;
+            decimal tp = 0, disc = 0;
+            decimal.TryParse(txtPurchase.Text, out tp);
+            decimal.TryParse(txtDisc.Text, out disc);
+            if (disc < 0) disc = 0;
+            decimal rp = Math.Round(tp * (1m + disc / 100m), 2);
+            txtSale.Text = rp.ToString("0.00");
+            priceCalcBusy = false;
+        }
+
+        private void OnRpChanged()
+        {
+            if (priceCalcBusy || txtPurchase == null || txtDisc == null || txtSale == null) return;
+            priceCalcBusy = true;
+            decimal tp = 0, rp = 0;
+            decimal.TryParse(txtPurchase.Text, out tp);
+            decimal.TryParse(txtSale.Text, out rp);
+            decimal disc = 0;
+            if (tp > 0) disc = Math.Round((rp - tp) * 100m / tp, 2);
+            if (disc < 0) disc = 0;
+            txtDisc.Text = disc.ToString("0.##");
+            priceCalcBusy = false;
         }
 
         private void UpdateUnitPreview()
@@ -211,9 +253,15 @@ namespace ApplianceManagement.Forms
             editingProductId = p.ProductID;
             txtName.Text = p.ProductName;
             txtBarcode.Text = p.Barcode ?? p.ProductCode;
-            // PurchasePrice on product is PACK price (after cost fix)
+            priceCalcBusy = true;
             txtPurchase.Text = p.PurchasePrice.ToString("0.00");
             txtSale.Text = p.SalePrice.ToString("0.00");
+            decimal d0 = 0;
+            if (p.PurchasePrice > 0)
+                d0 = Math.Round((p.SalePrice - p.PurchasePrice) * 100m / p.PurchasePrice, 2);
+            if (d0 < 0) d0 = 0;
+            if (txtDisc != null) txtDisc.Text = d0.ToString("0.##");
+            priceCalcBusy = false;
             txtMinStock.Text = p.MinimumStock.ToString();
             txtPackSize.Text = p.PackSize > 0 ? p.PackSize.ToString("0.####") : "1";
             if (!string.IsNullOrEmpty(p.UnitOfMeasure))
@@ -244,7 +292,7 @@ namespace ApplianceManagement.Forms
             txtCode.BackColor = Color.FromArgb(245, 247, 250);
             string next = _productService.NextCode();
             txtCode.Text = next; txtBarcode.Text = next;
-            txtName.Clear(); txtPurchase.Clear(); txtSale.Clear(); txtMinStock.Text = "0";
+            txtName.Clear(); txtPurchase.Clear(); txtSale.Clear(); if (txtDisc != null) txtDisc.Text = "0"; txtMinStock.Text = "0";
             chkCategory.Checked = false; cmbCategory.Enabled = false;
             chkUom.Checked = false; cmbUom.Enabled = false; cmbUom.SelectedIndex = -1;
             txtPackSize.Enabled = true; txtPackSize.Text = "1";
@@ -277,11 +325,10 @@ namespace ApplianceManagement.Forms
                 }
                 string uom = chkUom.Checked && cmbUom.SelectedItem != null ? cmbUom.SelectedItem.ToString() : null;
 
-                // Both prices are PACK prices (domain model)
                 if (chkEditExisting.Checked && editingProductId.HasValue)
                 {
-                    if (!DialogHelpers.Confirm(this, "Update this product?\nPack purchase: " + pur.ToString("0.00") +
-                            "\nPack sale: " + sale.ToString("0.00") +
+                    if (!DialogHelpers.Confirm(this, "Update this product?\nTP: " + pur.ToString("0.00") +
+                            "\nRP: " + sale.ToString("0.00") +
                             "\nPack size: " + pack.ToString("0.####"))) return;
                     _productService.Update(editingProductId.Value, txtName.Text.Trim(), pur, sale, min, true, uom, pack);
                     DialogHelpers.Info(this, "Product updated.\nUnit cost: " + Math.Round(pur / pack, 4).ToString("0.####") +
