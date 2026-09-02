@@ -46,11 +46,12 @@ namespace ApplianceManagement.Forms
             this.BackColor = UiHelper.BgColor;
             this.KeyPreview = true;
             UiHelper.AttachF4Close(this);
+            UiHelper.AttachEnterNavigation(this);
             this.KeyDown += (s, e) => { if (e.KeyCode == Keys.F12) Save(); };
 
             this.Controls.Add(UiHelper.CreateFormBanner(
                 "NEW / EDIT ITEM",
-                "TP + Disc% auto-updates RP  ·  Tick EDIT EXISTING to load by code",
+                "Margin: RP = TP/((100-Disc%)/100)  ·  Tick EDIT EXISTING to load by code",
                 FormAccent.NewItem, FormAccent.NewItemDark));
 
             Panel card = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(28, 16, 28, 16) };
@@ -171,7 +172,7 @@ namespace ApplianceManagement.Forms
             txtDisc.TextChanged += (s, e) => { OnTpOrDiscChanged(); UpdateUnitPreview(); };
             card.Controls.Add(new Label
             {
-                Text = "RP = TP × (1 + Disc%/100)  ·  edit RP to reverse-calc Disc%",
+                Text = "RP = TP / ((100-Disc%)/100)  ·  edit RP → Disc%",
                 Font = UiHelper.SmallFont,
                 ForeColor = Color.Gray,
                 Location = new Point(250, y + 6),
@@ -205,27 +206,32 @@ namespace ApplianceManagement.Forms
 
         private void OnTpOrDiscChanged()
         {
+            // RP = TP / ((100 - Disc%) / 100)
             if (priceCalcBusy || txtPurchase == null || txtDisc == null || txtSale == null) return;
             priceCalcBusy = true;
             decimal tp = 0, disc = 0;
             decimal.TryParse(txtPurchase.Text, out tp);
             decimal.TryParse(txtDisc.Text, out disc);
             if (disc < 0) disc = 0;
-            decimal rp = Math.Round(tp * (1m + disc / 100m), 2);
+            if (disc >= 100) disc = 99.99m;
+            decimal factor = (100m - disc) / 100m;
+            decimal rp = factor > 0 ? Math.Round(tp / factor, 2) : 0;
             txtSale.Text = rp.ToString("0.00");
             priceCalcBusy = false;
         }
 
         private void OnRpChanged()
         {
+            // Disc% = 100 * (1 - TP/RP)
             if (priceCalcBusy || txtPurchase == null || txtDisc == null || txtSale == null) return;
             priceCalcBusy = true;
             decimal tp = 0, rp = 0;
             decimal.TryParse(txtPurchase.Text, out tp);
             decimal.TryParse(txtSale.Text, out rp);
             decimal disc = 0;
-            if (tp > 0) disc = Math.Round((rp - tp) * 100m / tp, 2);
+            if (rp > 0) disc = Math.Round(100m * (1m - tp / rp), 2);
             if (disc < 0) disc = 0;
+            if (disc >= 100) disc = 99.99m;
             txtDisc.Text = disc.ToString("0.##");
             priceCalcBusy = false;
         }
@@ -257,9 +263,10 @@ namespace ApplianceManagement.Forms
             txtPurchase.Text = p.PurchasePrice.ToString("0.00");
             txtSale.Text = p.SalePrice.ToString("0.00");
             decimal d0 = 0;
-            if (p.PurchasePrice > 0)
-                d0 = Math.Round((p.SalePrice - p.PurchasePrice) * 100m / p.PurchasePrice, 2);
+            if (p.SalePrice > 0)
+                d0 = Math.Round(100m * (1m - p.PurchasePrice / p.SalePrice), 2);
             if (d0 < 0) d0 = 0;
+            if (d0 >= 100) d0 = 99.99m;
             if (txtDisc != null) txtDisc.Text = d0.ToString("0.##");
             priceCalcBusy = false;
             txtMinStock.Text = p.MinimumStock.ToString();
